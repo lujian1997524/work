@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "production": "NODE_ENV=production node src/app.js",
+    "install:prod": "npm install --production",
+    "init:db": "node sync-db.js",
+    "create:sample": "node create-sample-data.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "canvas": "^3.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "dxf-parser": "^1.1.2",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.2",
+    "sequelize": "^6.37.7",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "nodemon": "^3.1.10",
+    "wscat": "^6.1.0"
+  }
+}

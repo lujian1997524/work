@@ -1,0 +1,17 @@
+/* 阿里巴巴普惠体字体加载 */
+@font-face {
+  font-family: 'AlibabaPuHuiTi';
+  src: url('https://at.alicdn.com/t/c/font_2040897_c0kpuhebb7r.woff2') format('woff2'),
+       url('https://at.alicdn.com/t/c/font_2040897_c0kpuhebb7r.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 备用字体 */
+@font-face {
+  font-family: 'SimpleFont';
+  src: local('Arial'), local('Microsoft YaHei'), local('SimHei');
+  font-weight: normal;
+  font-style: normal;
+}

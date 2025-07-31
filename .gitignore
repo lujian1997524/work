@@ -1,0 +1,66 @@
+# 依赖
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 生产构建
+.next/
+out/
+build/
+dist/
+
+# Tauri/Rust 构建文件
+**/target/
+**/.cargo/
+**/*.rs.bk
+**/Cargo.lock
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+
+# 日志文件
+*.log
+logs
+
+# 上传文件
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# 数据库文件
+*.sqlite
+*.db
+
+# Docker
+.docker/
+
+# 环境变量文件
+.env
+.env.local
+.env.production
+.env.development
+
+# TypeScript 构建信息
+*.tsbuildinfo
+
+# Next.js 缓存
+.next/
+.vercel/
+
+# 其他
+.cache/
+.parcel-cache/
+
+# Git备份文件
+.git.backup/

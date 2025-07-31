@@ -1,0 +1,27 @@
+/* DXF预览组件字体配置 */
+@font-face {
+  font-family: 'NotoSansSC';
+  src: url('/fonts/NotoSansSC-Thin.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlibabaPuHuiTi';
+  src: url('/fonts/AlibabaPuHuiTi-Regular.woff2') format('woff2'),
+       url('/fonts/AlibabaPuHuiTi-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 为DXF查看器容器设置默认字体 */
+.dxf-viewer-container {
+  font-family: 'NotoSansSC', 'AlibabaPuHuiTi', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+/* 确保所有文本元素都使用中文字体 */
+.dxf-viewer-container * {
+  font-family: inherit;
+}
