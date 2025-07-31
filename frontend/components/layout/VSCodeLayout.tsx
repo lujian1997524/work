@@ -19,8 +19,8 @@ import {
 interface VSCodeLayoutProps {
   children: ReactNode;
   sidebar?: ReactNode;
-  activeView: 'active' | 'completed' | 'drawings' | 'workers' | 'dashboard' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'workers' | 'dashboard' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'workers' | 'settings';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'workers' | 'settings') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;

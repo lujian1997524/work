@@ -10,14 +10,13 @@ import {
   ClockIcon,
   DocumentTextIcon,
   UsersIcon,
-  ChartBarIcon,
   CogIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 interface ActivityBarProps {
-  activeView: 'active' | 'completed' | 'drawings' | 'workers' | 'dashboard' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'workers' | 'dashboard' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'workers' | 'settings';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'workers' | 'settings') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -58,12 +57,6 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
       icon: UsersIcon,
       label: '工人管理', 
       description: '员工信息管理'
-    },
-    { 
-      key: 'dashboard', 
-      icon: ChartBarIcon,
-      label: '仪表盘', 
-      description: '数据统计和报表'
     }
   ] as const;
 

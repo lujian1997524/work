@@ -152,7 +152,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 搜索API返回数据:', data); // 调试日志
         const formattedResults = formatSearchResults(data, searchQuery);
+        console.log('🔍 格式化后的结果:', formattedResults); // 调试日志
         
         // 缓存结果
         searchCache.current.set(cacheKey, formattedResults);

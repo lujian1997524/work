@@ -45,7 +45,11 @@ router.get('/', authenticate, async (req, res) => {
         where: {
           [Op.or]: [
             { name: { [Op.like]: searchPattern } },
-            { description: { [Op.like]: searchPattern } }
+            { description: { [Op.like]: searchPattern } },
+            // 通过关联表搜索创建者姓名
+            { '$creator.name$': { [Op.like]: searchPattern } },
+            // 通过关联表搜索负责工人姓名
+            { '$assignedWorker.name$': { [Op.like]: searchPattern } }
           ]
         },
         include: [
@@ -307,7 +311,10 @@ router.post('/advanced', authenticate, async (req, res) => {
       if (query) {
         where[Op.or] = [
           { name: { [Op.like]: `%${query}%` } },
-          { description: { [Op.like]: `%${query}%` } }
+          { description: { [Op.like]: `%${query}%` } },
+          // 通过关联表搜索创建者和负责工人
+          { '$creator.name$': { [Op.like]: `%${query}%` } },
+          { '$assignedWorker.name$': { [Op.like]: `%${query}%` } }
         ];
       }
 
