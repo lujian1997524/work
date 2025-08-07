@@ -64,3 +64,9 @@ backend/uploads/*
 
 # Git备份文件
 .git.backup/
+
+# 备份和压缩文件
+*.tar.gz
+*.zip
+database_backup_*.sql
+backup-*.tar.gz
