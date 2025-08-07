@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiRequest, isLocalStorageAvailable } from '@/utils/api';
-import { detectBackendWithRetry, getBackendUrl } from '@/utils/envConfig';
+import { getApiBaseUrl } from '@/utils/envConfig';
 
 // 定义用户类型
 export interface User {
@@ -85,27 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const initAuth = async () => {
       try {
-        // 在Electron环境下检测后端连接
-        if ((window as any).ELECTRON_ENV) {
-          console.log('🔍 Electron环境：开始检测后端连接...');
-          try {
-            const availableBackend = await Promise.race([
-              detectBackendWithRetry(2), // 减少重试次数
-              new Promise(resolve => setTimeout(() => resolve(null), 5000)) // 5秒超时
-            ]);
-            if (availableBackend) {
-              console.log('✅ 后端检测成功:', availableBackend);
-            } else {
-              console.warn('⚠️ 后端检测失败或超时，将使用默认地址');
-              // 设置默认后端地址
-              (window as any).BACKEND_URL = getBackendUrl();
-            }
-          } catch (error) {
-            console.warn('⚠️ 后端检测异常:', error);
-            // 设置默认后端地址
-            (window as any).BACKEND_URL = getBackendUrl();
-          }
-        }
+        console.log('🔑 开始认证初始化，后端API地址:', getApiBaseUrl());
         
         // 检查localStorage是否可用
         if (isLocalStorageAvailable()) {

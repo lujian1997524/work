@@ -7,6 +7,16 @@ const Material = require('./Material');
 const Drawing = require('./Drawing');
 const ThicknessSpec = require('./ThicknessSpec');
 const OperationHistory = require('./OperationHistory');
+const WorkerMaterial = require('./WorkerMaterial');
+const MaterialDimension = require('./MaterialDimension');
+const MaterialRequirement = require('./MaterialRequirement');
+const MaterialAllocation = require('./MaterialAllocation');
+
+// 导入sequelize实例
+const { sequelize } = require('../utils/database');
+
+// 初始化MaterialDimension模型 (其他模型已经定义好了)
+MaterialDimension.init(sequelize);
 
 // 定义模型关联关系
 
@@ -103,6 +113,11 @@ Material.belongsTo(User, {
   as: 'completedByUser'
 });
 
+Material.belongsTo(WorkerMaterial, {
+  foreignKey: 'assignedFromWorkerMaterialId',
+  as: 'sourceWorkerMaterial'
+});
+
 // Drawing 关联
 Drawing.belongsTo(Project, {
   foreignKey: 'projectId',
@@ -142,6 +157,110 @@ User.hasMany(OperationHistory, {
   as: 'operationHistory'
 });
 
+// WorkerMaterial 关联
+Worker.hasMany(WorkerMaterial, {
+  foreignKey: 'workerId',
+  as: 'materials'
+});
+
+WorkerMaterial.belongsTo(Worker, {
+  foreignKey: 'workerId',
+  as: 'worker'
+});
+
+WorkerMaterial.belongsTo(ThicknessSpec, {
+  foreignKey: 'thicknessSpecId',
+  as: 'thicknessSpec'
+});
+
+ThicknessSpec.hasMany(WorkerMaterial, {
+  foreignKey: 'thicknessSpecId',
+  as: 'workerMaterials'
+});
+
+// MaterialDimension 关联
+WorkerMaterial.hasMany(MaterialDimension, {
+  foreignKey: 'workerMaterialId',
+  as: 'dimensions'
+});
+
+MaterialDimension.belongsTo(WorkerMaterial, {
+  foreignKey: 'workerMaterialId',
+  as: 'workerMaterial'
+});
+
+// MaterialRequirement 关联
+Project.hasMany(MaterialRequirement, {
+  foreignKey: 'projectId',
+  as: 'materialRequirements'
+});
+
+MaterialRequirement.belongsTo(Project, {
+  foreignKey: 'projectId',
+  as: 'project'
+});
+
+MaterialRequirement.belongsTo(Material, {
+  foreignKey: 'materialId',
+  as: 'material'
+});
+
+Material.hasMany(MaterialRequirement, {
+  foreignKey: 'materialId',
+  as: 'requirements'
+});
+
+MaterialRequirement.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator'
+});
+
+// MaterialAllocation 关联
+MaterialRequirement.hasMany(MaterialAllocation, {
+  foreignKey: 'requirementId',
+  as: 'allocations'
+});
+
+MaterialAllocation.belongsTo(MaterialRequirement, {
+  foreignKey: 'requirementId',
+  as: 'requirement'
+});
+
+MaterialAllocation.belongsTo(Worker, {
+  foreignKey: 'fromWorkerId',
+  as: 'fromWorker'
+});
+
+MaterialAllocation.belongsTo(Worker, {
+  foreignKey: 'toWorkerId',
+  as: 'toWorker'
+});
+
+MaterialAllocation.belongsTo(WorkerMaterial, {
+  foreignKey: 'workerMaterialId',
+  as: 'workerMaterial'
+});
+
+MaterialAllocation.belongsTo(User, {
+  foreignKey: 'allocatedBy',
+  as: 'allocator'
+});
+
+Worker.hasMany(MaterialAllocation, {
+  foreignKey: 'fromWorkerId',
+  as: 'lentAllocations'
+});
+
+Worker.hasMany(MaterialAllocation, {
+  foreignKey: 'toWorkerId',
+  as: 'receivedAllocations'
+});
+
+WorkerMaterial.hasMany(MaterialAllocation, {
+  foreignKey: 'workerMaterialId',
+  as: 'allocations'
+});
+
 // 导出所有模型
 module.exports = {
   User,
@@ -151,5 +270,10 @@ module.exports = {
   Material,
   Drawing,
   ThicknessSpec,
-  OperationHistory
+  OperationHistory,
+  WorkerMaterial,
+  MaterialDimension,
+  MaterialRequirement,
+  MaterialAllocation,
+  sequelize
 };

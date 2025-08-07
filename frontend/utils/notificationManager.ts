@@ -94,8 +94,8 @@ class NotificationManager {
     try {
       const notification = new Notification(notificationOptions.title, notificationOptions);
 
-      // 播放音效（如果启用）
-      if (config.notifications.sound && audioManager.getConfig().enabled) {
+      // 播放音效（如果启用且不是静音通知）
+      if (!notificationOptions.silent && config.notifications.sound && audioManager.getConfig().enabled) {
         const soundType = this.getSoundTypeFromTitle(notificationOptions.title);
         audioManager.playNotificationSound(soundType);
       }
@@ -144,6 +144,7 @@ class NotificationManager {
 
   /**
    * 显示项目状态变更通知
+   * 根据项目状态转换播放对应音效和显示通知
    */
   public async showProjectStatusNotification(
     projectName: string, 
@@ -154,23 +155,46 @@ class NotificationManager {
     const statusLabels: Record<string, string> = {
       'pending': '待处理',
       'in_progress': '进行中',
-      'completed': '已完成',
-      'empty': '空白'
+      'completed': '已完成'
     };
 
-    const title = `项目状态更新`;
-    const body = `${projectName} 状态从 ${statusLabels[oldStatus] || oldStatus} 改为 ${statusLabels[newStatus] || newStatus}${workerName ? ` (${workerName})` : ''}`;
+    // 根据状态转换生成更准确的通知内容
+    let title = '项目状态更新';
+    let body = '';
+
+    if (oldStatus === 'pending' && newStatus === 'in_progress') {
+      title = '项目开始进行';
+      body = `项目 "${projectName}" 已开始进行${workerName ? ` (负责人: ${workerName})` : ''}`;
+    } else if (oldStatus === 'in_progress' && newStatus === 'completed') {
+      title = '项目已完成';
+      body = `项目 "${projectName}" 已全部完成！${workerName ? ` (负责人: ${workerName})` : ''}`;
+    } else if (oldStatus === 'completed' && newStatus === 'in_progress') {
+      title = '项目重新开始';
+      body = `已完成项目 "${projectName}" 重新进入进行状态${workerName ? ` (负责人: ${workerName})` : ''}`;
+    } else {
+      // 默认格式
+      body = `${projectName} 状态从 ${statusLabels[oldStatus] || oldStatus} 改为 ${statusLabels[newStatus] || newStatus}${workerName ? ` (${workerName})` : ''}`;
+    }
+
+    // 播放项目状态专用音效
+    const config = configManager.getConfig();
+    if (config.notifications.sound && audioManager.getConfig().enabled) {
+      const soundType = audioManager.getProjectStatusSound(newStatus);
+      audioManager.playNotificationSound(soundType);
+    }
 
     return this.showNotification({
       title,
       body,
       tag: `project-${projectName}-status`,
+      silent: true, // 设置为静音，因为我们已经手动播放了音效
       data: {
         type: 'project-status',
         projectName,
         oldStatus,
         newStatus,
-        workerName
+        workerName,
+        transition: `${oldStatus}-to-${newStatus}` // 添加转换信息用于调试
       }
     });
   }

@@ -2,11 +2,20 @@
 export { Button } from './Button'
 export type { ButtonProps } from './Button'
 
+export { IconButton } from './IconButton'
+export type { IconButtonProps } from './IconButton'
+
 export { Card } from './Card'  
 export type { CardProps } from './Card'
 
+export { InfoCard } from './InfoCard'
+export type { InfoCardProps } from './InfoCard'
+
 export { Input } from './Input'
 export type { InputProps } from './Input'
+
+export { Textarea } from './Textarea'
+export type { TextareaProps } from './Textarea'
 
 export { StatusIndicator, StatusToggle } from './StatusIndicator'
 export type { StatusIndicatorProps, StatusToggleProps, StatusType } from './StatusIndicator'
@@ -31,6 +40,9 @@ export type { SwitchProps } from './Switch'
 
 export { Badge } from './Badge'
 export type { BadgeProps } from './Badge'
+
+export { StateChip } from './StateChip'
+export type { StateChipProps } from './StateChip'
 
 export { Alert } from './Alert'
 export type { AlertProps } from './Alert'
@@ -122,3 +134,6 @@ export type { NavigationProps, NavigationItemProps, NavigationGroupProps, Naviga
 
 export { default as BatchSortModal } from './BatchSortModal'
 export { MaterialManagementModal } from './MaterialManagementModal'
+
+export { MaterialStatusManager } from './MaterialStatusManager'
+export type { MaterialStatusType, MaterialInfo } from './MaterialStatusManager'

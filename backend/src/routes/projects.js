@@ -476,7 +476,7 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// 创建项目
+// 创建项目（支持厚度选择，无数量）
 router.post('/', authenticate, requireOperator, async (req, res) => {
   try {
     const { 
@@ -486,7 +486,7 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
       startDate, 
       endDate, 
       assignedWorkerId,
-      selectedThicknessSpecs = [],
+      requiredThickness = [], // 新增：选择的厚度ID数组，不包含数量
       createdBy = req.user.id
     } = req.body;
 
@@ -496,24 +496,39 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
       });
     }
 
+    if (!assignedWorkerId) {
+      return res.status(400).json({
+        error: '请选择分配的工人'
+      });
+    }
+
     // 验证厚度规格选择
-    if (selectedThicknessSpecs.length === 0) {
+    if (requiredThickness.length === 0) {
       return res.status(400).json({
         error: '请至少选择一种板材厚度'
       });
     }
 
-    // 验证厚度规格是否存在
+    // 验证厚度规格是否存在且处于激活状态
     const validThicknessSpecs = await ThicknessSpec.findAll({
       where: {
-        id: selectedThicknessSpecs,
+        id: requiredThickness,
         isActive: true
       }
     });
 
-    if (validThicknessSpecs.length !== selectedThicknessSpecs.length) {
+    if (validThicknessSpecs.length !== requiredThickness.length) {
       return res.status(400).json({
-        error: '部分厚度规格无效或已禁用'
+        error: '部分厚度规格无效或已停用'
+      });
+    }
+
+    // 验证工人是否存在
+    const { Worker, WorkerMaterial } = require('../models');
+    const assignedWorker = await Worker.findByPk(assignedWorkerId);
+    if (!assignedWorker) {
+      return res.status(400).json({
+        error: '指定的工人不存在'
       });
     }
 
@@ -535,14 +550,39 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
         sortOrder: maxSortOrder + 1
       }, { transaction: t });
 
-      // 为每个选中的厚度规格创建材料记录
-      const materialPromises = selectedThicknessSpecs.map(thicknessSpecId => 
-        Material.create({
+      // 创建或查找工人材料记录，并为每个厚度规格创建项目材料记录
+      const materialPromises = validThicknessSpecs.map(async (thicknessSpec) => {
+        // 查找或创建工人材料记录
+        let workerMaterial = await WorkerMaterial.findOne({
+          where: {
+            workerId: assignedWorkerId,
+            thicknessSpecId: thicknessSpec.id
+          },
+          transaction: t
+        });
+
+        if (!workerMaterial) {
+          // 创建新的工人材料记录（数量为0，等待添加库存）
+          workerMaterial = await WorkerMaterial.create({
+            workerId: assignedWorkerId,
+            thicknessSpecId: thicknessSpec.id,
+            quantity: 0,
+            notes: `为项目 ${name.trim()} 自动创建`
+          }, { transaction: t });
+
+          console.log(`为工人 ${assignedWorkerId} 创建了新的材料记录: ${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit}`);
+        }
+
+        // 创建项目材料记录，关联到工人材料
+        return Material.create({
           projectId: project.id,
-          thicknessSpecId,
-          status: 'pending'
-        }, { transaction: t })
-      );
+          thicknessSpecId: thicknessSpec.id,
+          status: 'pending',
+          quantity: 0, // 初始数量为0，等待后续分配
+          notes: '等待分配数量',
+          assignedFromWorkerMaterialId: workerMaterial.id
+        }, { transaction: t });
+      });
 
       await Promise.all(materialPromises);
 
@@ -558,11 +598,14 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
         },
         {
           association: 'assignedWorker',
-          attributes: ['id', 'name']
+          attributes: ['id', 'name', 'department']
         },
         {
           association: 'materials',
-          include: ['thicknessSpec']
+          include: [{
+            association: 'thicknessSpec',
+            attributes: ['id', 'thickness', 'unit', 'materialType']
+          }]
         }
       ]
     });
@@ -576,7 +619,8 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
           description: result.description,
           status: result.status,
           priority: result.priority,
-          assignedWorkerId: result.assignedWorkerId
+          assignedWorkerId: result.assignedWorkerId,
+          selectedThicknessCount: requiredThickness.length
         },
         req.user.id,
         req.user.name
@@ -586,19 +630,23 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
     }
 
     res.status(201).json({
-      message: '项目创建成功',
-      project: newProject
+      message: '项目创建成功，已为工人创建或关联板材库存记录',
+      project: newProject,
+      workerMaterialsCreated: validThicknessSpecs.length
     });
 
     // 发送SSE事件通知其他用户
     try {
       sseManager.broadcast('project-created', {
         project: newProject,
+        workerId: assignedWorkerId,
+        requiredThickness,
         userName: req.user.name,
-        userId: req.user.id
+        userId: req.user.id,
+        workerMaterialsCreated: validThicknessSpecs.length
       }, req.user.id);
       
-      console.log(`SSE事件已发送: 项目创建 - ${newProject.name}`);
+      console.log(`SSE事件已发送: 项目创建 - ${newProject.name}，厚度规格: ${requiredThickness.length} 种，为工人创建/关联了材料库存记录`);
     } catch (sseError) {
       console.error('发送SSE事件失败:', sseError);
     }

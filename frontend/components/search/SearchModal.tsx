@@ -13,7 +13,8 @@ import {
   DocumentTextIcon,
   ClockIcon,
   PhoneIcon,
-  EnvelopeIcon
+  EnvelopeIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline';
 
 // 搜索结果类型定义
@@ -31,6 +32,19 @@ interface SearchResultItem {
   assignedWorker?: string;
   projectIds?: number[];
   _score?: number;
+  // 新增：材料库存相关字段
+  quantity?: number;
+  worker?: { id: number; name: string; department?: string };
+  thicknessSpec?: { id: number; thickness: string; unit: string; materialType?: string };
+  // 新增：项目材料信息
+  materials?: Array<{
+    id: number;
+    status: string;
+    completedDate?: string;
+    thicknessSpec: { id: number; thickness: string; unit: string; materialType?: string };
+  }>;
+  // 新增：工人项目和库存信息
+  assignedProjects?: Array<{ id: number; name: string; status: string }>;
 }
 
 interface SearchResults {
@@ -56,6 +70,12 @@ const SEARCH_CATEGORIES = {
     icon: FolderIcon, 
     weight: 10,
     color: 'text-blue-600'
+  },
+  materials: { 
+    name: '板材库存', 
+    icon: Squares2X2Icon, 
+    weight: 9,
+    color: 'text-indigo-600'
   },
   workers: { 
     name: '工人', 
@@ -152,9 +172,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        console.log('🔍 搜索API返回数据:', data); // 调试日志
         const formattedResults = formatSearchResults(data, searchQuery);
-        console.log('🔍 格式化后的结果:', formattedResults); // 调试日志
         
         // 缓存结果
         searchCache.current.set(cacheKey, formattedResults);
@@ -173,7 +191,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [token]);
 
-  // 格式化搜索结果
+  // 格式化搜索结果（碳板优先排序）
   const formatSearchResults = (rawResults: any, searchQuery: string): SearchResults => {
     const formatted: SearchResults = {};
     
@@ -191,7 +209,26 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             _score: calculateRelevanceScore(item, searchQuery, categoryKey)
           }))
           .filter((item: any) => item._score > 0)
-          .sort((a: any, b: any) => b._score - a._score)
+          .sort((a: any, b: any) => {
+            // 首先按相关性分数排序
+            if (b._score !== a._score) {
+              return b._score - a._score;
+            }
+            
+            // 相关性分数相同时，应用碳板优先策略
+            if (categoryKey === 'projects') {
+              const aCarbonRatio = getCarbonRatio(a.materials || []);
+              const bCarbonRatio = getCarbonRatio(b.materials || []);
+              
+              // 碳板占比高的项目优先
+              if (Math.abs(aCarbonRatio - bCarbonRatio) > 0.1) {
+                return bCarbonRatio - aCarbonRatio;
+              }
+            }
+            
+            // 最后按名称排序
+            return a.name.localeCompare(b.name);
+          })
           .slice(0, 8); // 每类最多8个结果
 
         if (scoredItems.length > 0) {
@@ -207,7 +244,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     return formatted;
   };
 
-  // 计算相关性分数
+  // 计算碳板占比辅助函数
+  const getCarbonRatio = (materials: any[]): number => {
+    if (materials.length === 0) return 0;
+    const carbonMaterials = materials.filter((m: any) => 
+      !m.thicknessSpec?.materialType || m.thicknessSpec.materialType === '碳板'
+    );
+    return carbonMaterials.length / materials.length;
+  };
+
+  // 计算相关性分数（碳板优先策略）
   const calculateRelevanceScore = (item: any, query: string, category: string): number => {
     const queryLower = query.toLowerCase();
     let score = 0;
@@ -238,6 +284,83 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         score += 2;
       }
     });
+    
+    // 碳板优先策略加权（95/5策略）
+    if (category === 'projects') {
+      // 检查项目是否主要使用碳板材料
+      const materials = item.materials || [];
+      const carbonMaterials = materials.filter((m: any) => 
+        !m.thicknessSpec?.materialType || m.thicknessSpec.materialType === '碳板'
+      );
+      const carbonRatio = materials.length > 0 ? carbonMaterials.length / materials.length : 0;
+      
+      // 碳板占比高的项目优先显示（符合95%策略）
+      if (carbonRatio >= 0.8) {
+        score += 5; // 碳板为主的项目额外加分
+      } else if (carbonRatio >= 0.5) {
+        score += 2; // 碳板占一半以上的项目适度加分
+      }
+      
+      // 碳板相关关键词搜索时进一步加权
+      if (queryLower.includes('碳板') || queryLower.includes('碳钢') || queryLower.includes('steel')) {
+        score += carbonRatio * 10; // 根据碳板比例加权
+      }
+      
+      // 特殊材料关键词搜索时调整权重
+      if (queryLower.includes('特殊') || queryLower.includes('不锈钢') || queryLower.includes('铝') || queryLower.includes('copper')) {
+        const specialRatio = 1 - carbonRatio;
+        score += specialRatio * 8; // 特殊材料比例越高，相关性越高
+      }
+    }
+    
+    // 新增：材料库存搜索增强
+    if (category === 'materials') {
+      // 厚度关键词搜索加权
+      const thicknessMatch = queryLower.match(/(\d+\.?\d*)mm?/);
+      if (thicknessMatch && item.thicknessSpec) {
+        const queryThickness = parseFloat(thicknessMatch[1]);
+        const itemThickness = parseFloat(item.thicknessSpec.thickness);
+        if (queryThickness === itemThickness) {
+          score += 15; // 精确厚度匹配高分
+        } else if (Math.abs(queryThickness - itemThickness) <= 1) {
+          score += 8; // 接近厚度匹配
+        }
+      }
+      
+      // 材料类型匹配
+      const materialType = item.thicknessSpec?.materialType || '碳板';
+      if (materialType.toLowerCase().includes(queryLower)) {
+        score += 12;
+      }
+      
+      // 库存数量影响（库存越多排名越前）
+      if (item.quantity) {
+        score += Math.min(item.quantity / 10, 5); // 最多加5分
+      }
+      
+      // 碳板库存优先策略
+      const isCarbonMaterial = !materialType || materialType === '碳板';
+      if (isCarbonMaterial) {
+        score += 3; // 碳板库存优先
+      }
+    }
+    
+    // 材料类型相关的搜索增强
+    if (category === 'drawings' || category === 'projects' || category === 'materials') {
+      // 碳板相关关键词
+      const carbonKeywords = ['碳板', '碳钢', 'carbon', 'steel', '钢板'];
+      const specialKeywords = ['不锈钢', '铝', '铜', 'stainless', 'aluminum', 'copper', '特殊'];
+      
+      const hasCarbonKeyword = carbonKeywords.some(keyword => queryLower.includes(keyword));
+      const hasSpecialKeyword = specialKeywords.some(keyword => queryLower.includes(keyword));
+      
+      if (hasCarbonKeyword) {
+        score += 3; // 碳板相关搜索加分
+      }
+      if (hasSpecialKeyword) {
+        score += 2; // 特殊材料相关搜索加分
+      }
+    }
     
     // 根据分类权重调整
     score *= SEARCH_CATEGORIES[category as keyof typeof SEARCH_CATEGORIES].weight / 10;
@@ -316,17 +439,78 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     onClose();
   };
 
-  // 获取结果项的元信息
+  // 获取结果项的元信息（包含碳板使用情况和增强信息）
   const getResultMeta = (item: SearchResultItem) => {
     switch (item.type) {
       case 'projects':
-        return `${item.status === 'completed' ? '已完成' : item.status === 'in_progress' ? '进行中' : '待处理'} • ${item.assignedWorker || '未分配'}`;
+        const statusText = item.status === 'completed' ? '已完成' : item.status === 'in_progress' ? '进行中' : '待处理';
+        const workerText = item.assignedWorker || '未分配';
+        
+        // 增强：显示材料详细信息
+        if (item.materials && item.materials.length > 0) {
+          const carbonRatio = getCarbonRatio(item.materials);
+          const carbonPercentage = Math.round(carbonRatio * 100);
+          const materialCount = item.materials.length;
+          
+          // 计算材料状态分布
+          const statusCounts = item.materials.reduce((acc, m) => {
+            acc[m.status] = (acc[m.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          
+          const statusSummary = [];
+          if (statusCounts.completed) statusSummary.push(`${statusCounts.completed}已完成`);
+          if (statusCounts.in_progress) statusSummary.push(`${statusCounts.in_progress}进行中`);
+          if (statusCounts.pending) statusSummary.push(`${statusCounts.pending}待处理`);
+          
+          const materialInfo = statusSummary.length > 0 ? ` • ${statusSummary.join('/')}` : '';
+          
+          if (carbonRatio >= 0.95) {
+            return `${statusText} • ${workerText} • 🔥碳板专用(${materialCount}种材料${materialInfo})`;
+          } else if (carbonRatio >= 0.8) {
+            return `${statusText} • ${workerText} • 碳板为主(${carbonPercentage}%${materialInfo})`;
+          } else if (carbonRatio >= 0.5) {
+            return `${statusText} • ${workerText} • 混合材料(碳板${carbonPercentage}%${materialInfo})`;
+          } else if (carbonRatio > 0) {
+            return `${statusText} • ${workerText} • 特殊材料为主(碳板${carbonPercentage}%${materialInfo})`;
+          } else {
+            return `${statusText} • ${workerText} • ⚠️特殊材料专用(${materialCount}种${materialInfo})`;
+          }
+        }
+        
+        return `${statusText} • ${workerText}`;
+        
       case 'workers':
-        return `${item.department || '未分配部门'} • ${item.phone || '无联系方式'}`;
+        // 增强：显示工人的项目和库存信息
+        const deptText = item.department || '未分配部门';
+        const contactText = item.phone || '无联系方式';
+        
+        const projectInfo = item.assignedProjects && item.assignedProjects.length > 0 
+          ? ` • 负责${item.assignedProjects.length}个项目` 
+          : ' • 无分配项目';
+          
+        const materialInfo = item.materials && item.materials.length > 0 
+          ? ` • 库存${item.materials.length}种材料` 
+          : ' • 无库存';
+          
+        return `${deptText} • ${contactText}${projectInfo}${materialInfo}`;
+        
       case 'departments':
         return `${item.meta || '0'} 名工人`;
+        
       case 'drawings':
         return `${item.description || '图纸文件'}`;
+        
+      case 'materials':
+        // 新增：板材库存元信息
+        const thickness = item.thicknessSpec ? `${item.thicknessSpec.thickness}${item.thicknessSpec.unit}` : '';
+        const materialType = item.thicknessSpec?.materialType || '碳板';
+        const quantity = item.quantity || 0;
+        const workerName = item.worker?.name || '未知工人';
+        const workerDept = item.worker?.department || '未分配部门';
+        
+        return `${thickness} ${materialType} • 库存${quantity}张 • ${workerName}(${workerDept})`;
+        
       default:
         return item.meta || '';
     }
@@ -343,6 +527,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         return BuildingOfficeIcon;
       case 'drawings':
         return DocumentTextIcon;
+      case 'materials':
+        return Squares2X2Icon;
       default:
         return FolderIcon;
     }
@@ -467,14 +653,46 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             />
           )}
 
-          {/* 搜索提示 */}
+          {/* 搜索提示（包含板材库存和碳板相关建议） */}
           {query.length === 0 && (
             <div className="text-center py-8">
               <MagnifyingGlassIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <div className="text-gray-500 text-sm">
                 <div className="mb-2">输入关键词开始搜索</div>
-                <div className="text-xs text-gray-400">
-                  支持搜索项目、工人、部门、图纸等内容
+                <div className="text-xs text-gray-400 space-y-3">
+                  <div>支持搜索项目、工人、部门、图纸、板材库存等内容</div>
+                  
+                  {/* 厚度搜索示例 */}
+                  <div className="border-t pt-2">
+                    <div className="font-medium text-indigo-600 mb-1">板材厚度搜索示例：</div>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">3mm</kbd>
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">2.5mm</kbd>
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">厚度</kbd>
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">库存</kbd>
+                    </div>
+                  </div>
+                  
+                  {/* 材料类型搜索示例 */}
+                  <div className="border-t pt-2">
+                    <div className="font-medium text-blue-600 mb-1">材料类型搜索示例：</div>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      <kbd className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">碳板</kbd>
+                      <kbd className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">钢板</kbd>
+                      <kbd className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs">不锈钢</kbd>
+                      <kbd className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs">特殊材料</kbd>
+                    </div>
+                  </div>
+                  
+                  {/* 综合搜索示例 */}
+                  <div className="border-t pt-2">
+                    <div className="font-medium text-green-600 mb-1">综合搜索示例：</div>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">张三 3mm</kbd>
+                      <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">碳板项目</kbd>
+                      <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">库存充足</kbd>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

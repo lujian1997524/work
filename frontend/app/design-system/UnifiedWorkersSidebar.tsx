@@ -63,7 +63,7 @@ export const UnifiedWorkersSidebar: React.FC<UnifiedWorkersSidebarProps> = ({
     
     try {
       setLoading(true);
-      const response = await apiRequest('/api/departments', {
+      const response = await apiRequest('/api/workers/departments', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -100,7 +100,7 @@ export const UnifiedWorkersSidebar: React.FC<UnifiedWorkersSidebarProps> = ({
     
     try {
       setSubmitLoading(true);
-      const response = await apiRequest('/api/departments', {
+      const response = await apiRequest('/api/workers/departments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +138,7 @@ export const UnifiedWorkersSidebar: React.FC<UnifiedWorkersSidebarProps> = ({
     
     try {
       setSubmitLoading(true);
-      const response = await apiRequest(`/api/departments/${editingDepartment.id}`, {
+      const response = await apiRequest(`/api/workers/departments/${editingDepartment.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +181,7 @@ export const UnifiedWorkersSidebar: React.FC<UnifiedWorkersSidebarProps> = ({
     if (!confirm(`确定要删除部门"${department.name}"吗？此操作不可撤销。`)) return;
     
     try {
-      const response = await apiRequest(`/api/departments/${department.id}`, {
+      const response = await apiRequest(`/api/workers/departments/${department.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

@@ -5,20 +5,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from '@/components/auth/LoginModal';
 import { ProjectTree } from '@/components/materials/ProjectTree';
 import { PastProjectsTree } from '@/components/projects/PastProjectsTree';
-import { MaterialsTable } from '@/components/materials/MaterialsTable';
-import { MaterialsCardView } from '@/components/materials/MaterialsCardView';
 import { PastProjectsCardView } from '@/components/projects/PastProjectsCardView';
-import { WorkerManagement } from '@/components/workers/WorkerManagement';
-import { WorkersSidebar } from '@/components/workers/WorkersSidebar';
-import { ProjectDetail } from '@/components/projects/ProjectDetail';
+import { ActiveProjectsCardView } from '@/components/projects/ActiveProjectsCardView';
+import { MaterialInventoryManagerNew as MaterialInventoryManager } from '@/components/materials/MaterialInventoryManagerNew';
+import { MaterialsSidebar } from '@/components/materials/MaterialsSidebar';
+import { ProjectDetailModern } from '@/components/projects/ProjectDetailModern';
 import { ProjectModal } from '@/components/materials/ProjectModal';
-import { ThicknessSpecModal } from '@/components/materials/ThicknessSpecModal';
 import { DrawingLibrary, DrawingsSidebar } from '@/components/drawings';
 import { SearchModal } from '@/components/search/SearchModal';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { UserProfileModal } from '@/components/user/UserProfileModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProjectStore, useMaterialStore } from '@/stores';
+import { useProjectStore, useMaterialStore, useGlobalSyncStore } from '@/stores';
+import { updateMaterialStatusShared } from '@/utils/materialStatusManager';
 import { NotificationContainer } from '@/components/ui/NotificationContainer';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { Card, Button, useDialog } from '@/components/ui';
@@ -43,11 +42,10 @@ export default function Home() {
 
 function HomeContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'workers' | 'settings'>('active');
+  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'settings'>('active');
   const [workerNameFilter, setWorkerNameFilter] = useState('');
   const [thicknessFilter, setThicknessFilter] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const [showThicknessSpecModal, setShowThicknessSpecModal] = useState(false);
   const [editingProject, setEditingProject] = useState<any>(null);
   const [drawingCategory, setDrawingCategory] = useState('all');
   const [drawingStats, setDrawingStats] = useState<{[key: string]: number}>({});
@@ -57,6 +55,11 @@ function HomeContent() {
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [showDrawingUpload, setShowDrawingUpload] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
+  const [workerIdFilter, setWorkerIdFilter] = useState<number | null>(null);
+  const [materialThicknessFilter, setMaterialThicknessFilter] = useState<string>('all'); // 新增：厚度筛选
+  const [materialInventoryTab, setMaterialInventoryTab] = useState<'inventory' | 'workers'>('inventory'); // 新增：板材库存Tab状态
+  const [thicknessSpecs, setThicknessSpecs] = useState<any[]>([]); // 厚度规格数据
   
   // 使用Dialog组件
   const { alert, confirm, DialogRenderer } = useDialog();
@@ -67,6 +70,7 @@ function HomeContent() {
   
   // Zustand状态管理
   const { 
+    projects,
     createProject,
     updateProject,
     deleteProject,
@@ -75,6 +79,29 @@ function HomeContent() {
   } = useProjectStore();
   
   const { fetchMaterials } = useMaterialStore();
+  
+  // 全局同步管理
+  const { startEventListeners, stopEventListeners } = useGlobalSyncStore();
+
+  // 获取厚度规格数据
+  const fetchThicknessSpecs = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await apiRequest('/api/thickness-specs', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setThicknessSpecs(data.thicknessSpecs || []);
+      }
+    } catch (error) {
+      console.error('获取厚度规格失败:', error);
+    }
+  };
 
   // 获取图纸统计信息
   // 批量排序功能
@@ -138,7 +165,16 @@ function HomeContent() {
   useEffect(() => {
     console.log('🚀 初始化应用...');
     fetchProjects();
+    fetchThicknessSpecs();
     fetchDrawingStats();
+    
+    // 启动全局事件监听器
+    startEventListeners();
+    
+    return () => {
+      // 清理事件监听器
+      stopEventListeners();
+    };
   }, []);
 
   // SSE连接管理
@@ -160,12 +196,12 @@ function HomeContent() {
   }, [isAuthenticated, token]);
 
   // 处理视图切换
-  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'settings') => {
+  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'materials' | 'settings') => {
     console.log('🔄 切换视图:', view);
     
     // 特殊处理
     if (view === 'settings') {
-      setShowThicknessSpecModal(true); // 板材厚度规格管理
+      setShowSettingsPage(true); // 系统设置页面
     } else {
       setViewType(view);
       setSelectedProjectId(null);
@@ -240,22 +276,11 @@ function HomeContent() {
         setSelectedProjectId(result.id);
         break;
         
-      case 'workers':
-        // 跳转到工人管理，并筛选到对应部门
-        setViewType('workers');
-        setSelectedDepartment(result.department || 'all');
-        break;
-        
       case 'drawings':
         // 跳转到图纸库，并筛选到对应分类
         setViewType('drawings');
         setDrawingCategory(result.category || 'all');
         break;
-        
-      case 'departments':
-        // 跳转到工人管理，选中该部门
-        setViewType('workers');
-        setSelectedDepartment(result.name);
         break;
     }
   };
@@ -270,9 +295,22 @@ function HomeContent() {
       }
     };
 
+    // 监听工人筛选事件
+    const handleSetWorkerFilter = (event: CustomEvent) => {
+      console.log('🎯 设置工人筛选:', event.detail.workerId);
+      setWorkerIdFilter(event.detail.workerId);
+      // 切换到materials视图
+      setViewType('materials');
+      // 设置板材库存Tab为激活状态
+      setMaterialInventoryTab('inventory');
+    };
+
     document.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('set-worker-filter', handleSetWorkerFilter as EventListener);
+    
     return () => {
       document.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('set-worker-filter', handleSetWorkerFilter as EventListener);
     };
   }, []);
 
@@ -329,19 +367,25 @@ function HomeContent() {
           />
         );
       
-      case 'workers':
+      case 'materials':
         return (
-          <WorkersSidebar
-            selectedDepartment={selectedDepartment}
-            onDepartmentChange={setSelectedDepartment}
-            onMobileItemClick={() => {}} // 移动端点击部门时关闭侧边栏的占位
+          <MaterialsSidebar
+            activeTab={materialInventoryTab}
+            onTabChange={setMaterialInventoryTab}
+            onMaterialTypeFilter={setMaterialTypeFilter}
+            onWorkerFilter={setWorkerIdFilter}
+            onThicknessFilter={setMaterialThicknessFilter}
             onRefresh={() => {
-              // 触发工人数据刷新事件
-              window.dispatchEvent(new CustomEvent('refresh-workers'));
+              // 触发材料数据刷新事件
+              window.dispatchEvent(new CustomEvent('refresh-materials'));
             }}
             className="h-full"
           />
         );
+      
+      case 'public-inventory':
+        // 公共库存不需要特殊侧边栏，显示基础项目树
+        return null;
       
       default:
         // 默认显示活动项目侧边栏
@@ -372,18 +416,19 @@ function HomeContent() {
     >
       {/* 主内容区域 */}
       <AnimatePresence mode="wait">
-        {viewType === 'workers' ? (
+        {viewType === 'materials' ? (
           <motion.div
-            key="worker-management"
+            key="material-inventory"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
-            <WorkerManagement 
+            <MaterialInventoryManager 
               className="h-full" 
-              selectedDepartment={selectedDepartment}
-              onDepartmentChange={setSelectedDepartment}
+              materialTypeFilter={materialTypeFilter}
+              workerIdFilter={workerIdFilter}
+              thicknessFilter={materialThicknessFilter}
             />
           </motion.div>
         ) : selectedProjectId && (viewType === 'active' || viewType === 'completed') ? (
@@ -394,7 +439,7 @@ function HomeContent() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
-            <ProjectDetail
+            <ProjectDetailModern
               projectId={selectedProjectId}
               onBack={() => handleSelectProject(null)}
               className="h-full"
@@ -438,12 +483,68 @@ function HomeContent() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
-            <MaterialsCardView
+            <ActiveProjectsCardView
               selectedProjectId={selectedProjectId}
               onProjectSelect={handleSelectProject}
-              viewType="active"
-              workerNameFilter={workerNameFilter}
-              thicknessFilter={thicknessFilter}
+              onProjectEdit={openEditModal}
+              onMaterialStatusChange={async (materialId: number, newStatus: any) => {
+                // 找到材料对应的项目和厚度规格
+                let targetProjectId: number | null = null;
+                let targetThicknessSpecId: number | null = null;
+                
+                // 遍历项目查找对应的材料
+                for (const project of projects) {
+                  const material = project.materials?.find(m => m.id === materialId);
+                  if (material) {
+                    targetProjectId = project.id;
+                    targetThicknessSpecId = material.thicknessSpecId;
+                    break;
+                  }
+                }
+                
+                if (targetProjectId && targetThicknessSpecId) {
+                  console.log('🔧 更新材料状态:', { materialId, targetProjectId, targetThicknessSpecId, newStatus });
+                  
+                  // 使用共享的材料状态管理逻辑
+                  const success = await updateMaterialStatusShared(targetProjectId, targetThicknessSpecId, newStatus, {
+                    projects: projects as any[],
+                    thicknessSpecs: thicknessSpecs,
+                    user,
+                    updateProjectFn: updateProject,
+                    fetchProjectsFn: fetchProjects
+                  });
+                  
+                  if (!success) {
+                    console.error('材料状态更新失败');
+                  }
+                } else {
+                  console.error('无法找到材料对应的项目信息:', { materialId });
+                }
+              }}
+              onJumpToMaterials={(projectId: number, workerId?: number) => {
+                // 跳转到板材管理，并筛选对应的工人
+                console.log('🎯 跳转到板材管理:', { projectId, workerId });
+                
+                // 切换到材料管理视图
+                setViewType('materials');
+                
+                // 设置工人筛选（如果有分配工人）
+                if (workerId) {
+                  setWorkerIdFilter(workerId);
+                } else {
+                  setWorkerIdFilter(null);
+                }
+                
+                // 设置材料库存Tab为激活状态
+                setMaterialInventoryTab('inventory');
+                
+                // 清空项目选择，显示材料管理界面
+                setSelectedProjectId(null);
+              }}
+              onProjectMoveToPast={() => {
+                // 项目移至过往后刷新数据
+                fetchProjects();
+              }}
               className="h-full overflow-y-auto"
             />
           </motion.div>
@@ -474,12 +575,6 @@ function HomeContent() {
         onSubmit={editingProject ? handleUpdateProject : handleCreateProject}
         project={editingProject}
         loading={false}
-      />
-
-      <ThicknessSpecModal
-        isOpen={showThicknessSpecModal}
-        onClose={() => setShowThicknessSpecModal(false)}
-        onUpdate={() => {}}
       />
 
       

@@ -3,9 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Input, Select, Form, FormField, FormActions, Loading } from '@/components/ui';
-import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { Button, Input, Select, Form, FormField, FormActions, Loading, Badge } from '@/components/ui';
+import { XMarkIcon, PlusIcon, TrashIcon, ChevronDownIcon, FireIcon, FolderIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/utils/api';
+import { useWorkerMaterialStore } from '@/stores';
+import { PROJECT_STATUS_OPTIONS, PROJECT_PRIORITY_OPTIONS } from '@/constants/projectEnums';
+import type { ThicknessSpec, ProjectFormData } from '@/types/project';
 
 interface Worker {
   id: number;
@@ -14,22 +17,12 @@ interface Worker {
   position: string;
 }
 
-interface ThicknessSpec {
+interface WorkerMaterial {
   id: number;
-  thickness: string;
-  unit: string;
-  materialType: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface ProjectFormData {
-  name: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  assignedWorkerId: number | null;
-  selectedThicknessSpecs: number[];
+  workerId: number;
+  thicknessSpecId: number;
+  quantity: number;
+  thicknessSpec: ThicknessSpec;
 }
 
 interface ProjectModalProps {
@@ -61,14 +54,17 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     status: 'pending',
     priority: 'medium',
     assignedWorkerId: null,
-    selectedThicknessSpecs: []
+    requiredThickness: []
   });
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [thicknessSpecs, setThicknessSpecs] = useState<ThicknessSpec[]>([]);
+  const [localWorkerMaterials, setLocalWorkerMaterials] = useState<any>(null);
+  const [loadingWorkerMaterials, setLoadingWorkerMaterials] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [managingMaterials, setManagingMaterials] = useState(false);
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [deletingMaterialId, setDeletingMaterialId] = useState<number | null>(null);
+  const [showSpecialMaterials, setShowSpecialMaterials] = useState(false);
   const { token } = useAuth();
 
   // 获取工人列表和厚度规格
@@ -88,7 +84,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         status: project.status as any,
         priority: project.priority as any,
         assignedWorkerId: project.assignedWorker?.id || null,
-        selectedThicknessSpecs: project.materials?.map(m => m.thicknessSpecId) || []
+        requiredThickness: project.materials?.map(m => m.thicknessSpecId) || [] // 编辑模式下获取已选择的厚度规格
       });
     } else {
       setFormData({
@@ -97,7 +93,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         status: 'pending',
         priority: 'medium',
         assignedWorkerId: null,
-        selectedThicknessSpecs: []
+        requiredThickness: []
       });
     }
     setFormErrors({});
@@ -126,7 +122,6 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        // 只显示激活的厚度规格，按排序顺序排列
         const activeSpecs = (data.thicknessSpecs || []).filter((spec: ThicknessSpec) => spec.isActive);
         setThicknessSpecs(activeSpecs);
       }
@@ -135,6 +130,47 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     }
   };
 
+  // 获取指定工人的板材库存
+  const fetchWorkerMaterials = async (workerId: number) => {
+    if (!workerId || !token) return;
+
+    try {
+      setLoadingWorkerMaterials(true);
+      const response = await apiRequest(`/api/worker-materials?workerId=${workerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLocalWorkerMaterials(data);
+      }
+    } catch (error) {
+      console.error('获取工人板材失败:', error);
+      setLocalWorkerMaterials(null);
+    } finally {
+      setLoadingWorkerMaterials(false);
+    }
+  };
+
+  // 监听工人选择变化
+  useEffect(() => {
+    if (formData.assignedWorkerId) {
+      fetchWorkerMaterials(formData.assignedWorkerId);
+    } else {
+      setLocalWorkerMaterials(null);
+    }
+  }, [formData.assignedWorkerId, token]);
+
+  // 分类厚度规格：碳板优先
+  const carbonThicknessSpecs = thicknessSpecs.filter(spec => 
+    !spec.materialType || spec.materialType === '碳板'
+  ).sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const specialThicknessSpecs = thicknessSpecs.filter(spec => 
+    spec.materialType && spec.materialType !== '碳板'
+  ).sort((a, b) => a.sortOrder - b.sortOrder);
+
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -142,8 +178,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       errors.name = '项目名称不能为空';
     }
 
-    if (formData.selectedThicknessSpecs.length === 0) {
-      errors.selectedThicknessSpecs = '请至少选择一种板材厚度';
+    if (!formData.assignedWorkerId) {
+      errors.assignedWorkerId = '请选择分配的工人';
+    }
+
+    if (formData.requiredThickness.length === 0) {
+      errors.requiredThickness = '请至少选择一种板材厚度';
     }
 
     setFormErrors(errors);
@@ -158,9 +198,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     }
 
     onSubmit(formData);
+    
+    // 触发项目创建事件
+    window.dispatchEvent(new CustomEvent('project-created', {
+      detail: { projectData: formData }
+    }));
   };
 
   const handleInputChange = (field: keyof ProjectFormData, value: any) => {
+    
+    // 更新表单数据
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // 清除对应字段的错误
@@ -174,100 +221,81 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   };
 
   // 处理厚度规格选择
-  const handleThicknessSpecToggle = async (specId: number) => {
-    // 如果是编辑模式且项目已存在，直接调用API
-    if (project?.id) {
-      const isSelected = formData.selectedThicknessSpecs.includes(specId);
-      
-      if (isSelected) {
-        // 删除板材
-        await handleRemoveMaterial(specId);
-      } else {
-        // 添加板材
-        await handleAddMaterial(specId);
-      }
-    } else {
-      // 创建模式，只更新本地状态
-      const isSelected = formData.selectedThicknessSpecs.includes(specId);
-      const newSelection = isSelected 
-        ? formData.selectedThicknessSpecs.filter(id => id !== specId)
-        : [...formData.selectedThicknessSpecs, specId];
-      
-      handleInputChange('selectedThicknessSpecs', newSelection);
-    }
+  const handleThicknessToggle = (thicknessSpecId: number) => {
+    const isSelected = formData.requiredThickness.includes(thicknessSpecId);
+    const newSelection = isSelected 
+      ? formData.requiredThickness.filter(id => id !== thicknessSpecId)
+      : [...formData.requiredThickness, thicknessSpecId];
+    
+    handleInputChange('requiredThickness', newSelection);
   };
 
-  // 添加板材（编辑模式）
-  const handleAddMaterial = async (thicknessSpecId: number) => {
-    if (!project?.id) return;
+  // 获取工人在指定厚度规格下的库存数量
+  const getWorkerStock = (spec: ThicknessSpec) => {
+    if (!localWorkerMaterials?.materials) return 0;
     
-    try {
-      setAddingMaterial(true);
-      const response = await apiRequest(`/api/projects/${project.id}/materials`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ thicknessSpecId })
-      });
-
-      if (response.ok) {
-        // 更新本地状态
-        const newSelection = [...formData.selectedThicknessSpecs, thicknessSpecId];
-        handleInputChange('selectedThicknessSpecs', newSelection);
-        
-        // 触发材料更新事件
-        window.dispatchEvent(new CustomEvent('materials-updated'));
-      } else {
-        const error = await response.json();
-        alert(error.error || '添加板材失败');
-      }
-    } catch (error) {
-      console.error('添加板材错误:', error);
-      alert('添加板材失败');
-    } finally {
-      setAddingMaterial(false);
-    }
+    // 查找匹配的材料记录
+    const foundMaterial = localWorkerMaterials.materials.find((material: any) => 
+      material.thicknessSpec && material.thicknessSpec.id === spec.id
+    );
+    
+    return foundMaterial ? foundMaterial.quantity || 0 : 0;
   };
 
-  // 删除板材（编辑模式）
-  const handleRemoveMaterial = async (thicknessSpecId: number) => {
-    if (!project?.id) return;
+  // 厚度规格按钮组件
+  const ThicknessButton: React.FC<{
+    spec: ThicknessSpec;
+    isSelected: boolean;
+    onClick: () => void;
+    priority: 'high' | 'low';
+  }> = ({ spec, isSelected, onClick, priority }) => {
+    const stockQuantity = getWorkerStock(spec);
+    const hasStock = stockQuantity > 0;
     
-    // 找到对应的材料ID
-    const material = project.materials?.find(m => m.thicknessSpecId === thicknessSpecId);
-    if (!material) return;
-
-    const confirmed = window.confirm('确定要删除这个板材吗？删除后该板材的所有状态信息将丢失。');
-    if (!confirmed) return;
-    
-    try {
-      setDeletingMaterialId(material.id);
-      const response = await apiRequest(`/api/materials/${material.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        // 更新本地状态
-        const newSelection = formData.selectedThicknessSpecs.filter(id => id !== thicknessSpecId);
-        handleInputChange('selectedThicknessSpecs', newSelection);
+    return (
+      <button
+        type="button" 
+        onClick={onClick}
+        className={`px-3 py-2 text-sm rounded-lg border-2 transition-colors relative ${
+          priority === 'high'
+            ? isSelected
+              ? 'border-blue-500 bg-blue-500 text-white'
+              : hasStock 
+                ? 'border-green-300 bg-green-50 text-green-800 hover:border-green-500'
+                : 'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-500'
+            : isSelected
+              ? 'border-gray-500 bg-gray-500 text-white'
+              : hasStock
+                ? 'border-green-300 bg-green-50 text-green-700 hover:border-green-500' 
+                : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-500'
+        }`}
+        title={`${spec.thickness}${spec.unit} ${spec.materialType || '碳板'}${formData.assignedWorkerId ? `\n工人库存: ${stockQuantity} 张` : ''}`}
+      >
+        <div className="text-center">
+          <div className="font-medium">
+            {spec.thickness}{spec.unit}
+          </div>
+          {spec.materialType && (
+            <div className="text-xs opacity-75">{spec.materialType}</div>
+          )}
+          {/* 库存指示器 */}
+          {formData.assignedWorkerId && (
+            <div className="text-xs mt-1">
+              {hasStock ? (
+                <span className="text-green-600 font-semibold">{stockQuantity}张</span>
+              ) : (
+                <span className="text-red-500">无库存</span>
+              )}
+            </div>
+          )}
+        </div>
         
-        // 触发材料更新事件
-        window.dispatchEvent(new CustomEvent('materials-updated'));
-      } else {
-        const error = await response.json();
-        alert(error.error || '删除板材失败');
-      }
-    } catch (error) {
-      console.error('删除板材错误:', error);
-      alert('删除板材失败');
-    } finally {
-      setDeletingMaterialId(null);
-    }
+        {/* 库存状态角标 */}
+        {formData.assignedWorkerId && hasStock && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
+        )}
+      </button>
+    );
   };
 
   if (!isOpen) return null;
@@ -339,11 +367,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   <Select
                     value={formData.status}
                     onChange={(value) => handleInputChange('status', value)}
-                    options={[
-                      { value: 'pending', label: '待处理' },
-                      { value: 'in_progress', label: '进行中' },
-                      { value: 'completed', label: '已完成' }
-                    ]}
+                    options={PROJECT_STATUS_OPTIONS}
                   />
                 </FormField>
 
@@ -351,82 +375,180 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   <Select
                     value={formData.priority}
                     onChange={(value) => handleInputChange('priority', value)}
-                    options={[
-                      { value: 'low', label: '低' },
-                      { value: 'medium', label: '中' },
-                      { value: 'high', label: '高' },
-                      { value: 'urgent', label: '紧急' }
-                    ]}
+                    options={PROJECT_PRIORITY_OPTIONS}
                   />
                 </FormField>
               </div>
 
-              {/* 分配工人 */}
-              <FormField label="分配工人">
+              {/* 分配工人 - 必填 */}
+              <FormField label="分配工人" required error={formErrors.assignedWorkerId}>
                 <Select
-                  value={formData.assignedWorkerId || ''}
-                  onChange={(value) => handleInputChange('assignedWorkerId', value ? parseInt(value as string) : null)}
-                  options={[
-                    { value: '', label: '未分配' },
-                    ...workers.map((worker) => ({
-                      value: worker.id.toString(),
-                      label: `${worker.name} - ${worker.department}`
-                    }))
-                  ]}
-                  clearable
+                  value={formData.assignedWorkerId ? formData.assignedWorkerId.toString() : ''}
+                  onChange={(value) => {
+                    handleInputChange('assignedWorkerId', value && value !== '' ? parseInt(value as string) : null);
+                  }}
+                  placeholder="请选择工人"
+                  options={workers.map((worker) => ({
+                    value: worker.id.toString(),
+                    label: `${worker.name} - ${worker.department || '未分配'}`
+                  }))}
+                  error={formErrors.assignedWorkerId}
                 />
-              </FormField>
-
-              {/* 板材厚度选择 */}
-              <FormField label="板材厚度" required error={formErrors.selectedThicknessSpecs}>
-                {project?.id && (
-                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="text-sm text-blue-800 font-medium mb-1">实时板材管理</div>
-                    <div className="text-xs text-blue-600">
-                      编辑项目时，点击厚度规格会立即添加或删除对应的板材
+                {/* 只在编辑模式下显示工人库存概览 */}
+                {project && formData.assignedWorkerId && !loadingWorkerMaterials && localWorkerMaterials && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-green-800">工人库存概览</h4>
+                      <span className="text-xs text-green-600">
+                        总计: {localWorkerMaterials.materials?.reduce((sum: number, m: any) => sum + (m.quantity || 0), 0) || 0} 张
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {localWorkerMaterials.materials?.length > 0 ? (
+                        localWorkerMaterials.materials
+                          .filter((material: any) => material.quantity > 0)
+                          .map((material: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center text-xs">
+                              <span className="text-green-700">
+                                {material.thicknessSpec?.thickness}{material.thicknessSpec?.unit} {material.thicknessSpec?.materialType || '碳板'}
+                              </span>
+                              <span className="font-semibold text-green-800">
+                                {material.quantity}张
+                                {material.dimensions?.length > 0 && (
+                                  <span className="ml-1 text-green-600">
+                                    ({material.dimensions.length}种尺寸)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="text-xs text-green-600 text-center">该工人暂无板材库存</div>
+                      )}
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                  {thicknessSpecs.map((spec) => {
-                    const isSelected = formData.selectedThicknessSpecs.includes(spec.id);
-                    const isProcessing = addingMaterial || deletingMaterialId !== null;
-                    const isThisSpecProcessing = deletingMaterialId === project?.materials?.find(m => m.thicknessSpecId === spec.id)?.id;
-                    
-                    return (
-                      <button
-                        key={spec.id}
-                        type="button"
-                        onClick={() => handleThicknessSpecToggle(spec.id)}
-                        disabled={isProcessing}
-                        className={`px-3 py-2 text-sm rounded-lg border-2 transition-colors relative ${
-                          isSelected
-                            ? 'border-ios18-blue bg-ios18-blue text-white'
-                            : 'border-gray-300 bg-white text-gray-700 hover:border-ios18-blue hover:bg-ios18-blue/10'
-                        } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {isThisSpecProcessing && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Loading size="sm" />
-                          </div>
-                        )}
-                        <div className={isThisSpecProcessing ? 'opacity-0' : ''}>
-                          {spec.thickness}{spec.unit}
-                          {spec.materialType && (
-                            <div className="text-xs opacity-75">{spec.materialType}</div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {formData.selectedThicknessSpecs.length > 0 && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    已选择 {formData.selectedThicknessSpecs.length} 种厚度规格
-                    {project?.id && (
-                      <span className="text-blue-600 ml-2">（已实时同步到项目）</span>
-                    )}
+                {project && formData.assignedWorkerId && loadingWorkerMaterials && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-xs text-blue-600 text-center">
+                      正在加载工人库存信息...
+                    </div>
                   </div>
+                )}
+              </FormField>
+
+              {/* 需要的板材厚度 - 碳板优先设计 */}
+              <FormField label="需要的板材厚度" required error={formErrors.requiredThickness}>
+                {thicknessSpecs.length === 0 ? (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                    <div className="text-sm text-gray-600">
+                      正在加载厚度规格...
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* 碳板厚度区域 - 主要显示 */}
+                    {carbonThicknessSpecs.length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-semibold text-blue-900 flex items-center">
+                            <FireIcon className="w-4 h-4 mr-1" />
+                            碳板厚度
+                            <Badge variant="primary" className="ml-2">主要材料</Badge>
+                          </h4>
+                          <span className="text-xs text-blue-600">
+                            {formData.requiredThickness.filter(id => 
+                              carbonThicknessSpecs.some(spec => spec.id === id)
+                            ).length} 已选择
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {carbonThicknessSpecs.map((spec) => {
+                            const isSelected = formData.requiredThickness.includes(spec.id);
+                            
+                            return (
+                              <ThicknessButton
+                                key={spec.id}
+                                spec={spec}
+                                isSelected={isSelected}
+                                onClick={() => handleThicknessToggle(spec.id)}
+                                priority="high"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 特殊材料厚度区域 - 折叠显示 */}
+                    {specialThicknessSpecs.length > 0 && (
+                      <div className="border border-gray-200 rounded-lg">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setShowSpecialMaterials(!showSpecialMaterials)}
+                          className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+                        >
+                          <span className="text-sm font-medium text-gray-700 flex items-center">
+                            <FolderIcon className="w-4 h-4 mr-1" />
+                            特殊材料
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500">
+                              {formData.requiredThickness.filter(id => 
+                                specialThicknessSpecs.some(spec => spec.id === id)
+                              ).length} 已选择
+                            </span>
+                            <ChevronDownIcon 
+                              className={`w-4 h-4 text-gray-500 transition-transform ${
+                                showSpecialMaterials ? 'rotate-180' : ''
+                              }`} 
+                            />
+                          </div>
+                        </Button>
+                        
+                        {showSpecialMaterials && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-3 pt-0">
+                              <div className="grid grid-cols-4 gap-2">
+                                {specialThicknessSpecs.map((spec) => {
+                                  const isSelected = formData.requiredThickness.includes(spec.id);
+                                  
+                                  return (
+                                    <ThicknessButton
+                                      key={spec.id}
+                                      spec={spec}
+                                      isSelected={isSelected}
+                                      onClick={() => handleThicknessToggle(spec.id)}
+                                      priority="low"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 选择统计 */}
+                    {formData.requiredThickness.length > 0 && (
+                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-sm text-green-800 flex items-center">
+                          <CheckCircleIcon className="w-4 h-4 mr-1" />
+                          已选择 {formData.requiredThickness.length} 种板材厚度
+                          <span className="text-green-600 ml-2">
+                            （创建项目后将为工人生成对应厚度的板材记录，数量为0等待填写）
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </FormField>
             </form>

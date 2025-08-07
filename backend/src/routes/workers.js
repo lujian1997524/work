@@ -51,6 +51,7 @@ router.get('/', authenticate, async (req, res) => {
         phone: worker.phone,
         department: worker.departmentInfo?.name || '未分配',
         departmentId: worker.departmentId,
+        position: worker.position,
         status: worker.status,
         projectCount: projectCount, // 添加项目数量
         createdAt: worker.createdAt,
@@ -84,7 +85,7 @@ router.get('/', authenticate, async (req, res) => {
  */
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, phone, departmentId } = req.body;
+    const { name, phone, departmentId, position } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({
@@ -115,10 +116,22 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
+    // 验证部门ID是否存在（如果提供了）
+    if (departmentId) {
+      const department = await Department.findByPk(departmentId);
+      if (!department) {
+        return res.status(400).json({
+          success: false,
+          message: '指定的部门不存在'
+        });
+      }
+    }
+
     const worker = await Worker.create({
       name: name.trim(),
       phone: phone.trim(),
       departmentId: departmentId || null,
+      position: position ? position.trim() : null,
       status: 'active'
     });
 
@@ -141,6 +154,7 @@ router.post('/', authenticate, async (req, res) => {
         phone: createdWorker.phone,
         department: createdWorker.departmentInfo?.name || '未分配',
         departmentId: createdWorker.departmentId,
+        position: createdWorker.position,
         status: createdWorker.status,
         projectCount: 0, // 新创建的工人项目数量为0
         createdAt: createdWorker.createdAt,
@@ -164,7 +178,7 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, departmentId } = req.body;
+    const { name, phone, departmentId, position } = req.body;
 
     const worker = await Worker.findByPk(id);
     if (!worker) {
@@ -192,10 +206,22 @@ router.put('/:id', authenticate, async (req, res) => {
       }
     }
 
+    // 验证部门ID是否存在（如果提供了）
+    if (departmentId) {
+      const department = await Department.findByPk(departmentId);
+      if (!department) {
+        return res.status(400).json({
+          success: false,
+          message: '指定的部门不存在'
+        });
+      }
+    }
+
     await worker.update({
       name: name?.trim() || worker.name,
       phone: phone?.trim() || worker.phone,
       departmentId: departmentId !== undefined ? departmentId : worker.departmentId,
+      position: position?.trim() || worker.position,
       updatedAt: new Date()
     });
 
@@ -229,6 +255,7 @@ router.put('/:id', authenticate, async (req, res) => {
         phone: updatedWorker.phone,
         department: updatedWorker.departmentInfo?.name || '未分配',
         departmentId: updatedWorker.departmentId,
+        position: updatedWorker.position,
         status: updatedWorker.status,
         projectCount: projectCount,
         createdAt: updatedWorker.createdAt,

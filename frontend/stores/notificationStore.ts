@@ -52,19 +52,25 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       notifications: [...state.notifications, notification]
     }));
     
-    // 智能选择并播放提示音
-    const soundType = audioManager.getNotificationSound(
-      notification.type, 
-      notification.title, 
-      notification.message
-    );
-    audioManager.playNotificationSound(soundType);
+    // 检查是否为项目状态通知，如果是则跳过音效播放（由 materialStatusManager 统一处理）
+    if (notification.id.includes('project-status-') || notification.title.includes('项目状态')) {
+      // 跳过SSE项目状态通知的音效播放
+    } else {
+      // 智能选择并播放提示音
+      const soundType = audioManager.getNotificationSound(
+        notification.type, 
+        notification.title, 
+        notification.message
+      );
+      audioManager.playNotificationSound(soundType);
+    }
     
-    // 发送桌面通知
+    // 发送桌面通知（静音，因为这里已经播放了音效）
     notificationManager.showNotification({
       title: notification.title,
       body: notification.message,
       tag: `app-notification-${notification.id}`,
+      silent: true, // 设置为静音，避免重复播放
       data: {
         type: notification.type,
         source: 'app-notification',

@@ -1,44 +1,11 @@
 import { create } from 'zustand';
 import { sseManager } from '@/utils/sseManager';
 import { apiRequest } from '@/utils/api';
+import type { Project, Material } from '@/types/project';
 
-// 材料状态类型
-export interface MaterialState {
-  id: number;
-  projectId: number;
-  thicknessSpecId: number;
-  status: 'pending' | 'in_progress' | 'completed';
-  startDate?: string;
-  completedDate?: string;
-  completedBy?: number;
-  notes?: string;
-  thicknessSpec?: {
-    id: number;
-    thickness: string;
-    unit: string;
-    materialType: string;
-  };
-}
-
-// 项目状态类型
-export interface ProjectState {
-  id: number;
-  name: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
-  assignedWorkerId?: number;
-  createdBy: number;
-  createdAt: string;
-  updatedAt: string;
-  description?: string; // 项目描述/备注
-  // 扩展属性
-  assignedWorker?: {
-    id: number;
-    name: string;
-  };
-  materials?: MaterialState[];
-  drawings?: any[];
-}
+// 类型别名，兼容现有代码
+export type MaterialState = Material;
+export type ProjectState = Project;
 
 // 获取认证token的辅助函数
 const getAuthToken = (): string | null => {
@@ -67,10 +34,10 @@ const debouncedRefresh = (fetchProjects: () => Promise<void>) => {
 // 项目Store接口
 export interface ProjectStore {
   // 状态
-  projects: ProjectState[];
-  completedProjects: ProjectState[];
-  pastProjects: ProjectState[];
-  pastProjectsByMonth: Record<string, ProjectState[]>;
+  projects: Project[];
+  completedProjects: Project[];
+  pastProjects: Project[];
+  pastProjectsByMonth: Record<string, Project[]>;
   loading: boolean;
   error: string | null;
   lastUpdated: number;
@@ -84,21 +51,21 @@ export interface ProjectStore {
   fetchProjects: () => Promise<void>;
   fetchCompletedProjects: (workerName?: string) => Promise<void>;
   fetchPastProjects: (year?: number, month?: number) => Promise<void>;
-  createProject: (projectData: Partial<ProjectState>) => Promise<ProjectState | null>;
-  updateProject: (id: number, updates: Partial<ProjectState>, options?: { silent?: boolean }) => Promise<ProjectState | null>;
+  createProject: (projectData: Partial<Project>) => Promise<Project | null>;
+  updateProject: (id: number, updates: Partial<Project>, options?: { silent?: boolean }) => Promise<Project | null>;
   deleteProject: (id: number) => Promise<boolean>;
   moveToPastProject: (id: number) => Promise<boolean>;
   restoreFromPastProject: (id: number) => Promise<boolean>;
-  getProjectById: (id: number) => ProjectState | undefined;
+  getProjectById: (id: number) => Project | undefined;
   
   // SSE相关方法
   setupSSEListeners: () => void;
   cleanupSSEListeners: () => void;
   
   // 内部方法
-  setProjects: (projects: ProjectState[]) => void;
-  addProject: (project: ProjectState) => void;
-  updateProjectInStore: (id: number, updates: Partial<ProjectState>) => void;
+  setProjects: (projects: Project[]) => void;
+  addProject: (project: Project) => void;
+  updateProjectInStore: (id: number, updates: Partial<Project>) => void;
   optimisticUpdateMaterialStatus: (projectId: number, materialId: number, newStatus: 'pending' | 'in_progress' | 'completed', user?: { id: number; name: string }) => void;
   setOptimisticUpdating: (updating: boolean) => void;
   removeProject: (id: number) => void;
@@ -238,7 +205,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       } else {
         // 如果没有指定年月，返回按月分组的数据
         const pastProjectsByMonth = data.projectsByMonth || {};
-        const pastProjects = Object.values(pastProjectsByMonth).flat() as ProjectState[];
+        const pastProjects = Object.values(pastProjectsByMonth).flat() as Project[];
         set({ 
           pastProjects,
           pastProjectsByMonth, 
@@ -274,7 +241,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       });
       
       if (!response.ok) {
-        throw new Error('创建项目失败');
+        const errorData = await response.json();
+        throw new Error(errorData.error || '创建项目失败');
       }
       
       const data = await response.json();
@@ -290,6 +258,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       // 通知其他组件更新
       window.dispatchEvent(new CustomEvent('project-created', { 
         detail: newProject 
+      }));
+      window.dispatchEvent(new CustomEvent('materials-updated', { 
+        detail: { projectId: newProject.id, action: 'project-created' } 
       }));
       
       return newProject;
@@ -794,5 +765,93 @@ if (typeof window !== 'undefined') {
         console.log('🚀 乐观更新进行中，跳过Store层刷新');
       }
     }, 800); // 增加防抖时间到800ms
+  });
+
+  // 监听新的材料状态更新事件 - 使用乐观更新而非全量刷新
+  window.addEventListener('material-status-updated', (event: any) => {
+    const eventDetail = event.detail;
+    const { projectId, thicknessSpecId, newStatus, action } = eventDetail;
+    
+    console.log('📡 Store层收到material-status-updated事件，进行乐观更新:', eventDetail);
+    
+    const store = useProjectStore.getState();
+    
+    // 使用乐观更新：直接更新Store中的数据，无需全量刷新
+    if (projectId && thicknessSpecId) {
+      const currentProjects = store.projects;
+      const targetProjectIndex = currentProjects.findIndex(p => p.id === projectId);
+      
+      if (targetProjectIndex >= 0) {
+        const updatedProjects = [...currentProjects];
+        const targetProject = { ...updatedProjects[targetProjectIndex] };
+        const materials = targetProject.materials || [];
+        
+        if (action === 'delete') {
+          // 删除材料记录
+          targetProject.materials = materials.filter(m => m.thicknessSpecId !== thicknessSpecId);
+        } else if (action === 'create') {
+          // 创建新材料记录
+          const newMaterial = {
+            id: Date.now(), // 临时ID
+            projectId,
+            thicknessSpecId,
+            status: newStatus,
+            startDate: newStatus === 'in_progress' ? new Date().toISOString().split('T')[0] : undefined,
+            completedDate: newStatus === 'completed' ? new Date().toISOString().split('T')[0] : undefined
+          };
+          targetProject.materials = [...materials, newMaterial];
+        } else if (action === 'update') {
+          // 更新现有材料记录
+          targetProject.materials = materials.map(m => 
+            m.thicknessSpecId === thicknessSpecId 
+              ? { 
+                  ...m, 
+                  status: newStatus,
+                  startDate: newStatus === 'in_progress' && !m.startDate ? new Date().toISOString().split('T')[0] : m.startDate,
+                  completedDate: newStatus === 'completed' ? new Date().toISOString().split('T')[0] : m.completedDate
+                }
+              : m
+          );
+        }
+        
+        // 计算项目新状态
+        const allMaterials = targetProject.materials || [];
+        const hasEmpty = allMaterials.length === 0 || allMaterials.some(m => !m.status);
+        const hasPending = allMaterials.some(m => m.status === 'pending');
+        const hasInProgress = allMaterials.some(m => m.status === 'in_progress');
+        const hasCompleted = allMaterials.some(m => m.status === 'completed');
+        
+        let newProjectStatus = targetProject.status;
+        
+        // 规则1: 有任何一个进行中状态时，项目为进行中状态
+        if (hasInProgress) {
+          newProjectStatus = 'in_progress';
+        }
+        // 规则2: 当待处理状态和已完成状态同时存在时，项目为进行中状态
+        else if (hasPending && hasCompleted) {
+          newProjectStatus = 'in_progress';
+        }
+        // 规则3: 当只有空白状态和已完成状态时，项目为已完成状态
+        else if (hasCompleted && !hasPending && !hasInProgress) {
+          newProjectStatus = 'completed';
+        }
+        // 规则4: 当只有空白状态和待处理状态时，项目为待处理状态
+        else {
+          newProjectStatus = 'pending';
+        }
+        
+        targetProject.status = newProjectStatus;
+        updatedProjects[targetProjectIndex] = targetProject;
+        
+        // 直接更新Store，触发UI更新但避免全量刷新
+        store.setProjects(updatedProjects);
+        
+        console.log('✅ 材料状态和项目状态乐观更新完成，无需全量刷新', {
+          项目ID: projectId,
+          新材料状态: newStatus,
+          新项目状态: newProjectStatus
+        });
+      }
+    }
   });
 }

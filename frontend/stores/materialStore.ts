@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiRequest } from '@/utils/api';
+import type { Material } from '@/types/project';
 
 // 获取认证token的辅助函数
 const getAuthToken = (): string | null => {
@@ -7,47 +8,25 @@ const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
-// 材料状态类型
-interface MaterialState {
-  id: number;
-  project_id: number;
-  thickness_spec_id: number;
-  status: 'pending' | 'in_progress' | 'completed';
-  start_date?: string;
-  completed_date?: string;
-  completed_by?: number;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  // 关联数据
-  thickness_spec?: {
-    id: number;
-    thickness: number;
-    unit: string;
-    material_type: string;
-  };
-  completed_by_user?: {
-    id: number;
-    name: string;
-  };
-}
+// 类型别名，兼容现有代码
+export type MaterialState = Material;
 
 // 材料Store接口
 interface MaterialStore {
   // 状态
-  materials: MaterialState[];
+  materials: Material[];
   loading: boolean;
   error: string | null;
   lastUpdated: number;
 
   // 操作方法
   fetchMaterials: (projectId?: number) => Promise<void>;
-  updateMaterialStatus: (id: number, status: MaterialState['status'], additionalData?: any) => Promise<MaterialState | null>;
-  getMaterialsByProject: (projectId: number) => MaterialState[];
+  updateMaterialStatus: (id: number, status: Material['status'], additionalData?: any) => Promise<Material | null>;
+  getMaterialsByProject: (projectId: number) => Material[];
   
   // 内部方法
-  setMaterials: (materials: MaterialState[]) => void;
-  updateMaterialInStore: (id: number, updates: Partial<MaterialState>) => void;
+  setMaterials: (materials: Material[]) => void;
+  updateMaterialInStore: (id: number, updates: Partial<Material>) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }
@@ -149,6 +128,9 @@ export const useMaterialStore = create<MaterialStore>((set, get) => ({
       }));
       
       // 通知其他组件更新
+      window.dispatchEvent(new CustomEvent('materials-updated', { 
+        detail: { id, updates: updatedMaterial } 
+      }));
       window.dispatchEvent(new CustomEvent('material-updated', { 
         detail: { id, updates: updatedMaterial } 
       }));
@@ -165,7 +147,7 @@ export const useMaterialStore = create<MaterialStore>((set, get) => ({
 
   // 根据项目ID获取材料
   getMaterialsByProject: (projectId) => {
-    return get().materials.filter(m => m.project_id === projectId);
+    return get().materials.filter(m => m.projectId === projectId);
   },
 
   // 内部状态管理方法

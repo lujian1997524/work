@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui';
+import { Button, useDialog } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   UserIcon,
@@ -26,6 +26,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { confirm, DialogRenderer } = useDialog();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -70,8 +71,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     };
   }, [isOpen]);
 
-  const handleLogout = () => {
-    if (confirm('确定要退出登录吗？')) {
+  const handleLogout = async () => {
+    const confirmed = await confirm('确定要退出登录吗？');
+    if (confirmed) {
       logout();
       setIsOpen(false);
     }
@@ -103,6 +105,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   ];
 
   return (
+    <>
     <div ref={menuRef} className={`relative ${className}`}>
       {/* 用户头像按钮 */}
       <button
@@ -211,5 +214,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       document.body
       )}
     </div>
+    
+    {/* Dialog渲染器 */}
+    <DialogRenderer />
+  </>
   );
 };

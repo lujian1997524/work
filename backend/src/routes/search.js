@@ -36,19 +36,18 @@ router.get('/', authenticate, async (req, res) => {
     const searchPattern = `%${searchTerm}%`;
     
     // 导入模型
-    const { Project, Worker, Department, Drawing, User } = require('../models');
+    const { Project, Worker, Department, Drawing, User, Material, ThicknessSpec, WorkerMaterial } = require('../models');
 
     // 并行搜索所有类型
-    const [projects, workers, departments, drawings] = await Promise.all([
-      // 搜索项目
+    const [projects, workers, departments, drawings, workerMaterials] = await Promise.all([
+      // 搜索项目 - 增强版，包含材料信息（包括过往项目）
       Project.findAll({
         where: {
           [Op.or]: [
             { name: { [Op.like]: searchPattern } },
             { description: { [Op.like]: searchPattern } },
-            // 通过关联表搜索创建者姓名
+            // 通过关联表搜索创建者和负责工人
             { '$creator.name$': { [Op.like]: searchPattern } },
-            // 通过关联表搜索负责工人姓名
             { '$assignedWorker.name$': { [Op.like]: searchPattern } }
           ]
         },
@@ -62,13 +61,25 @@ router.get('/', authenticate, async (req, res) => {
             model: Worker,
             as: 'assignedWorker',
             attributes: ['id', 'name', 'department']
+          },
+          // 新增：材料关联信息
+          {
+            model: Material,
+            as: 'materials',
+            attributes: ['id', 'status', 'completedDate'],
+            include: [{
+              model: ThicknessSpec,
+              as: 'thicknessSpec',
+              attributes: ['id', 'thickness', 'unit', 'materialType']
+            }],
+            required: false // 左连接，即使没有材料也显示项目
           }
         ],
-        limit: 10,
+        limit: 15, // 增加限制数量以适应更多搜索结果
         order: [['updatedAt', 'DESC']]
       }),
 
-      // 搜索工人
+      // 搜索工人 - 增强版，包含项目和库存信息
       Worker.findAll({
         where: {
           [Op.and]: [
@@ -90,9 +101,34 @@ router.get('/', authenticate, async (req, res) => {
             as: 'departmentInfo',
             attributes: ['id', 'name'],
             required: false
+          },
+          // 新增：工人负责的项目
+          {
+            model: Project,
+            as: 'assignedProjects',
+            attributes: ['id', 'name', 'status'],
+            where: { 
+              status: { [Op.in]: ['pending', 'in_progress'] } // 只显示进行中的项目
+            },
+            required: false
+          },
+          // 新增：工人的板材库存
+          {
+            model: WorkerMaterial,
+            as: 'materials',
+            attributes: ['id', 'quantity'],
+            where: { 
+              quantity: { [Op.gt]: 0 } // 只显示有库存的材料
+            },
+            include: [{
+              model: ThicknessSpec,
+              as: 'thicknessSpec',
+              attributes: ['id', 'thickness', 'unit', 'materialType']
+            }],
+            required: false
           }
         ],
-        limit: 10,
+        limit: 12, // 增加限制数量
         order: [['name', 'ASC']]
       }),
 
@@ -125,10 +161,48 @@ router.get('/', authenticate, async (req, res) => {
         ],
         limit: 8,
         order: [['uploadTime', 'DESC']]
+      }),
+
+      // 新增：搜索板材库存（修复关联查询）
+      WorkerMaterial.findAll({
+        where: {
+          quantity: { [Op.gt]: 0 }
+        },
+        include: [
+          {
+            model: Worker,
+            as: 'worker',
+            attributes: ['id', 'name', 'department', 'departmentId'],
+            where: { 
+              status: 'active',
+              name: { 
+                [Op.and]: [
+                  { [Op.ne]: null }, // 确保工人姓名不为空
+                  { [Op.like]: searchPattern } // 添加搜索过滤
+                ]
+              }
+            },
+            include: [{
+              model: Department,
+              as: 'departmentInfo',
+              attributes: ['id', 'name'],
+              required: false // 左连接，允许部门为空
+            }],
+            required: true // 内连接，确保工人存在
+          },
+          {
+            model: ThicknessSpec,
+            as: 'thicknessSpec',
+            attributes: ['id', 'thickness', 'unit', 'materialType'],
+            required: true
+          }
+        ],
+        limit: 10,
+        order: [['quantity', 'DESC']]
       })
     ]);
 
-    // 格式化搜索结果
+    // 格式化搜索结果 - 增强版
     const formatProjects = projects.map(project => ({
       id: project.id,
       name: project.name,
@@ -138,17 +212,35 @@ router.get('/', authenticate, async (req, res) => {
       assignedWorker: project.assignedWorker?.name || null,
       department: project.assignedWorker?.department || null,
       createdAt: project.createdAt,
-      updatedAt: project.updatedAt
+      updatedAt: project.updatedAt,
+      // 新增：材料信息
+      materials: project.materials?.map(material => ({
+        id: material.id,
+        status: material.status,
+        completedDate: material.completedDate,
+        thicknessSpec: material.thicknessSpec
+      })) || []
     }));
 
     const formatWorkers = workers.map(worker => ({
       id: worker.id,
       name: worker.name,
-      department: worker.departmentInfo?.name || worker.department || '未分配',
+      department: worker.departmentInfo?.name || '未分配',
       position: worker.position,
       phone: worker.phone,
-      email: worker.email,
-      status: worker.status
+      status: worker.status,
+      // 新增：负责的项目信息
+      assignedProjects: worker.assignedProjects?.map(project => ({
+        id: project.id,
+        name: project.name,
+        status: project.status
+      })) || [],
+      // 新增：库存信息
+      materials: worker.materials?.map(material => ({
+        id: material.id,
+        quantity: material.quantity,
+        thicknessSpec: material.thicknessSpec
+      })) || []
     }));
 
     const formatDepartments = await Promise.all(
@@ -183,6 +275,33 @@ router.get('/', authenticate, async (req, res) => {
       uploadedAt: drawing.uploadTime
     }));
 
+    // 新增：格式化板材库存结果（修复部门显示）
+    const formatWorkerMaterials = workerMaterials.map(workerMaterial => {
+      // 使用标准化的部门信息
+      const department = workerMaterial.worker.departmentInfo?.name || '未分配部门';
+      
+      return {
+        id: workerMaterial.id,
+        quantity: workerMaterial.quantity,
+        worker: {
+          id: workerMaterial.worker.id,
+          name: workerMaterial.worker.name,
+          department: department
+        },
+        thicknessSpec: {
+          id: workerMaterial.thicknessSpec.id,
+          thickness: workerMaterial.thicknessSpec.thickness,
+          unit: workerMaterial.thicknessSpec.unit,
+          materialType: workerMaterial.thicknessSpec.materialType
+        },
+        // 用于搜索结果显示的名称
+        name: `${workerMaterial.thicknessSpec.thickness}${workerMaterial.thicknessSpec.unit} ${workerMaterial.thicknessSpec.materialType || '碳板'}`,
+        // 用于搜索结果显示的描述
+        description: `库存 ${workerMaterial.quantity} 张 • ${workerMaterial.worker.name}`,
+        department: department
+      };
+    });
+
     res.json({
       success: true,
       query: searchTerm,
@@ -190,7 +309,8 @@ router.get('/', authenticate, async (req, res) => {
       workers: formatWorkers,
       departments: formatDepartments,
       drawings: formatDrawings,
-      totalCount: formatProjects.length + formatWorkers.length + formatDepartments.length + formatDrawings.length
+      materials: formatWorkerMaterials, // 新增板材库存结果
+      totalCount: formatProjects.length + formatWorkers.length + formatDepartments.length + formatDrawings.length + formatWorkerMaterials.length
     });
 
   } catch (error) {
@@ -408,6 +528,14 @@ router.post('/advanced', authenticate, async (req, res) => {
     if (type === 'all' || type === 'workers') {
       const workers = await Worker.findAll({
         where: buildWorkerWhere(),
+        include: [
+          {
+            model: Department,
+            as: 'departmentInfo',
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ],
         order: getOrder(sort),
         limit: Math.min(parseInt(limit), 100)
       });
@@ -415,10 +543,9 @@ router.post('/advanced', authenticate, async (req, res) => {
       results.workers = workers.map(worker => ({
         id: worker.id,
         name: worker.name,
-        department: worker.department,
+        department: worker.departmentInfo?.name || '未分配',
         position: worker.position,
         phone: worker.phone,
-        email: worker.email,
         createdAt: worker.createdAt,
         type: 'worker'
       }));

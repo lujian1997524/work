@@ -52,7 +52,6 @@ class AudioManager {
   private setupUserInteractionListener() {
     const enableAudio = () => {
       this.hasUserInteracted = true;
-      console.log('✅ 用户已交互，音频播放已启用');
       
       // 移除监听器，只需要监听一次
       document.removeEventListener('click', enableAudio);
@@ -94,12 +93,11 @@ class AudioManager {
   async playNotificationSound(type: SoundType): Promise<void> {
     // 只在浏览器环境中播放音频
     if (typeof window === 'undefined' || !this.config.enabled) {
-      console.log('音频已禁用或非浏览器环境');
       return;
     }
 
     if (!this.hasUserInteracted) {
-      console.log(`用户尚未交互，跳过音效播放: ${type} (这是正常的浏览器安全策略)`);
+      // 静默跳过，这是正常的浏览器安全策略
       return;
     }
 
@@ -108,7 +106,6 @@ class AudioManager {
       
       // 如果缓存中没有音频，直接创建新的
       if (!audio) {
-        console.log(`创建新的音频对象: ${this.soundPaths[type]}`);
         audio = new Audio(this.soundPaths[type]);
         audio.volume = this.config.volume;
         this.audioCache.set(type, audio);
@@ -117,27 +114,13 @@ class AudioManager {
       // 重置播放位置（防止连续播放问题）
       audio.currentTime = 0;
       audio.volume = this.config.volume;
-
-      console.log(`播放音效: ${type}, 音量: ${this.config.volume}, 路径: ${this.soundPaths[type]}`);
       
       // 播放音频
       await audio.play();
-      console.log(`音效播放成功: ${type}`);
     } catch (error) {
-      // 区分不同类型的错误，避免不必要的错误日志
-      if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') {
-          // 用户交互限制错误，这是正常的浏览器安全行为
-          console.log(`音效播放需要用户交互: ${type} (这是正常的浏览器安全策略)`);
-        } else if (error.name === 'AbortError') {
-          // 播放被中断，通常是因为新的播放请求
-          console.log(`音效播放被中断: ${type}`);
-        } else {
-          // 其他真正的错误才记录为错误
-          console.error(`音效播放失败: ${type}`, error.message);
-        }
-      } else {
-        console.error(`音效播放失败: ${type}`, error);
+      // 静默处理音频播放错误
+      if (error instanceof Error && error.name !== 'NotAllowedError' && error.name !== 'AbortError') {
+        console.error(`音效播放失败: ${type}`, error.message);
       }
     }
   }

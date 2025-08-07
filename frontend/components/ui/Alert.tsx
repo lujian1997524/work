@@ -2,6 +2,14 @@
 
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  InformationCircleIcon,
+  RocketLaunchIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline'
 
 export interface AlertProps {
   children: React.ReactNode
@@ -29,37 +37,37 @@ export const Alert: React.FC<AlertProps> = ({
       bg: 'bg-blue-50 dark:bg-blue-900/20',
       border: 'border-blue-200 dark:border-blue-800',
       text: 'text-blue-800 dark:text-blue-200',
-      icon: '💡'
+      icon: <InformationCircleIcon className="w-5 h-5" />
     },
     primary: {
       bg: 'bg-ios18-blue/10 dark:bg-ios18-blue/20',
       border: 'border-ios18-blue/30 dark:border-ios18-blue/50',
       text: 'text-ios18-blue dark:text-ios18-blue',
-      icon: '🚀'
+      icon: <RocketLaunchIcon className="w-5 h-5" />
     },
     success: {
       bg: 'bg-green-50 dark:bg-green-900/20',
       border: 'border-green-200 dark:border-green-800',
       text: 'text-green-800 dark:text-green-200',
-      icon: '✅'
+      icon: <CheckCircleIcon className="w-5 h-5" />
     },
     warning: {
       bg: 'bg-yellow-50 dark:bg-yellow-900/20',
       border: 'border-yellow-200 dark:border-yellow-800',
       text: 'text-yellow-800 dark:text-yellow-200',
-      icon: '⚠️'
+      icon: <ExclamationTriangleIcon className="w-5 h-5" />
     },
     danger: {
       bg: 'bg-red-50 dark:bg-red-900/20',
       border: 'border-red-200 dark:border-red-800',
       text: 'text-red-800 dark:text-red-200',
-      icon: '❌'
+      icon: <XCircleIcon className="w-5 h-5" />
     },
     error: {
       bg: 'bg-red-50 dark:bg-red-900/20',
       border: 'border-red-200 dark:border-red-800',
       text: 'text-red-800 dark:text-red-200',
-      icon: '❌'
+      icon: <XCircleIcon className="w-5 h-5" />
     }
   }
 

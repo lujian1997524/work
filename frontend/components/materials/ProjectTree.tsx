@@ -106,11 +106,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
     }
     const success = await deleteProject(projectId);
     if (!success) {
-      await confirm('删除项目失败，请重试', { 
-        title: '操作失败',
-        confirmText: '确定',
-        showCancel: false 
-      });
+      await alert('删除项目失败，请重试');
     }
   };
 

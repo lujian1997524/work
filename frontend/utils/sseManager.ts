@@ -60,11 +60,19 @@ class SSEManager {
 
   // 获取SSE连接URL - 直连模式
   private getSSEUrl(token: string): string {
-    const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || '192.168.31.134';
+    // 优先使用完整URL配置
+    if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+      const sseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/sse/connect?token=${encodeURIComponent(token)}`;
+      console.log('📡 使用完整URL SSE:', sseUrl.substring(0, 80) + '...');
+      return sseUrl;
+    }
+    
+    // 兜底使用主机+端口配置
+    const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost';
     const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
     
     const sseUrl = `http://${backendHost}:${backendPort}/api/sse/connect?token=${encodeURIComponent(token)}`;
-    console.log('📡 使用直连SSE URL:', sseUrl.substring(0, 80) + '...');
+    console.log('📡 使用主机+端口SSE URL:', sseUrl.substring(0, 80) + '...');
     return sseUrl;
   }
 

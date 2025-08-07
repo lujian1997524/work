@@ -4,12 +4,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Modal, Button, Input, Dropdown, FileDropzone, Alert, ProgressBar } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiRequest } from '@/utils/apiConfig';
+import { apiRequest } from '@/utils/api';
 
 export interface DrawingUploadProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  projectId?: number; // 可选的项目ID，用于关联到特定项目
 }
 
 interface UploadFile {
@@ -23,7 +24,8 @@ interface UploadFile {
 export const DrawingUpload: React.FC<DrawingUploadProps> = ({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  projectId // 接收项目ID参数
 }) => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [description, setDescription] = useState('');
@@ -69,9 +71,22 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
     console.log('- 文件名:', uploadFile.file.name);
     console.log('- 文件大小:', uploadFile.file.size);
     console.log('- 文件类型:', uploadFile.file.type);
+    console.log('- 项目ID:', projectId);
     
-    // 如果是常用零件，使用专门的API端点
-    const uploadEndpoint = isCommonPart ? '/api/drawings/common-parts/upload' : '/api/drawings/upload';
+    // 根据是否有projectId选择API端点
+    let uploadEndpoint: string;
+    if (projectId) {
+      // 如果有项目ID，上传到特定项目
+      uploadEndpoint = `/api/drawings/project/${projectId}/upload`;
+    } else if (isCommonPart) {
+      // 如果是常用零件，使用专门的API端点
+      uploadEndpoint = '/api/drawings/common-parts/upload';
+    } else {
+      // 否则上传到图纸库
+      uploadEndpoint = '/api/drawings/upload';
+    }
+    
+    console.log('🚀 使用上传端点:', uploadEndpoint);
 
     try {
       // 更新文件状态为上传中
@@ -146,14 +161,12 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
       const successCount = results.filter(Boolean).length;
       
       if (successCount > 0) {
-        onSuccess();
+        onSuccess(); // 调用成功回调刷新数据
         
-        // 如果全部成功，关闭对话框
+        // 如果全部成功，立即关闭对话框并重置表单
         if (successCount === files.filter(f => f.status === 'pending').length) {
-          setTimeout(() => {
-            onClose();
-            resetForm();
-          }, 1000);
+          onClose();
+          resetForm();
         }
       }
     } finally {

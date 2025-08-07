@@ -18,7 +18,10 @@ router.get('/', authenticate, async (req, res) => {
     const departmentsWithWorkerCount = await Promise.all(
       departments.map(async (dept) => {
         const workerCount = await Worker.count({
-          where: { department: dept.name }
+          where: { 
+            departmentId: dept.id,
+            status: 'active'
+          }
         });
         return {
           id: dept.id,
@@ -202,7 +205,10 @@ router.delete('/:id', authenticate, async (req, res) => {
     // 检查是否有工人分配到这个部门
     const { Worker } = require('../models');
     const workersInDepartment = await Worker.count({
-      where: { department: department.name }
+      where: { 
+        departmentId: id,
+        status: 'active'
+      }
     });
 
     if (workersInDepartment > 0) {

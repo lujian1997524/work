@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Button, Card, Input, StatusIndicator, StatusToggle, Switch, Badge, Alert, Avatar, Skeleton, SkeletonCard, SkeletonList, ProgressBar, ProgressWithSteps, Modal, ConfirmModal, Dropdown, TabBar, Tabs, Slider, RangeSlider, Toast, ToastContainer, useToast, Tooltip, Popover, DatePicker, SearchBar, Empty, EmptyData, EmptySearch, Loading, LoadingSpinner, LoadingDots, LoadingOverlay, Stepper, Breadcrumb, Tree, Rating, Timeline, Pagination, Table, TableHeader, TableBody, TableRow, TableCell, TableContainer, SortableTableRow, Form, FormGroup, FormField, FormActions, FormContainer, Select, List, ListItem, ListGroup, ListAction, ListContainer, Navigation, NavigationItem, NavigationGroup, NavigationDivider, TabNavigation } from '../../components/ui'
+import { Button, Card, Input, StatusIndicator, StatusToggle, Switch, Badge, Alert, Avatar, Skeleton, SkeletonCard, SkeletonList, ProgressBar, ProgressWithSteps, Modal, ConfirmModal, Dropdown, TabBar, Tabs, Slider, RangeSlider, Toast, ToastContainer, useToast, Tooltip, Popover, DatePicker, SearchBar, Empty, EmptyData, EmptySearch, Loading, LoadingSpinner, LoadingDots, LoadingOverlay, Stepper, Breadcrumb, Tree, Rating, Timeline, Pagination, Table, TableHeader, TableBody, TableRow, TableCell, TableContainer, SortableTableRow, Form, FormGroup, FormField, FormActions, FormContainer, Select, List, ListItem, ListGroup, ListAction, ListContainer, Navigation, NavigationItem, NavigationGroup, NavigationDivider, TabNavigation, MaterialStatusManager } from '../../components/ui'
 import { useNotification, NotificationContainer as NotificationManager } from '../../components/ui/Notification'
 import { Dialog, useDialog } from '../../components/ui/Dialog'
 import { SearchBox } from '../../components/ui/SearchBox'
 import type { SearchType, SearchResult } from '../../components/ui/SearchBox'
+import type { MaterialInfo, MaterialStatusType } from '../../components/ui/MaterialStatusManager'
 import { MainLayout } from '../../components/layout'
 import type { StatusType, DropdownOption, TabItem, SearchSuggestion, StepperStep, BreadcrumbItem, TreeNode, TimelineItem } from '../../components/ui'
 import { UnifiedWorkersSidebar } from './UnifiedWorkersSidebar'
@@ -41,6 +42,96 @@ export default function DesignSystemPage() {
 
   // WorkersSidebar状态
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all')
+
+  // Material Status Manager状态
+  const [materialStatusDemo, setMaterialStatusDemo] = useState<MaterialInfo[]>([
+    {
+      id: 1,
+      projectId: 1,
+      projectName: '激光切割项目A',
+      thicknessSpecId: 1,
+      materialType: '碳板',
+      thickness: '2.0',
+      unit: 'mm',
+      status: 'pending',
+      quantity: 5,
+      assignedWorker: { id: 1, name: '张三' },
+      priority: 'high',
+      notes: '优先处理，客户要求加急'
+    },
+    {
+      id: 2,
+      projectId: 1,
+      projectName: '激光切割项目A',
+      thicknessSpecId: 2,
+      materialType: '碳板',
+      thickness: '3.0',
+      unit: 'mm',
+      status: 'in_progress',
+      quantity: 3,
+      assignedWorker: { id: 2, name: '李四' },
+      startDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      priority: 'medium'
+    },
+    {
+      id: 3,
+      projectId: 2,
+      projectName: '精密加工项目B',
+      thicknessSpecId: 3,
+      materialType: '不锈钢',
+      thickness: '1.5',
+      unit: 'mm',
+      status: 'completed',
+      quantity: 8,
+      assignedWorker: { id: 1, name: '张三' },
+      completedBy: { id: 1, name: '张三' },
+      startDate: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      completedDate: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      priority: 'low',
+      notes: '质量检查通过'
+    },
+    {
+      id: 4,
+      projectId: 3,
+      projectName: '钢结构项目C',
+      thicknessSpecId: 4,
+      materialType: '钢板',
+      thickness: '5.0',
+      unit: 'mm',
+      status: 'pending',
+      assignedWorker: { id: 3, name: '王五' },
+      priority: 'urgent',
+      notes: '等待材料到货'
+    },
+    {
+      id: 5,
+      projectId: 2,
+      projectName: '精密加工项目B',
+      thicknessSpecId: 5,
+      materialType: '锰板',
+      thickness: '4.0',
+      unit: 'mm',
+      status: 'pending',
+      quantity: 2,
+      assignedWorker: { id: 2, name: '李四' },
+      priority: 'medium'
+    },
+    {
+      id: 6,
+      projectId: 1,
+      projectName: '激光切割项目A',
+      thicknessSpecId: 6,
+      materialType: '碳板',
+      thickness: '6.0',
+      unit: 'mm',
+      status: 'in_progress',
+      quantity: 4,
+      assignedWorker: { id: 3, name: '王五' },
+      startDate: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      priority: 'high',
+      notes: '需要特殊处理工艺'
+    }
+  ])
 
   // 搜索框组件状态
   const [searchBoxType, setSearchBoxType] = useState<SearchType>('all')
@@ -108,9 +199,69 @@ export default function DesignSystemPage() {
 
   // 处理搜索结果选择
   const handleSearchResultSelect = (result: SearchResult) => {
-    console.log('选择搜索结果:', result)
     addToast({ 
       message: `选择了：${result.title}`, 
+      type: 'info' 
+    })
+  }
+
+  // Material Status Manager处理函数
+  const handleMaterialStatusChange = (materialId: number, newStatus: MaterialStatusType) => {
+    setMaterialStatusDemo(prev => 
+      prev.map(material => 
+        material.id === materialId 
+          ? { 
+              ...material, 
+              status: newStatus,
+              startDate: newStatus === 'in_progress' && !material.startDate 
+                ? new Date().toISOString() 
+                : material.startDate,
+              completedDate: newStatus === 'completed' 
+                ? new Date().toISOString() 
+                : undefined,
+              completedBy: newStatus === 'completed' 
+                ? { id: 1, name: '演示用户' } 
+                : undefined
+            }
+          : material
+      )
+    )
+    addToast({ 
+      message: `材料状态已更新为：${newStatus}`, 
+      type: 'success' 
+    })
+  }
+
+  const handleMaterialUpdate = (materialId: number, updates: Partial<MaterialInfo>) => {
+    setMaterialStatusDemo(prev => 
+      prev.map(material => 
+        material.id === materialId 
+          ? { ...material, ...updates }
+          : material
+      )
+    )
+    addToast({ 
+      message: '材料信息已更新', 
+      type: 'success' 
+    })
+  }
+
+  const handleMaterialAdd = (newMaterial: Omit<MaterialInfo, 'id'>) => {
+    const material: MaterialInfo = {
+      ...newMaterial,
+      id: Date.now() // 临时ID
+    }
+    setMaterialStatusDemo(prev => [...prev, material])
+    addToast({ 
+      message: '新材料已添加', 
+      type: 'success' 
+    })
+  }
+
+  const handleMaterialDelete = (materialId: number) => {
+    setMaterialStatusDemo(prev => prev.filter(m => m.id !== materialId))
+    addToast({ 
+      message: '材料已删除', 
       type: 'info' 
     })
   }
@@ -271,7 +422,8 @@ export default function DesignSystemPage() {
     { id: 'form', label: '表单组件', icon: '📝' },
     { id: 'select', label: '选择器', icon: '🎯' },
     { id: 'list', label: '列表组件', icon: '📃' },
-    { id: 'navigation', label: '导航组件', icon: '🧭' }
+    { id: 'navigation', label: '导航组件', icon: '🧭' },
+    { id: 'material-status', label: '板材状态管理', icon: '🔧' }
   ]
 
   // 快捷导航滚动函数
@@ -2313,6 +2465,222 @@ export default function DesignSystemPage() {
             <div>
               <h3 className="text-lg font-medium text-text-primary mb-3">所有侧边栏的统一风格方案</h3>
               <AllSidebarsDemo />
+            </div>
+          </div>
+          </Card>
+        </div>
+
+        {/* MaterialStatusManager板材状态管理组件 */}
+        <div id="material-status">
+          <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-text-primary">板材状态管理组件</h2>
+            <div className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-mono">
+              MaterialStatusManager.tsx
+            </div>
+          </div>
+          <div className="space-y-8">
+            {/* 功能介绍 */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+              <h4 className="font-medium mb-2 text-purple-800">组件特性</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <h5 className="font-medium text-purple-700 mb-1">🎛️ 多样化显示模式</h5>
+                  <ul className="space-y-1 text-purple-600">
+                    <li>• 网格模式：紧凑的按钮网格显示</li>
+                    <li>• 列表模式：详细的卡片列表展示</li>
+                    <li>• 紧凑模式：单行紧凑式显示</li>
+                    <li>• Mini模式：超紧凑小按钮显示</li>
+                    <li>• 时间轴模式：按时间展示材料状态</li>
+                  </ul>
+                </div>
+                <div>
+                  <h5 className="font-medium text-purple-700 mb-1">⚡ 强大交互功能</h5>
+                  <ul className="space-y-1 text-purple-600">
+                    <li>• 三状态循环切换（待处理→进行中→已完成）</li>
+                    <li>• 批量操作和多选管理</li>
+                    <li>• 智能分组和筛选功能</li>
+                    <li>• 音效反馈系统</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* 网格模式演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">网格模式 (默认显示)</h3>
+              <MaterialStatusManager
+                materials={materialStatusDemo}
+                onStatusChange={handleMaterialStatusChange}
+                onMaterialUpdate={handleMaterialUpdate}
+                onMaterialAdd={handleMaterialAdd}
+                onMaterialDelete={handleMaterialDelete}
+                displayMode="grid"
+                enableBatchOperations={true}
+                enableSoundFeedback={true}
+                className="border border-gray-200 rounded-lg"
+              />
+            </div>
+
+            {/* 列表模式演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">列表模式 (详细视图)</h3>
+              <MaterialStatusManager
+                materials={materialStatusDemo.slice(0, 3)}
+                onStatusChange={handleMaterialStatusChange}
+                onMaterialUpdate={handleMaterialUpdate}
+                displayMode="list"
+                enableBatchOperations={true}
+                className="border border-gray-200 rounded-lg"
+              />
+            </div>
+
+            {/* 紧凑模式演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">紧凑模式 (单行显示)</h3>
+              <MaterialStatusManager
+                materials={materialStatusDemo.slice(0, 4)}
+                onStatusChange={handleMaterialStatusChange}
+                displayMode="compact"
+                showAddButton={false}
+                enableBatchOperations={false}
+                className="border border-gray-200 rounded-lg"
+              />
+            </div>
+
+            {/* Mini模式演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">Mini模式 (超紧凑显示)</h3>
+              <div className="bg-blue-50 p-3 rounded-lg mb-3">
+                <p className="text-sm text-blue-700">
+                  <strong>🎯 专为活跃项目设计：</strong>极简紧凑，节省空间，只显示材料代码，适合在项目卡片中嵌入使用
+                </p>
+              </div>
+              <MaterialStatusManager
+                materials={materialStatusDemo.slice(0, 6)}
+                onStatusChange={handleMaterialStatusChange}
+                displayMode="mini"
+                showAddButton={false}
+                enableBatchOperations={false}
+                className="border border-gray-200 rounded-lg"
+              />
+            </div>
+
+            {/* 分组功能演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">分组功能演示</h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">按项目分组</h4>
+                  <MaterialStatusManager
+                    materials={materialStatusDemo}
+                    onStatusChange={handleMaterialStatusChange}
+                    displayMode="grid"
+                    groupBy="project"
+                    showAddButton={false}
+                    enableBatchOperations={false}
+                    className="border border-gray-200 rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">按材料类型分组</h4>
+                  <MaterialStatusManager
+                    materials={materialStatusDemo}
+                    onStatusChange={handleMaterialStatusChange}
+                    displayMode="grid"
+                    groupBy="material_type"
+                    showAddButton={false}
+                    enableBatchOperations={false}
+                    className="border border-gray-200 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">按状态分组</h4>
+                  <MaterialStatusManager
+                    materials={materialStatusDemo}
+                    onStatusChange={handleMaterialStatusChange}
+                    displayMode="grid"
+                    groupBy="status"
+                    showAddButton={false}
+                    enableBatchOperations={false}
+                    className="border border-gray-200 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 筛选功能演示 */}
+            <div>
+              <h3 className="text-lg font-medium text-text-primary mb-3">筛选功能演示</h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">只显示碳板材料</h4>
+                  <MaterialStatusManager
+                    materials={materialStatusDemo}
+                    onStatusChange={handleMaterialStatusChange}
+                    displayMode="grid"
+                    filterBy={{ materialType: '碳板' }}
+                    showAddButton={false}
+                    enableBatchOperations={false}
+                    className="border border-gray-200 rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">只显示进行中的材料</h4>
+                  <MaterialStatusManager
+                    materials={materialStatusDemo}
+                    onStatusChange={handleMaterialStatusChange}
+                    displayMode="grid"
+                    filterBy={{ status: 'in_progress' }}
+                    showAddButton={false}
+                    enableBatchOperations={false}
+                    className="border border-gray-200 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 使用说明 */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h4 className="font-medium mb-3 text-blue-800">💡 使用说明</h4>
+              <div className="space-y-2 text-sm text-blue-700">
+                <div><strong>状态切换：</strong>点击材料按钮可在三种状态间循环切换</div>
+                <div><strong>批量操作：</strong>勾选多个材料后可进行批量状态修改或删除</div>
+                <div><strong>编辑材料：</strong>点击编辑图标可修改材料的备注和优先级</div>
+                <div><strong>音效控制：</strong>点击扬声器图标可开启/关闭操作音效</div>
+                <div><strong>材料代码：</strong>T=碳板、B=不锈钢、M=锰板、S=钢板</div>
+                <div><strong>优先级：</strong>支持低、中、高、紧急四个级别，用圆点标识显示</div>
+              </div>
+            </div>
+
+            {/* API说明 */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h4 className="font-medium mb-3 text-gray-800">📋 主要Props</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="font-mono text-purple-600 mb-1">materials: MaterialInfo[]</div>
+                  <div className="text-gray-600 mb-3">材料数据数组，包含状态、项目、工人等信息</div>
+                  
+                  <div className="font-mono text-purple-600 mb-1">displayMode: 'grid' | 'list' | 'compact' | 'mini'</div>
+                  <div className="text-gray-600 mb-3">显示模式：网格、列表、紧凑或超紧凑模式</div>
+                  
+                  <div className="font-mono text-purple-600 mb-1">groupBy: 'project' | 'material_type' | 'status'</div>
+                  <div className="text-gray-600 mb-3">分组方式：按项目、材料类型或状态分组</div>
+                </div>
+                <div>
+                  <div className="font-mono text-purple-600 mb-1">enableBatchOperations: boolean</div>
+                  <div className="text-gray-600 mb-3">启用批量操作功能</div>
+                  
+                  <div className="font-mono text-purple-600 mb-1">enableSoundFeedback: boolean</div>
+                  <div className="text-gray-600 mb-3">启用音效反馈功能</div>
+                  
+                  <div className="font-mono text-purple-600 mb-1">filterBy: {'{materialType, status, ...}'}</div>
+                  <div className="text-gray-600">筛选条件对象</div>
+                </div>
+              </div>
             </div>
           </div>
           </Card>

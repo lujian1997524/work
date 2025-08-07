@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectOption } from '@/components/ui/Select';
 import { ChevronDownIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiRequest } from '@/utils/api';
+import { PROJECT_STATUS_OPTIONS, PROJECT_PRIORITY_OPTIONS } from '@/constants/projectEnums';
 
 interface AdvancedFiltersProps {
   onFilterChange: (filters: any) => void;
@@ -17,6 +20,9 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const { token } = useAuth();
+  
   const [filters, setFilters] = useState({
     type: 'all',
     status: '',
@@ -26,6 +32,37 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     dateTo: '',
     sort: 'relevance'
   });
+
+  // 获取部门数据
+  const fetchDepartments = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await apiRequest('/api/workers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const workers = data.workers || [];
+        // 提取唯一的部门名称
+        const uniqueDepartments = [...new Set(
+          workers
+            .map((worker: any) => worker.department)
+            .filter((dept: string) => dept && dept.trim())
+        )].sort();
+        setDepartments(uniqueDepartments);
+      }
+    } catch (error) {
+      console.error('获取部门列表失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [token]);
 
   // 定义选项数据
   const typeOptions: SelectOption[] = [
@@ -37,24 +74,17 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
   const statusOptions: SelectOption[] = [
     { value: '', label: '所有状态' },
-    { value: 'pending', label: '待处理' },
-    { value: 'in_progress', label: '进行中' },
-    { value: 'completed', label: '已完成' }
+    ...PROJECT_STATUS_OPTIONS
   ];
 
   const priorityOptions: SelectOption[] = [
     { value: '', label: '所有优先级' },
-    { value: 'high', label: '高优先级' },
-    { value: 'medium', label: '中优先级' },
-    { value: 'low', label: '低优先级' }
+    ...PROJECT_PRIORITY_OPTIONS
   ];
 
   const departmentOptions: SelectOption[] = [
     { value: '', label: '所有部门' },
-    { value: '激光切割部', label: '激光切割部' },
-    { value: '焊接部', label: '焊接部' },
-    { value: '质检部', label: '质检部' },
-    { value: '包装部', label: '包装部' }
+    ...departments.map(dept => ({ value: dept, label: dept }))
   ];
 
   const sortOptions: SelectOption[] = [

@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+
 // 响应式设计系统配置
 export const breakpoints = {
   xs: '480px',   // 小屏手机

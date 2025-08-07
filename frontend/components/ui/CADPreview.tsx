@@ -185,10 +185,7 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
     return (
       <div className={`border border-gray-200 rounded-lg overflow-hidden ${className}`} style={{ width, height }}>
         <div className="w-full h-full flex items-center justify-center bg-gray-50">
-          <div className="flex flex-col items-center space-y-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span className="text-sm text-gray-500">加载DXF预览中...</span>
-          </div>
+          <Loading text="加载DXF预览中..." />
         </div>
       </div>
     );

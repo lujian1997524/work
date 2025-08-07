@@ -11,6 +11,12 @@ const sequelize = new Sequelize(
     port: process.env.DB_PORT || 3330,
     dialect: 'mysql',
     timezone: '+08:00', // 设置为北京时间
+    dialectOptions: {
+      charset: 'utf8mb4',
+      collate: 'utf8mb4_unicode_ci',
+      supportBigNumbers: true,
+      bigNumberStrings: true
+    },
     pool: {
       max: 5,
       min: 0,

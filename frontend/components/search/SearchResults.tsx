@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Loading } from '@/components/ui';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 interface SearchResult {
   id: number;
@@ -59,7 +60,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     return (
       <div className={`space-y-6 ${className}`}>
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">🔍</div>
+          <MagnifyingGlassIcon className="w-16 h-16 mb-4 text-gray-400 mx-auto" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
             未找到相关结果
           </h3>

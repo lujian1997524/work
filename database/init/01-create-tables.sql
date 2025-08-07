@@ -60,14 +60,17 @@ CREATE TABLE materials (
     thickness_spec_id INT NOT NULL COMMENT '厚度规格ID',
     quantity INT DEFAULT 1 COMMENT '数量',
     status ENUM('pending', 'in_progress', 'completed') DEFAULT 'pending' COMMENT '状态',
+    start_date DATE COMMENT '开始日期',
     completed_date DATE COMMENT '完成日期',
     completed_by INT COMMENT '完成人',
+    assigned_from_worker_material_id INT COMMENT '来源工人材料ID',
     notes TEXT COMMENT '备注',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (thickness_spec_id) REFERENCES thickness_specs(id),
-    FOREIGN KEY (completed_by) REFERENCES workers(id)
+    FOREIGN KEY (completed_by) REFERENCES workers(id),
+    FOREIGN KEY (assigned_from_worker_material_id) REFERENCES worker_materials(id)
 );
 
 -- 图纸表
@@ -92,13 +95,19 @@ INSERT INTO users (name, role) VALUES
 ('高春强', 'admin'),
 ('杨伟', 'operator');
 
-INSERT INTO thickness_specs (thickness, unit, sort_order) VALUES 
-(3.0, 'mm', 1),
-(4.0, 'mm', 2),
-(6.0, 'mm', 3),
-(10.0, 'mm', 4),
-(16.0, 'mm', 5),
-(20.0, 'mm', 6);
+INSERT INTO thickness_specs (thickness, unit, material_type, sort_order) VALUES 
+(2.0, 'mm', '碳板', 1),
+(3.0, 'mm', '碳板', 2),
+(4.0, 'mm', '碳板', 3),
+(6.0, 'mm', '碳板', 4),
+(10.0, 'mm', '碳板', 5),
+(16.0, 'mm', '碳板', 6),
+(20.0, 'mm', '碳板', 7),
+(3.0, 'mm', '不锈钢', 8),
+(4.0, 'mm', '不锈钢', 9),
+(6.0, 'mm', '不锈钢', 10),
+(10.0, 'mm', '锰板', 11),
+(12.0, 'mm', '锰板', 12);
 
 -- 插入测试工人数据
 INSERT INTO workers (name, phone, department, position, status) VALUES 
@@ -118,3 +127,42 @@ INSERT INTO materials (project_id, thickness_spec_id, quantity, status) VALUES
 (1, 3, 2, 'pending'),
 (2, 1, 8, 'pending'),
 (2, 4, 1, 'pending');
+
+-- 工人板材库存表
+CREATE TABLE worker_materials (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    worker_id INT NOT NULL,
+    thickness_spec_id INT NOT NULL COMMENT '厚度规格ID',
+    quantity INT NOT NULL DEFAULT 0 COMMENT '数量（张）',
+    notes TEXT NULL COMMENT '备注',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE,
+    FOREIGN KEY (thickness_spec_id) REFERENCES thickness_specs(id),
+    INDEX idx_worker_id (worker_id),
+    INDEX idx_thickness_spec_id (thickness_spec_id),
+    UNIQUE KEY unique_worker_thickness (worker_id, thickness_spec_id)
+);
+
+-- 插入工人板材库存示例数据
+-- 张三（工人ID: 1）的板材库存
+INSERT INTO worker_materials (worker_id, thickness_spec_id, quantity, notes) VALUES
+(1, 1, 10, '2mm碳板库存'),  -- 2mm碳板
+(1, 2, 15, '3mm碳板库存'),  -- 3mm碳板
+(1, 3, 8, '4mm碳板库存'),   -- 4mm碳板
+(1, 8, 3, '3mm不锈钢库存'), -- 3mm不锈钢
+(1, 11, 2, '10mm锰板库存'); -- 10mm锰板
+
+-- 李四（工人ID: 2）的板材库存
+INSERT INTO worker_materials (worker_id, thickness_spec_id, quantity, notes) VALUES
+(2, 1, 5, '2mm碳板库存'),   -- 2mm碳板
+(2, 3, 12, '4mm碳板库存'),  -- 4mm碳板
+(2, 5, 6, '10mm碳板库存'),  -- 10mm碳板
+(2, 9, 4, '4mm不锈钢库存'); -- 4mm不锈钢
+
+-- 王五（工人ID: 3）的板材库存
+INSERT INTO worker_materials (worker_id, thickness_spec_id, quantity, notes) VALUES
+(3, 2, 20, '3mm碳板库存'),  -- 3mm碳板
+(3, 6, 8, '16mm碳板库存'),  -- 16mm碳板
+(3, 7, 4, '20mm碳板库存'),  -- 20mm碳板
+(3, 12, 3, '12mm锰板库存'); -- 12mm锰板

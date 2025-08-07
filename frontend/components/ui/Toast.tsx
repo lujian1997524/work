@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline'
 
 export interface ToastProps {
   id?: string
@@ -33,22 +40,22 @@ export const Toast: React.FC<ToastProps & { onRemove: () => void }> = ({
   const typeStyles = {
     success: {
       bg: 'bg-green-500',
-      icon: '✅',
+      icon: <CheckCircleIcon className="w-5 h-5" />,
       textColor: 'text-white'
     },
     error: {
       bg: 'bg-red-500',
-      icon: '❌',
+      icon: <XCircleIcon className="w-5 h-5" />,
       textColor: 'text-white'
     },
     warning: {
       bg: 'bg-yellow-500',
-      icon: '⚠️',
+      icon: <ExclamationTriangleIcon className="w-5 h-5" />,
       textColor: 'text-white'
     },
     info: {
       bg: 'bg-ios18-blue',
-      icon: 'ℹ️',
+      icon: <InformationCircleIcon className="w-5 h-5" />,
       textColor: 'text-white'
     }
   }
@@ -91,9 +98,7 @@ export const Toast: React.FC<ToastProps & { onRemove: () => void }> = ({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <XMarkIcon className="w-4 h-4" />
         </motion.button>
       )}
     </motion.div>

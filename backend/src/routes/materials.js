@@ -1,6 +1,13 @@
 const express = require('express');
-const { Material, ThicknessSpec, Project, Worker } = require('../models');
+const { Material, ThicknessSpec, Project, Worker, WorkerMaterial, MaterialDimension, sequelize } = require('../models');
 const { authenticate, requireOperator } = require('../middleware/auth');
+const { 
+  validateWorkerMaterialConsistency,
+  validateProjectMaterialAllocation,
+  validateAllocationQuantity,
+  validateThicknessSpecConsistency,
+  cleanupEmptyWorkerMaterials
+} = require('../middleware/dataValidation');
 const sseManager = require('../utils/sseManager');
 const { recordMaterialUpdate } = require('../utils/operationHistory');
 
@@ -163,7 +170,11 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
 });
 
 // 更新板材状态
-router.put('/:id', authenticate, requireOperator, async (req, res) => {
+router.put('/:id', 
+  authenticate, 
+  requireOperator, 
+  validateProjectMaterialAllocation,
+  async (req, res) => {
   try {
     const { id } = req.params;
     const { status, completedBy, notes, startDate, completedDate } = req.body;
@@ -507,6 +518,308 @@ router.get('/stats', authenticate, async (req, res) => {
     console.error('获取板材统计错误:', error);
     res.status(500).json({
       error: '获取统计信息失败',
+      message: error.message
+    });
+  }
+});
+
+// 获取材料类型统计数据（支持碳板优先策略）
+router.get('/type-stats', authenticate, async (req, res) => {
+  try {
+    console.log('🔧 获取材料类型统计数据...');
+    
+    // 使用原生SQL查询获取精确的统计数据
+    const query = `
+      SELECT 
+        ts.id as thicknessSpecId,
+        ts.thickness,
+        ts.unit,
+        ts.material_type as materialType,
+        ts.is_active as isActive,
+        ts.sort_order as sortOrder,
+        COUNT(m.id) as totalMaterials,
+        COUNT(CASE WHEN m.status = 'pending' THEN 1 END) as pendingCount,
+        COUNT(CASE WHEN m.status = 'in_progress' THEN 1 END) as inProgressCount,
+        COUNT(CASE WHEN m.status = 'completed' THEN 1 END) as completedCount,
+        COUNT(DISTINCT m.project_id) as projectCount,
+        COUNT(CASE WHEN p.is_past_project = false THEN m.id END) as activeMaterials
+      FROM thickness_specs ts
+      LEFT JOIN materials m ON ts.id = m.thickness_spec_id
+      LEFT JOIN projects p ON m.project_id = p.id
+      WHERE ts.is_active = 1
+      GROUP BY ts.id, ts.thickness, ts.unit, ts.material_type, ts.is_active, ts.sort_order
+      ORDER BY 
+        CASE 
+          WHEN (ts.material_type IS NULL OR ts.material_type = '碳板') THEN 0 
+          ELSE 1 
+        END,
+        ts.sort_order ASC
+    `;
+    
+    const [results] = await sequelize.query(query);
+    
+    // 处理查询结果，分类为碳板和特殊材料
+    const carbonMaterials = [];
+    const specialMaterials = [];
+    
+    results.forEach(row => {
+      const materialStat = {
+        thicknessSpecId: row.thicknessSpecId,
+        thickness: row.thickness,
+        unit: row.unit,
+        materialType: row.materialType || '碳板',
+        isActive: Boolean(row.isActive),
+        sortOrder: row.sortOrder,
+        stats: {
+          totalMaterials: parseInt(row.totalMaterials) || 0,
+          pendingCount: parseInt(row.pendingCount) || 0,
+          inProgressCount: parseInt(row.inProgressCount) || 0,
+          completedCount: parseInt(row.completedCount) || 0,
+          projectCount: parseInt(row.projectCount) || 0,
+          activeMaterials: parseInt(row.activeMaterials) || 0,
+          completionRate: row.totalMaterials > 0 
+            ? Math.round((row.completedCount / row.totalMaterials) * 100) 
+            : 0
+        }
+      };
+      
+      // 按照95/5策略分类
+      if (!row.materialType || row.materialType === '碳板') {
+        carbonMaterials.push(materialStat);
+      } else {
+        specialMaterials.push(materialStat);
+      }
+    });
+    
+    // 计算汇总统计
+    const totalCarbonMaterials = carbonMaterials.reduce((sum, item) => sum + item.stats.totalMaterials, 0);
+    const totalSpecialMaterials = specialMaterials.reduce((sum, item) => sum + item.stats.totalMaterials, 0);
+    const totalMaterials = totalCarbonMaterials + totalSpecialMaterials;
+    
+    const summary = {
+      totalMaterials,
+      carbonMaterials: {
+        count: carbonMaterials.length,
+        totalMaterials: totalCarbonMaterials,
+        percentage: totalMaterials > 0 ? Math.round((totalCarbonMaterials / totalMaterials) * 100) : 0,
+        completedMaterials: carbonMaterials.reduce((sum, item) => sum + item.stats.completedCount, 0),
+        inProgressMaterials: carbonMaterials.reduce((sum, item) => sum + item.stats.inProgressCount, 0),
+        pendingMaterials: carbonMaterials.reduce((sum, item) => sum + item.stats.pendingCount, 0)
+      },
+      specialMaterials: {
+        count: specialMaterials.length,
+        totalMaterials: totalSpecialMaterials,
+        percentage: totalMaterials > 0 ? Math.round((totalSpecialMaterials / totalMaterials) * 100) : 0,
+        completedMaterials: specialMaterials.reduce((sum, item) => sum + item.stats.completedCount, 0),
+        inProgressMaterials: specialMaterials.reduce((sum, item) => sum + item.stats.inProgressCount, 0),
+        pendingMaterials: specialMaterials.reduce((sum, item) => sum + item.stats.pendingCount, 0)
+      },
+      strategy95_5: {
+        actual: {
+          carbon: totalMaterials > 0 ? Math.round((totalCarbonMaterials / totalMaterials) * 100) : 0,
+          special: totalMaterials > 0 ? Math.round((totalSpecialMaterials / totalMaterials) * 100) : 0
+        },
+        target: {
+          carbon: 95,
+          special: 5
+        },
+        deviation: {
+          carbon: totalMaterials > 0 ? Math.round((totalCarbonMaterials / totalMaterials) * 100) - 95 : 0,
+          special: totalMaterials > 0 ? Math.round((totalSpecialMaterials / totalMaterials) * 100) - 5 : 0
+        }
+      }
+    };
+    
+    console.log('✅ 材料类型统计完成:', {
+      碳板种类: carbonMaterials.length,
+      特殊材料种类: specialMaterials.length,
+      总材料数: totalMaterials,
+      碳板占比: summary.carbonMaterials.percentage + '%',
+      特殊材料占比: summary.specialMaterials.percentage + '%'
+    });
+    
+    res.json({
+      summary,
+      carbonMaterials,
+      specialMaterials,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('获取材料类型统计失败:', error);
+    res.status(500).json({
+      error: '获取材料类型统计失败',
+      message: error.message
+    });
+  }
+});
+
+// 板材分配API - 从工人库存中分配特定尺寸的板材给项目
+router.post('/allocate', 
+  authenticate, 
+  requireOperator, 
+  validateThicknessSpecConsistency,
+  validateAllocationQuantity,
+  validateProjectMaterialAllocation,
+  async (req, res) => {
+  try {
+    const {
+      projectId,
+      materialId, // 项目Material记录ID
+      workerMaterialId, // 工人材料记录ID
+      dimensionId, // 可选：特定尺寸ID
+      allocateQuantity, // 分配数量
+      notes
+    } = req.body;
+
+    // 验证必填字段
+    if (!projectId || !materialId || !workerMaterialId || !allocateQuantity || allocateQuantity <= 0) {
+      return res.status(400).json({
+        error: '缺少必填字段或分配数量无效'
+      });
+    }
+
+    // 使用事务确保数据一致性
+    const result = await sequelize.transaction(async (transaction) => {
+      // 1. 验证项目Material记录
+      const projectMaterial = await Material.findByPk(materialId, {
+        include: [
+          { association: 'project' },
+          { association: 'thicknessSpec' }
+        ],
+        transaction
+      });
+
+      if (!projectMaterial) {
+        throw new Error('项目材料记录不存在');
+      }
+
+      if (projectMaterial.projectId !== parseInt(projectId)) {
+        throw new Error('材料记录与项目不匹配');
+      }
+
+      // 2. 验证工人材料记录
+      const workerMaterial = await WorkerMaterial.findByPk(workerMaterialId, {
+        include: [
+          { association: 'worker' },
+          { association: 'thicknessSpec' },
+          { association: 'dimensions' }
+        ],
+        transaction
+      });
+
+      if (!workerMaterial) {
+        throw new Error('工人材料记录不存在');
+      }
+
+      // 3. 验证厚度规格匹配
+      if (projectMaterial.thicknessSpecId !== workerMaterial.thicknessSpecId) {
+        throw new Error('项目材料和工人材料的厚度规格不匹配');
+      }
+
+      // 4. 处理特定尺寸分配（如果指定了dimensionId）
+      let allocatedDimension = null;
+      if (dimensionId) {
+        const dimension = await MaterialDimension.findByPk(dimensionId, { transaction });
+        if (!dimension || dimension.workerMaterialId !== workerMaterialId) {
+          throw new Error('指定的尺寸记录不存在或不属于该工人材料');
+        }
+
+        if (dimension.quantity < allocateQuantity) {
+          throw new Error(`指定尺寸库存不足，可用数量: ${dimension.quantity}`);
+        }
+
+        // 扣减尺寸库存
+        await dimension.update({
+          quantity: dimension.quantity - allocateQuantity
+        }, { transaction });
+
+        // 如果尺寸数量为0，删除该尺寸记录
+        if (dimension.quantity - allocateQuantity === 0) {
+          await dimension.destroy({ transaction });
+        }
+
+        allocatedDimension = {
+          width: dimension.width,
+          height: dimension.height,
+          quantity: allocateQuantity,
+          notes: dimension.notes
+        };
+      } else {
+        // 通用分配：从工人材料总量中扣减
+        if (workerMaterial.quantity < allocateQuantity) {
+          throw new Error(`工人材料库存不足，可用数量: ${workerMaterial.quantity}`);
+        }
+
+        // 扣减工人材料总量
+        await workerMaterial.update({
+          quantity: workerMaterial.quantity - allocateQuantity
+        }, { transaction });
+      }
+
+      // 5. 更新项目Material记录
+      const updatedProjectMaterial = await projectMaterial.update({
+        quantity: projectMaterial.quantity + allocateQuantity,
+        assignedFromWorkerMaterialId: workerMaterialId,
+        status: projectMaterial.status === 'pending' ? 'pending' : projectMaterial.status,
+        notes: notes || projectMaterial.notes,
+        startDate: projectMaterial.startDate || new Date()
+      }, { transaction });
+
+      // 6. 如果工人材料总量为0且没有尺寸记录，删除工人材料记录
+      const remainingDimensions = await MaterialDimension.count({
+        where: { workerMaterialId: workerMaterialId },
+        transaction
+      });
+
+      if (workerMaterial.quantity === 0 && remainingDimensions === 0) {
+        await workerMaterial.destroy({ transaction });
+      }
+
+      return {
+        projectMaterial: updatedProjectMaterial,
+        workerMaterial,
+        allocatedDimension,
+        allocateQuantity
+      };
+    });
+
+    res.json({
+      success: true,
+      message: `成功分配 ${allocateQuantity} 张板材`,
+      allocation: {
+        projectId,
+        materialId,
+        allocateQuantity,
+        allocatedDimension: result.allocatedDimension,
+        projectMaterial: result.projectMaterial
+      }
+    });
+
+    // 发送SSE事件通知
+    try {
+      sseManager.broadcast('material-allocated', {
+        projectId,
+        projectName: result.projectMaterial.project?.name,
+        workerName: result.workerMaterial.worker?.name,
+        materialType: result.projectMaterial.thicknessSpec?.materialType || '碳板',
+        thickness: result.projectMaterial.thicknessSpec?.thickness,
+        allocateQuantity,
+        allocatedDimension: result.allocatedDimension,
+        userName: req.user.name,
+        userId: req.user.id
+      }, req.user.id);
+
+      console.log(`板材分配完成: 项目 ${result.projectMaterial.project?.name}, 分配数量: ${allocateQuantity} 张`);
+    } catch (sseError) {
+      console.error('发送板材分配SSE事件失败:', sseError);
+    }
+
+  } catch (error) {
+    console.error('板材分配失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '板材分配失败',
       message: error.message
     });
   }

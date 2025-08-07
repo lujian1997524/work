@@ -5,22 +5,23 @@ import { motion } from 'framer-motion';
 import { ActivityBar } from './ActivityBar';
 import { useResponsive } from '@/hooks/useResponsive';
 import { MobileDrawer, BottomSheet } from '@/components/ui/ResponsiveLayout';
+import { IconButton } from '@/components/ui';
 import { 
   ClipboardDocumentListIcon,
   CheckCircleIcon,
   DocumentIcon,
-  UsersIcon,
   MagnifyingGlassIcon,
   UserCircleIcon,
   Cog6ToothIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  Bars3Icon
 } from '@heroicons/react/24/outline';
 
 interface VSCodeLayoutProps {
   children: ReactNode;
   sidebar?: ReactNode;
-  activeView: 'active' | 'completed' | 'drawings' | 'workers' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'workers' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'settings';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'settings') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -87,7 +88,7 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
         {/* 简化活动栏 */}
         <div className="w-16 bg-gray-100/80 backdrop-blur-xl border-r border-gray-200 flex-shrink-0">
           <div className="p-2 space-y-2">
-            {['active', 'completed', 'drawings', 'workers'].map((view) => (
+            {['active', 'completed', 'drawings', 'materials'].map((view) => (
               <button
                 key={view}
                 onClick={() => onViewChange(view as any)}
@@ -130,24 +131,25 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
       {/* 移动端顶部栏 */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <button
+          <IconButton
+            icon={Bars3Icon}
             onClick={() => setShowMobileSidebar(true)}
-            className="p-2 rounded-lg hover:bg-gray-100"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+            size="md"
+            variant="ghost"
+            tooltip="打开菜单"
+          />
           <h1 className="text-lg font-bold">激光切割管理</h1>
           
           {/* 用户头像和菜单 */}
           <div className="relative">
-            <button
+            <IconButton
+              icon={UserCircleIcon}
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="p-2 rounded-lg hover:bg-gray-100"
-            >
-              <UserCircleIcon className="w-6 h-6" />
-            </button>
+              size="md"
+              variant="ghost"
+              tooltip="用户菜单"
+              isActive={showUserMenu}
+            />
             
             {/* 用户菜单下拉 */}
             {showUserMenu && (
@@ -193,7 +195,7 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
             { key: 'completed', label: '过往', icon: CheckCircleIcon },
             { key: 'search', label: '搜索', icon: MagnifyingGlassIcon, isSearch: true },
             { key: 'drawings', label: '图纸', icon: DocumentIcon },
-            { key: 'workers', label: '工人', icon: UsersIcon }
+            { key: 'materials', label: '板材', icon: ClipboardDocumentListIcon }
           ].map((item) => (
             <button
               key={item.key}

@@ -62,17 +62,22 @@ export const useGlobalSyncStore = create<GlobalSyncState>((set, get) => ({
     // 监听数据更新事件
     const handleProjectCreated = () => {
       state.updateLastSyncTime();
-      console.log('📝 项目已创建，状态已同步');
     };
     
     const handleProjectUpdated = () => {
       state.updateLastSyncTime();
-      console.log('✏️ 项目已更新，状态已同步');
     };
     
     const handleMaterialUpdated = () => {
       state.updateLastSyncTime();
-      console.log('🔧 材料状态已更新，状态已同步');
+    };
+
+    const handleMaterialsUpdated = () => {
+      state.updateLastSyncTime();
+    };
+
+    const handleWorkerMaterialsUpdated = () => {
+      state.updateLastSyncTime();
     };
 
     // 注册事件监听器
@@ -81,6 +86,9 @@ export const useGlobalSyncStore = create<GlobalSyncState>((set, get) => ({
     window.addEventListener('project-created', handleProjectCreated);
     window.addEventListener('project-updated', handleProjectUpdated);
     window.addEventListener('material-updated', handleMaterialUpdated);
+    window.addEventListener('materials-updated', handleMaterialsUpdated);
+    window.addEventListener('material-status-updated', handleMaterialsUpdated); // 新的材料状态更新事件
+    window.addEventListener('worker-materials-updated', handleWorkerMaterialsUpdated);
 
     // 保存清理函数
     eventListeners = [
@@ -89,6 +97,9 @@ export const useGlobalSyncStore = create<GlobalSyncState>((set, get) => ({
       () => window.removeEventListener('project-created', handleProjectCreated),
       () => window.removeEventListener('project-updated', handleProjectUpdated),
       () => window.removeEventListener('material-updated', handleMaterialUpdated),
+      () => window.removeEventListener('materials-updated', handleMaterialsUpdated),
+      () => window.removeEventListener('material-status-updated', handleMaterialsUpdated),
+      () => window.removeEventListener('worker-materials-updated', handleWorkerMaterialsUpdated),
     ];
   },
 

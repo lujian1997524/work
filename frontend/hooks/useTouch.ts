@@ -223,7 +223,6 @@ export const useTouch = (
           // 检测双击
           if (lastTap && (now - lastTap) < doubleTapDelay) {
             // 这里可以扩展双击处理
-            console.log('双击检测');
           }
           
           if (handlers.onTap) {

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FolderIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 interface FileDropzoneProps {
   onFileSelect: (file: File) => void;
@@ -160,7 +161,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
               exit={{ opacity: 0, scale: 0.8 }}
               className="text-gray-500"
             >
-              <div className="text-6xl mb-4">📁</div>
+              <FolderIcon className="w-16 h-16 mb-4 text-gray-400" />
               <h3 className="text-lg font-semibold text-text-primary mb-2">
                 点击选择文件或拖拽到此处
               </h3>
@@ -197,9 +198,10 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm"
+            className="mt-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center"
           >
-            ❌ {error}
+            <XCircleIcon className="w-4 h-4 mr-2" />
+            {error}
           </motion.div>
         )}
       </AnimatePresence>

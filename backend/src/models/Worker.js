@@ -17,19 +17,6 @@ const Worker = sequelize.define('Worker', {
     allowNull: true,
     comment: '联系电话'
   },
-  email: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    validate: {
-      isEmail: true
-    },
-    comment: '邮箱地址'
-  },
-  department: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '所属部门'
-  },
   departmentId: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -37,7 +24,7 @@ const Worker = sequelize.define('Worker', {
       model: 'departments',
       key: 'id'
     },
-    comment: '部门ID'
+    comment: '部门ID（标准外键关联）'
   },
   position: {
     type: DataTypes.STRING(50),
@@ -63,13 +50,13 @@ const Worker = sequelize.define('Worker', {
   }
 }, {
   tableName: 'workers',
-  comment: '工人资料表',
+  comment: '工人资料表（标准化版本）',
   indexes: [
     {
       fields: ['name']
     },
     {
-      fields: ['department']
+      fields: ['departmentId']
     },
     {
       fields: ['status']

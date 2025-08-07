@@ -3,7 +3,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 
-export type StatusType = 'empty' | 'pending' | 'in_progress' | 'completed'
+export type StatusType = 'pending' | 'in_progress' | 'completed'
 
 export interface StatusIndicatorProps {
   status: StatusType
@@ -15,26 +15,20 @@ export interface StatusIndicatorProps {
 }
 
 const statusConfig = {
-  empty: {
-    color: 'bg-transparent border-gray-300',
-    icon: '',
-    label: '空白',
-    textColor: 'text-gray-400'
-  },
   pending: {
-    color: 'bg-gray-200 border-gray-400',
+    color: 'bg-gray-300 border-gray-500',
     icon: '○',
     label: '待处理',
-    textColor: 'text-gray-600'
+    textColor: 'text-gray-700'
   },
   in_progress: {
-    color: 'bg-status-warning',
+    color: 'bg-blue-500 hover:bg-blue-600',
     icon: '●',
     label: '进行中',
     textColor: 'text-white'
   },
   completed: {
-    color: 'bg-status-success',
+    color: 'bg-green-500 hover:bg-green-600',
     icon: '✓',
     label: '已完成',
     textColor: 'text-white'
@@ -60,27 +54,28 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   const baseClasses = `
     ${sizeClasses[size]} ${config.color} ${config.textColor}
     rounded-full flex items-center justify-center font-medium
-    transition-all duration-200
-    ${status === 'pending' || status === 'empty' ? 'border-2' : ''}
-    ${interactive ? 'cursor-pointer hover:scale-110 active:scale-95' : ''}
+    transition-all duration-300 ease-in-out
+    ${status === 'pending' ? 'border-2' : ''}
+    ${interactive ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}
   `
 
   const IndicatorElement = (
     <motion.div
       className={`${baseClasses} ${className}`}
-      whileHover={interactive ? { scale: 1.1 } : {}}
-      whileTap={interactive ? { scale: 0.95 } : {}}
+      whileHover={interactive ? { scale: 1.15, rotate: 5 } : {}}
+      whileTap={interactive ? { scale: 0.9, rotate: -5 } : {}}
       onClick={onClick}
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
+      initial={{ scale: 0, rotate: -180 }}
+      animate={{ scale: 1, rotate: 0 }}
       transition={{ 
         type: "spring", 
-        stiffness: 500, 
-        damping: 30,
+        stiffness: 400, 
+        damping: 25,
         delay: 0.1 
       }}
+      key={status} // 重要：状态变化时重新触发动画
     >
-      {status === 'pending' || status === 'empty' ? null : config.icon}
+      {status === 'pending' ? null : config.icon}
     </motion.div>
   )
 
@@ -116,16 +111,14 @@ export const StatusToggle: React.FC<StatusToggleProps> = ({
 }) => {
   const getNextStatus = (current: StatusType): StatusType => {
     switch (current) {
-      case 'empty':
-        return 'pending'
       case 'pending':
         return 'in_progress'
       case 'in_progress':
         return 'completed'
       case 'completed':
-        return 'empty'
+        return 'pending'
       default:
-        return 'empty'
+        return 'pending'
     }
   }
 

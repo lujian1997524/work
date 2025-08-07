@@ -5,7 +5,7 @@ const morgan = require('morgan');
 require('dotenv').config();
 
 // 导入配置管理
-const { getConfig, logConfig } = require('./config/envConfig');
+const { getBackendConfig, logBackendConfig } = require('./config/envConfig');
 
 // 导入数据库连接和模型
 const { testConnection } = require('./utils/database');
@@ -15,11 +15,14 @@ const models = require('./models');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const workersRoutes = require('./routes/workers');
-const departmentsRoutes = require('./routes/departments');
+// const departmentsRoutes = require('./routes/departments'); // 已废弃，统一使用 /api/workers/departments
 const projectsRoutes = require('./routes/projects');
 const materialsRoutes = require('./routes/materials');
 const thicknessSpecsRoutes = require('./routes/thickness-specs');
 const drawingsRoutes = require('./routes/drawings');
+const workerMaterialsRoutes = require('./routes/worker-materials');
+const materialDimensionsRoutes = require('./routes/material-dimensions');
+const materialRequirementsRoutes = require('./routes/material-requirements');
 const dxfRoutes = require('./routes/dxf');
 const searchRoutes = require('./routes/search');
 const sseRoutes = require('./routes/sse');
@@ -27,7 +30,7 @@ const sseRoutes = require('./routes/sse');
 const app = express();
 
 // 获取配置
-const config = getConfig();
+const config = getBackendConfig();
 
 // 中间件配置
 app.use(helmet());
@@ -99,10 +102,11 @@ app.get('/api', (req, res) => {
       auth: '/api/auth',
       users: '/api/users',
       workers: '/api/workers',
-      departments: '/api/departments',
+      // departments: '/api/departments', // 已废弃，使用 /api/workers/departments
       projects: '/api/projects',
       materials: '/api/materials',
       thicknessSpecs: '/api/thickness-specs',
+      workerMaterials: '/api/worker-materials',
       drawings: '/api/drawings',
       dxf: '/api/dxf',
       search: '/api/search',
@@ -115,9 +119,12 @@ app.get('/api', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/workers', workersRoutes);
-app.use('/api/departments', departmentsRoutes);
+// app.use('/api/departments', departmentsRoutes); // 已废弃，统一使用 /api/workers/departments
 app.use('/api/projects', projectsRoutes);
 app.use('/api/materials', materialsRoutes);
+app.use('/api/worker-materials', workerMaterialsRoutes);
+app.use('/api/material-requirements', materialRequirementsRoutes);
+app.use('/api/material-dimensions', materialDimensionsRoutes);
 app.use('/api/thickness-specs', thicknessSpecsRoutes);
 // drawings路由已在上面提前注册
 app.use('/api/dxf', dxfRoutes);
@@ -146,13 +153,12 @@ const PORT = config.server.PORT;
 // 启动服务器
 app.listen(PORT, config.server.HOST, async () => {
   console.log(`🚀 激光切割管理系统后端服务启动成功`);
-  console.log(`📡 HTTP API: ${config.server.BACKEND_URL}`);
-  console.log(`🌐 局域网访问: ${config.server.BACKEND_URL}`);
-  console.log(`🔍 健康检查: ${config.server.BACKEND_URL}/health`);
-  console.log(`📚 API文档: ${config.server.BACKEND_URL}/api`);
+  console.log(`📡 服务器地址: http://${config.server.HOST}:${config.server.PORT}`);
+  console.log(`🔍 健康检查: http://${config.server.HOST}:${config.server.PORT}/health`);
+  console.log(`📚 API文档: http://${config.server.HOST}:${config.server.PORT}/api`);
   
   // 输出配置信息
-  logConfig();
+  logBackendConfig();
   
   // 测试数据库连接
   await testConnection();

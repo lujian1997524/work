@@ -1,15 +1,20 @@
 // API 配置 - 全部使用直连方式
-const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || '192.168.31.134';
-const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
+// 优先使用完整URL配置，兜底使用主机+端口配置
+const API_BASE_URL = (() => {
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+    console.log('🔧 使用完整URL配置:', process.env.NEXT_PUBLIC_BACKEND_URL);
+    return process.env.NEXT_PUBLIC_BACKEND_URL;
+  }
+  
+  const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost';
+  const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
+  const url = `http://${backendHost}:${backendPort}`;
+  
+  console.log('🔧 使用主机+端口配置:', { backendHost, backendPort, url });
+  return url;
+})();
 
-// 直连后端基础地址（不包含/api）
-export const API_BASE_URL = `http://${backendHost}:${backendPort}`;
-
-console.log('🔧 API 配置 (直连模式):', {
-  backendHost,
-  backendPort,
-  API_BASE_URL
-});
+export { API_BASE_URL };
 
 // API 请求封装
 export const apiRequest = async (endpoint: string, options: RequestInit = {}) => {

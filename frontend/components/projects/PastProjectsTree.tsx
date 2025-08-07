@@ -5,17 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectStore } from '@/stores';
 import { Loading } from '@/components/ui';
+import type { Project } from '@/types/project';
 
-// 使用ProjectState类型，因为这与实际数据结构匹配
-interface PastProject {
-  id: number;
-  name: string;
-  status: string;
-  priority: string;
-  createdAt?: string;
-  created_at?: string;
-  creator?: { id: number; name: string };
-  assignedWorker?: { id: number; name: string };
+// 使用统一的Project类型别名，添加过往项目特有字段
+interface PastProject extends Project {
   // 过往项目特有字段（从API返回）
   isPastProject?: boolean;
   movedToPastAt?: string;

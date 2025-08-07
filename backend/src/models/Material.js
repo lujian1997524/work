@@ -55,9 +55,19 @@ const Material = sequelize.define('Material', {
     type: DataTypes.INTEGER,
     allowNull: true,
     field: 'completed_by',
-    comment: '完成人',
+    comment: '完成人（用户ID）',
     references: {
-      model: 'workers',
+      model: 'users',
+      key: 'id'
+    }
+  },
+  assignedFromWorkerMaterialId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'assigned_from_worker_material_id',
+    comment: '来源工人材料ID',
+    references: {
+      model: 'worker_materials',
       key: 'id'
     }
   },
@@ -81,6 +91,9 @@ const Material = sequelize.define('Material', {
     },
     {
       fields: ['completed_by']
+    },
+    {
+      fields: ['assigned_from_worker_material_id']
     }
   ]
 });

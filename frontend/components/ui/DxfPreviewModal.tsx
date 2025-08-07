@@ -244,11 +244,7 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
               
               {loading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-3 border-blue-500"></div>
-                    <span className="text-lg text-gray-600">加载图纸预览中...</span>
-                    <span className="text-sm text-gray-400">专业图纸查看</span>
-                  </div>
+                  <Loading text="加载图纸预览中..." size="lg" />
                 </div>
               )}
 
