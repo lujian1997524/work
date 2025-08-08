@@ -9,7 +9,7 @@ const {
   cleanupEmptyWorkerMaterials
 } = require('../middleware/dataValidation');
 const sseManager = require('../utils/sseManager');
-const { recordMaterialUpdate } = require('../utils/operationHistory');
+const { recordMaterialUpdate, recordMaterialStart, recordMaterialComplete, recordMaterialAllocate } = require('../utils/operationHistory');
 
 const router = express.Router();
 
@@ -221,18 +221,42 @@ router.put('/:id',
     // 记录操作历史
     if (status && status !== material.status) {
       try {
-        await recordMaterialUpdate(
-          material.projectId,
-          {
-            id: material.id,
-            thicknessSpecId: material.thicknessSpecId,
-            thicknessSpec: material.thicknessSpec
-          },
-          material.status,
-          status,
-          req.user.id,
-          req.user.name
-        );
+        const materialData = {
+          id: material.id,
+          thicknessSpecId: material.thicknessSpecId,
+          thicknessSpec: material.thicknessSpec,
+          project: material.project
+        };
+
+        // 根据状态变化使用不同的记录函数
+        if (status === 'in_progress' && material.status === 'pending') {
+          // 开始处理板材
+          await recordMaterialStart(
+            material.projectId,
+            materialData,
+            req.user.id,
+            req.user.name
+          );
+        } else if (status === 'completed' && material.status === 'in_progress') {
+          // 完成板材加工
+          await recordMaterialComplete(
+            material.projectId,
+            materialData,
+            material.startDate,
+            req.user.id,
+            req.user.name
+          );
+        } else {
+          // 其他状态变更使用通用记录
+          await recordMaterialUpdate(
+            material.projectId,
+            materialData,
+            material.status,
+            status,
+            req.user.id,
+            req.user.name
+          );
+        }
       } catch (historyError) {
         console.error('记录材料更新历史失败:', historyError);
       }
@@ -783,6 +807,25 @@ router.post('/allocate',
         allocateQuantity
       };
     });
+
+    // 记录材料分配历史
+    try {
+      await recordMaterialAllocate(
+        projectId,
+        {
+          materialType: result.projectMaterial.thicknessSpec?.materialType || '碳板',
+          thickness: result.projectMaterial.thicknessSpec?.thickness,
+          quantity: allocateQuantity,
+          sources: result.workerMaterial.worker?.name,
+          allocatedTo: result.projectMaterial.project?.name,
+          projectName: result.projectMaterial.project?.name
+        },
+        req.user.id,
+        req.user.name
+      );
+    } catch (historyError) {
+      console.error('记录材料分配历史失败:', historyError);
+    }
 
     res.json({
       success: true,

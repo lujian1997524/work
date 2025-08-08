@@ -19,8 +19,11 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  useDialog
+  useDialog,
+  Timeline,
+  Select
 } from '@/components/ui';
+import type { TimelineItem } from '@/components/ui/Timeline';
 import { 
   ArrowLeftIcon, 
   PencilIcon, 
@@ -41,11 +44,14 @@ import {
   XMarkIcon,
   ChartBarIcon,
   TruckIcon,
-  TagIcon
+  TagIcon,
+  ArrowRightIcon,
+  ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 import { updateMaterialStatusShared, getProjectMaterialStatus } from '@/utils/materialStatusManager';
 import { formatDate, formatDateTime } from '@/utils/dateFormatter';
 import { apiRequest } from '@/utils/api';
+import { useResponsive } from '@/hooks/useResponsive';
 import { DrawingUpload } from '@/components/drawings/DrawingUpload';
 import { MaterialRequirementManager } from '@/components/materials/MaterialRequirementManager';
 import { ProjectBorrowingDetails } from '@/components/materials/ProjectBorrowingDetails';
@@ -117,6 +123,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
 
 
   const { token, user } = useAuth();
+  const { isMobile, isTablet } = useResponsive();
   const { projects, updateProject, fetchProjects } = useProjectStore();
   const { confirm, alert, DialogRenderer } = useDialog();
 
@@ -479,40 +486,66 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
 
   return (
     <div className={`h-full flex flex-col bg-gray-50 ${className}`}>
-      {/* 顶部导航 */}
+      {/* 顶部导航 - 移动端适配 */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onBack}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeftIcon className="w-4 h-4" />
-                <span>返回</span>
-              </Button>
-              <div className="h-6 w-px bg-gray-300" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
-                <div className="flex items-center space-x-3 mt-1">
+        <div className={isMobile ? "px-4 py-3" : "px-6 py-4"}>
+          <div className={isMobile ? "space-y-3" : "flex items-center justify-between"}>
+            {/* 返回按钮和标题 */}
+            <div className={isMobile ? "flex items-center justify-between" : "flex items-center space-x-4"}>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size={isMobile ? "md" : "sm"}
+                  onClick={onBack}
+                  className="flex items-center space-x-2 shrink-0"
+                >
+                  <ArrowLeftIcon className="w-4 h-4" />
+                  <span>返回</span>
+                </Button>
+                {!isMobile && <div className="h-6 w-px bg-gray-300" />}
+              </div>
+              
+              {/* 移动端标题单独一行 */}
+              {isMobile && (
+                <div className="text-right">
                   <Badge className={status.color} size="sm">
                     {status.label}
                   </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* 项目信息 */}
+            <div className={isMobile ? "space-y-2" : ""}>
+              <h1 className={`font-bold text-gray-900 ${isMobile ? "text-lg" : "text-xl"}`}>
+                {project.name}
+              </h1>
+              <div className={`flex items-center space-x-3 ${isMobile ? "text-xs" : "mt-1"}`}>
+                {!isMobile && (
+                  <>
+                    <Badge className={status.color} size="sm">
+                      {status.label}
+                    </Badge>
+                    <Badge className={priority.color} size="sm" variant="outline">
+                      {priority.label}
+                    </Badge>
+                  </>
+                )}
+                <span className="text-xs text-gray-500">
+                  创建于 {formatDate(project.createdAt)}
+                </span>
+                {isMobile && (
                   <Badge className={priority.color} size="sm" variant="outline">
                     {priority.label}
                   </Badge>
-                  <span className="text-xs text-gray-500">
-                    创建于 {formatDate(project.createdAt)}
-                  </span>
-                </div>
+                )}
               </div>
             </div>
             
-            {/* Tab导航 */}
-            <div className="flex space-x-1">
-              {[
+            {/* Tab导航 - 移动端适配 */}
+            <div className={isMobile ? "overflow-x-auto" : ""}>
+              <div className={`flex space-x-1 ${isMobile ? "min-w-max px-1" : ""}`}>
+                {[
                 { key: 'overview', label: '概览', icon: DocumentTextIcon },
                 { key: 'materials', label: '板材', icon: CogIcon, badge: total },
                 { key: 'drawings', label: '图纸', icon: PhotoIcon, badge: project.drawings.length },
@@ -524,13 +557,13 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
                     key={tab.key}
                     variant={activeTab === tab.key ? "primary" : "ghost"}
                     onClick={() => setActiveTab(tab.key as any)}
-                    className={`px-4 py-2 text-sm font-medium transition-colors flex items-center space-x-2 ${
+                    className={`${isMobile ? "px-3 py-2 text-xs" : "px-4 py-2 text-sm"} font-medium transition-colors flex items-center space-x-2 whitespace-nowrap ${
                       activeTab === tab.key
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className={isMobile ? "w-3 h-3" : "w-4 h-4"} />
                     <span>{tab.label}</span>
                     {tab.badge !== undefined && tab.badge > 0 && (
                       <Badge variant="secondary" size="sm" className="ml-1">
@@ -541,12 +574,11 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
                 );
               })}
             </div>
-          </div>
         </div>
       </div>
 
-      {/* 主内容区 */}
-      <div className="flex-1 overflow-auto">
+      {/* 主内容区 - 移动端适配 */}
+      <div className={`flex-1 overflow-auto ${isMobile ? "pb-20" : ""}`}>
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
             <OverviewSection 
@@ -649,46 +681,34 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
       )}
 
       <DialogRenderer />
+      </div>
     </div>
+  </div>
   );
-};
+}
 
 // 概览子组件
-const OverviewSection: React.FC<{
-  project: Project;
-  carbon: { total: number; completed: number };
-  special: { total: number; completed: number };
-  total: number;
-  completed: number;
-  inProgress: number;
-  pending: number;
-  startDate: Date | null;
-  endDate: Date | null;
-  duration: number;
-  projectNotes: string;
-  setProjectNotes: (notes: string) => void;
-  editingNotes: boolean;
-  setEditingNotes: (editing: boolean) => void;
-  savingNotes: boolean;
-  handleSaveNotes: () => void;
-}> = ({ 
+const OverviewSection = ({ 
   project, carbon, special, total, completed, inProgress, pending, 
   startDate, endDate, duration, projectNotes, setProjectNotes, 
   editingNotes, setEditingNotes, savingNotes, handleSaveNotes 
-}) => (
-  <motion.div
-    key="overview"
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -20 }}
-    className="p-6 space-y-6"
-  >
-    {/* 项目概览卡片 */}
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+}: any) => {
+  const { isMobile, isTablet } = useResponsive();
+  
+  return (
+    <motion.div
+      key="overview"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className={isMobile ? "p-4 space-y-4" : "p-6 space-y-6"}
+    >
+      {/* 项目概览卡片 - 移动端适配 */}
+      <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : isTablet ? "grid-cols-2" : "grid-cols-1 lg:grid-cols-4"}`}>
       {/* 项目基本信息 */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-          <UserIcon className="w-5 h-5" />
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className={`${isMobile ? "text-base" : "text-lg"} font-semibold text-gray-900 mb-4 flex items-center space-x-2`}>
+          <UserIcon className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
           <span>项目信息</span>
         </h3>
         <div className="space-y-3">
@@ -708,8 +728,8 @@ const OverviewSection: React.FC<{
       </Card>
 
       {/* 碳板进度（优先显示） */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">碳板进度</h3>
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className={`${isMobile ? "text-base" : "text-lg"} font-semibold text-gray-900 mb-4`}>碳板进度</h3>
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -742,32 +762,32 @@ const OverviewSection: React.FC<{
       </Card>
 
       {/* 整体统计 */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">整体统计</h3>
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className={`${isMobile ? "text-base" : "text-lg"} font-semibold text-gray-900 mb-4`}>整体统计</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{completed}</div>
+            <div className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-green-600`}>{completed}</div>
             <div className="text-xs text-gray-500">已完成</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
+            <div className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-blue-600`}>{inProgress}</div>
             <div className="text-xs text-gray-500">进行中</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{pending}</div>
+            <div className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-yellow-600`}>{pending}</div>
             <div className="text-xs text-gray-500">待处理</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{total}</div>
+            <div className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-600`}>{total}</div>
             <div className="text-xs text-gray-500">总计</div>
           </div>
         </div>
       </Card>
 
       {/* 工期统计 */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-          <CalendarIcon className="w-5 h-5" />
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className={`${isMobile ? "text-base" : "text-lg"} font-semibold text-gray-900 mb-4 flex items-center space-x-2`}>
+          <CalendarIcon className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
           <span>工期统计</span>
         </h3>
         <div className="space-y-3">
@@ -804,9 +824,9 @@ const OverviewSection: React.FC<{
     </div>
 
     {/* 项目备注 */}
-    <Card className="p-6">
+    <Card className={isMobile ? "p-4" : "p-6"}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">项目备注</h3>
+        <h3 className={`${isMobile ? "text-base" : "text-lg"} font-semibold text-gray-900`}>项目备注</h3>
         <Button
           variant="ghost"
           size="sm"
@@ -849,6 +869,7 @@ const OverviewSection: React.FC<{
     </Card>
   </motion.div>
 );
+};
 
 // 材料管理子组件 - 采用类似ActiveProjectCard的样式
 const MaterialsSection: React.FC<{
@@ -976,7 +997,7 @@ const MaterialsSection: React.FC<{
     return (
       <div key={spec.id} className="flex flex-col">
         {/* 状态切换按钮 - 使用Button实现点击状态切换 */}
-        <div className="flex flex-col items-center p-2 border border-gray-200 rounded-t-lg bg-white hover:shadow-sm transition-shadow">
+        <div className="flex flex-col items-center p-2 rounded-t-lg bg-white hover:shadow-sm transition-shadow">
           <button
             type="button"
             className={`w-full py-1.5 rounded text-xs font-medium ${config.color} ${config.textColor} hover:opacity-80 transition-all hover:scale-105 border border-transparent hover:border-gray-300 cursor-pointer`}
@@ -1076,7 +1097,7 @@ const MaterialsSection: React.FC<{
     >
       {/* 碳板材料区域 */}
       {carbonSpecs.length > 0 && (
-        <div className="bg-blue-50 rounded-lg p-4">
+        <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-blue-900">
               碳板材料 ({carbonSpecs.length}种)
@@ -1117,7 +1138,7 @@ const MaterialsSection: React.FC<{
 
       {/* 特殊材料区域 */}
       {specialSpecs.length > 0 && (
-        <div className="bg-orange-50 rounded-lg p-4">
+        <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-orange-900">
               特殊材料 ({specialSpecs.length}种)
@@ -1268,27 +1289,216 @@ const HistorySection: React.FC<{
   operationHistory: OperationHistory[];
   onRefresh: () => void;
 }> = ({ projectId, operationHistory, onRefresh }) => {
-  const getOperationIcon = (type: string) => {
-    switch (type) {
-      case 'material_update': return CogIcon;
-      case 'drawing_upload': return PhotoIcon;
-      case 'project_update': return PencilIcon;
-      case 'project_create': return PlusIcon;
-      case 'project_delete': return TrashIcon;
-      default: return DocumentIcon;
+  const [filterType, setFilterType] = useState<string>('all');
+
+  // 状态翻译
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': '待处理',
+      'in_progress': '进行中', 
+      'completed': '已完成',
+      'cancelled': '已取消',
+      'low': '低',
+      'medium': '中',
+      'high': '高',
+      'urgent': '紧急'
+    };
+    return statusMap[status] || status;
+  };
+
+  // 获取业务友好的操作描述和图标
+  const getBusinessDescription = (record: OperationHistory) => {
+    const { operationType, operationDescription, operator, details } = record;
+    
+    switch (operationType) {
+      case 'material_start':
+        return {
+          title: `${operator.name} 开始处理板材`,
+          description: `项目：${details?.projectName || ''} | ${details?.materialType || ''} ${details?.thickness || ''}mm`,
+          icon: <PlayIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
+        
+      case 'material_complete':
+        const duration = details?.duration ? ` | 用时：${details.duration}` : '';
+        return {
+          title: `${operator.name} 完成板材加工`,
+          description: `项目：${details?.projectName || ''} | ${details?.materialType || ''} ${details?.thickness || ''}mm${duration}`,
+          icon: <CheckCircleIcon className="w-4 h-4 text-white" />,
+          status: 'success' as const
+        };
+        
+      case 'material_update':
+        const oldStatus = translateStatus(details?.oldStatus || '');
+        const newStatus = translateStatus(details?.newStatus || '');
+        return {
+          title: `${operator.name} 更新板材状态`,
+          description: `${details?.materialType || ''} ${details?.thickness || ''}mm (${oldStatus} → ${newStatus})`,
+          icon: <CogIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
+        
+      case 'material_transfer':
+        return {
+          title: `${operator.name} 转移板材`,
+          description: `将 ${details?.quantity || ''}张 ${details?.materialType || ''} ${details?.thickness || ''}mm 转移给 ${details?.targetWorker || ''}`,
+          icon: <ArrowRightIcon className="w-4 h-4 text-white" />,
+          status: 'warning' as const
+        };
+        
+      case 'requirement_add':
+        return {
+          title: `${operator.name} 添加材料需求`,
+          description: `项目：${details?.projectName || ''} | 需求：${details?.materialType || ''} ${details?.thickness || ''}mm ${details?.dimensions || ''} ${details?.quantity || ''}张`,
+          icon: <PlusIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
+        
+      case 'material_allocate':
+        return {
+          title: `${operator.name} 分配板材`,
+          description: `为项目${details?.projectName || ''}分配了 ${details?.quantity || ''}张板材，来源：${details?.sources || ''}`,
+          icon: <UserIcon className="w-4 h-4 text-white" />,
+          status: 'success' as const
+        };
+        
+      case 'drawing_upload':
+        const isDelete = details?.action === 'delete';
+        return {
+          title: `${operator.name} ${isDelete ? '删除' : '上传'}图纸`,
+          description: `项目：${details?.projectName || ''} | 文件：${details?.filename || operationDescription}`,
+          icon: isDelete ? <TrashIcon className="w-4 h-4 text-white" /> : <PhotoIcon className="w-4 h-4 text-white" />,
+          status: isDelete ? 'warning' as const : 'success' as const
+        };
+        
+      case 'project_create':
+        return {
+          title: `${operator.name} 创建项目`,
+          description: `项目名称：${details?.projectName || operationDescription}`,
+          icon: <PlusIcon className="w-4 h-4 text-white" />,
+          status: 'success' as const
+        };
+        
+      case 'project_update':
+        // 解析operationDescription中的状态信息
+        let description = `项目：${details?.projectName || ''} | ${operationDescription}`;
+        if (operationDescription && operationDescription.includes('→')) {
+          // 如果描述中包含状态变更，翻译状态
+          description = operationDescription.replace(/pending/g, '待处理')
+            .replace(/in_progress/g, '进行中')
+            .replace(/completed/g, '已完成')
+            .replace(/cancelled/g, '已取消');
+          description = `项目：${details?.projectName || ''} | ${description}`;
+        }
+        return {
+          title: `${operator.name} 更新项目`,
+          description: description,
+          icon: <PencilIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
+        
+      case 'project_status_change':
+        const fromStatus = translateStatus(details?.fromStatus || '');
+        const toStatus = translateStatus(details?.toStatus || '');
+        return {
+          title: `${operator.name} 变更项目状态`,
+          description: `项目：${details?.projectName || ''} | 状态：${fromStatus} → ${toStatus}`,
+          icon: <ExclamationCircleIcon className="w-4 h-4 text-white" />,
+          status: 'warning' as const
+        };
+
+      case 'worker_assign':
+        return {
+          title: `${operator.name} 分配工人`,
+          description: `项目：${details?.projectName || ''} | 工人：${details?.oldWorkerName || '无'} → ${details?.newWorkerName || '无'}`,
+          icon: <UserIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
+
+      case 'project_milestone':
+        return {
+          title: `${operator.name} 达成里程碑`,
+          description: `项目：${details?.projectName || ''} | 里程碑：${details?.milestone || ''}`,
+          icon: <CheckCircleIcon className="w-4 h-4 text-white" />,
+          status: 'success' as const
+        };
+
+      case 'priority_change':
+        const oldPriority = translateStatus(details?.oldPriority || '');
+        const newPriority = translateStatus(details?.newPriority || '');
+        return {
+          title: `${operator.name} 调整优先级`,
+          description: `项目：${details?.projectName || ''} | 优先级：${oldPriority} → ${newPriority}`,
+          icon: <TagIcon className="w-4 h-4 text-white" />,
+          status: 'warning' as const
+        };
+
+      case 'project_delete':
+        return {
+          title: `${operator.name} 删除项目`,
+          description: `项目名称：${details?.projectName || operationDescription}`,
+          icon: <TrashIcon className="w-4 h-4 text-white" />,
+          status: 'error' as const
+        };
+        
+      default:
+        // 对于未识别的操作类型，也尝试翻译描述中的状态
+        let translatedDescription = operationDescription || '未知操作';
+        if (translatedDescription.includes('→')) {
+          translatedDescription = translatedDescription.replace(/pending/g, '待处理')
+            .replace(/in_progress/g, '进行中')
+            .replace(/completed/g, '已完成')
+            .replace(/cancelled/g, '已取消');
+        }
+        return {
+          title: translatedDescription,
+          description: `操作者：${operator.name}`,
+          icon: <DocumentTextIcon className="w-4 h-4 text-white" />,
+          status: 'info' as const
+        };
     }
   };
 
-  const getOperationColor = (type: string) => {
-    switch (type) {
-      case 'material_update': return 'text-blue-600';
-      case 'drawing_upload': return 'text-green-600';
-      case 'project_update': return 'text-orange-600';
-      case 'project_create': return 'text-purple-600';
-      case 'project_delete': return 'text-red-600';
-      default: return 'text-gray-600';
+  // 筛选选项
+  const filterOptions = [
+    { value: 'all', label: '全部操作' },
+    { value: 'material', label: '板材操作' },
+    { value: 'project', label: '项目操作' },
+    { value: 'drawing', label: '图纸操作' },
+    { value: 'requirement', label: '需求管理' }
+  ];
+
+  // 筛选操作历史
+  const filteredHistory = operationHistory.filter(record => {
+    if (filterType === 'all') return true;
+    
+    switch (filterType) {
+      case 'material':
+        return ['material_start', 'material_complete', 'material_transfer', 'material_allocate', 'material_update'].includes(record.operationType);
+      case 'project':
+        return ['project_create', 'project_update', 'project_status_change', 'worker_assign', 'project_milestone', 'priority_change', 'project_delete'].includes(record.operationType);
+      case 'drawing':
+        return ['drawing_upload'].includes(record.operationType);
+      case 'requirement':
+        return ['requirement_add', 'requirement_allocate'].includes(record.operationType);
+      default:
+        return true;
     }
-  };
+  });
+
+  // 转换为Timeline所需的数据格式
+  const timelineItems: TimelineItem[] = filteredHistory.map(record => {
+    const businessInfo = getBusinessDescription(record);
+    
+    return {
+      id: record.id.toString(),
+      title: businessInfo.title,
+      description: businessInfo.description,
+      timestamp: new Date(record.created_at),
+      icon: businessInfo.icon,
+      status: businessInfo.status
+    };
+  });
 
   return (
     <motion.div
@@ -1298,61 +1508,86 @@ const HistorySection: React.FC<{
       exit={{ opacity: 0, y: -20 }}
       className="p-6 space-y-6"
     >
+      {/* 标题和控制栏 */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">操作历史</h3>
-        <Button variant="ghost" size="sm" onClick={onRefresh}>
-          刷新
-        </Button>
+        <h3 className="text-lg font-semibold text-gray-900">项目操作记录</h3>
+        <div className="flex items-center space-x-3">
+          <Button variant="ghost" size="sm" onClick={onRefresh}>
+            刷新
+          </Button>
+        </div>
       </div>
 
-      {operationHistory.length > 0 ? (
-        <div className="space-y-4">
-          {operationHistory.map((record) => {
-            const Icon = getOperationIcon(record.operationType);
-            const colorClass = getOperationColor(record.operationType);
-            
-            return (
-              <motion.div
-                key={record.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Card className="p-4">
-                  <div className="flex items-start space-x-4">
-                    <div className={`flex-shrink-0 ${colorClass}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">
-                          {record.operationDescription}
-                        </h4>
-                        <span className="text-sm text-gray-500">
-                          {formatDateTime(record.created_at)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        操作者: {record.operator.name}
-                      </p>
-                      {record.details && Object.keys(record.details).length > 0 && (
-                        <div className="mt-2 text-xs text-gray-500">
-                          <pre className="whitespace-pre-wrap">
-                            {JSON.stringify(record.details, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
+      {/* 筛选控制 */}
+      <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+        <div className="flex items-center space-x-3">
+          <span className="text-sm font-medium text-gray-700">筛选类型：</span>
+          <Select
+            value={filterType}
+            onChange={(value) => setFilterType(value.toString())}
+            options={filterOptions}
+            className="w-32"
+          />
+        </div>
+        <span className="text-xs text-gray-500">共 {filteredHistory.length} 条记录</span>
+      </div>
+
+      {/* 时间轴内容 */}
+      {timelineItems.length > 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <Timeline
+            items={timelineItems}
+            mode="left"
+            size="md"
+            pending={"持续记录项目操作中..."}
+          />
         </div>
       ) : (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
           <ClockIcon className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p>暂无操作历史</p>
+          <h4 className="text-lg font-medium text-gray-900 mb-2">暂无操作记录</h4>
+          <p className="text-gray-500">
+            {filterType === 'all' ? '该项目还没有任何操作记录' : `没有找到「${filterOptions.find(opt => opt.value === filterType)?.label}」相关的操作记录`}
+          </p>
+          {filterType !== 'all' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFilterType('all')}
+              className="mt-3"
+            >
+              查看所有记录
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* 说明信息 */}
+      {timelineItems.length > 0 && (
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">操作记录说明</h4>
+          <div className="text-xs text-blue-700 space-y-1">
+            <div className="flex items-center space-x-2">
+              <PlayIcon className="w-3 h-3" />
+              <span>开始处理 - 工人开始处理某项板材加工任务</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <CheckCircleIcon className="w-3 h-3" />
+              <span>完成加工 - 工人完成板材加工并记录用时</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <ArrowRightIcon className="w-3 h-3" />
+              <span>转移板材 - 工人之间的板材资源转移</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <UserIcon className="w-3 h-3" />
+              <span>分配材料 - 为项目分配所需的板材资源</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <PlusIcon className="w-3 h-3" />
+              <span>添加需求 - 项目新增材料需求或创建项目</span>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>

@@ -18,10 +18,18 @@ const OperationHistory = sequelize.define('OperationHistory', {
     }
   },
   operationType: {
-    type: DataTypes.ENUM('material_update', 'drawing_upload', 'project_update', 'project_create', 'project_delete'),
+    type: DataTypes.ENUM(
+      // 原有操作类型
+      'material_update', 'drawing_upload', 'project_update', 'project_create', 'project_delete',
+      // 新增的项目生命周期操作类型
+      'material_start', 'material_complete', 'material_transfer', 'material_allocate',
+      'requirement_add', 'requirement_allocate', 'project_status_change', 'worker_assign',
+      'project_milestone', 'quality_check', 'delivery_schedule', 'resource_allocation',
+      'batch_operation', 'system_backup', 'data_export', 'priority_change'
+    ),
     allowNull: false,
     field: 'operation_type',
-    comment: '操作类型'
+    comment: '操作类型：包含完整项目生命周期的所有关键操作'
   },
   operationDescription: {
     type: DataTypes.STRING(500),

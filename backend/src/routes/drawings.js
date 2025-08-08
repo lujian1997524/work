@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { Drawing, Project, User } = require('../models');
 const { authenticate } = require('../middleware/auth');
-const { recordDrawingUpload } = require('../utils/operationHistory');
+const { recordDrawingUpload, recordDrawingDelete } = require('../utils/operationHistory');
 const { Op } = require('sequelize');
 
 // 配置文件上传存储
@@ -463,6 +463,18 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     await drawing.destroy();
+
+    // 记录图纸删除历史
+    try {
+      await recordDrawingDelete(
+        drawing.projectId,
+        drawing,
+        req.user.id,
+        req.user.name
+      );
+    } catch (historyError) {
+      console.error('记录图纸删除历史失败:', historyError);
+    }
 
     res.json({
       success: true,

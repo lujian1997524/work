@@ -10,8 +10,10 @@ const {
   Material, 
   Project,
   ThicknessSpec,
-  User 
+  User,
+  Department
 } = require('../models');
+const { recordRequirementAdd } = require('../utils/operationHistory');
 
 /**
  * 获取项目的材料需求列表
@@ -126,6 +128,11 @@ router.post('/', authenticate, async (req, res) => {
             {
               model: ThicknessSpec,
               as: 'thicknessSpec'
+            },
+            {
+              model: Project,
+              as: 'project',
+              attributes: ['id', 'name']
             }
           ]
         },
@@ -136,6 +143,26 @@ router.post('/', authenticate, async (req, res) => {
         }
       ]
     });
+
+    // 记录需求添加历史
+    try {
+      await recordRequirementAdd(
+        projectId,
+        {
+          id: requirement.id,
+          materialType: material.thicknessSpec?.materialType || '碳板',
+          thickness: material.thicknessSpec?.thickness,
+          dimensions: `${width}×${height}`,
+          quantity: quantity,
+          specifications: notes,
+          project: { name: fullRequirement.material?.project?.name }
+        },
+        req.user.id,
+        req.user.name
+      );
+    } catch (historyError) {
+      console.error('记录需求添加历史失败:', historyError);
+    }
 
     res.json({
       success: true,
@@ -204,23 +231,31 @@ router.get('/check-inventory', authenticate, async (req, res) => {
             }
           ]
         }
-      ],
-      order: [
-        // 项目工人优先
-        ...(projectWorkerId ? [
-          [{ model: Worker, as: 'worker' }, 'id', projectWorkerId === 'workerId' ? 'ASC' : 'DESC']
-        ] : []),
-        ['quantity', 'DESC'] // 库存量倒序
       ]
     });
 
-    const inventory = workerMaterials.map(wm => ({
-      workerId: wm.workerId,
-      workerName: wm.worker.name,
-      department: wm.worker.departmentInfo?.name || '未分配',
-      quantity: wm.quantity,
-      isProjectWorker: projectWorkerId && wm.workerId == projectWorkerId
-    }));
+    // 查询完成后再进行排序，确保项目工人优先
+    const inventory = workerMaterials
+      .map(wm => ({
+        workerId: wm.workerId,
+        workerName: wm.worker.name,
+        department: wm.worker.departmentInfo?.name || '未分配',
+        quantity: wm.quantity,
+        isProjectWorker: projectWorkerId && wm.workerId == projectWorkerId,
+        isPublicInventory: wm.worker.name === '公共库存'
+      }))
+      .sort((a, b) => {
+        // 第一优先级：项目负责工人排在最前面
+        if (a.isProjectWorker && !b.isProjectWorker) return -1;
+        if (!a.isProjectWorker && b.isProjectWorker) return 1;
+        
+        // 第二优先级：公共库存排在项目工人之后，其他工人之前
+        if (a.isPublicInventory && !b.isPublicInventory && !b.isProjectWorker) return -1;
+        if (!a.isPublicInventory && b.isPublicInventory && !a.isProjectWorker) return 1;
+        
+        // 第三优先级：其他工人按库存数量降序（数量多的在前）
+        return b.quantity - a.quantity;
+      });
 
     res.json({
       success: true,

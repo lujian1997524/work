@@ -3,7 +3,7 @@ const { Project, Material, Drawing, ThicknessSpec, Worker, User, OperationHistor
 const { Op } = require('sequelize');
 const { authenticate, requireOperator, requireAdmin } = require('../middleware/auth');
 const sseManager = require('../utils/sseManager');
-const { recordProjectUpdate, recordProjectCreate, recordProjectDelete } = require('../utils/operationHistory');
+const { recordProjectUpdate, recordProjectCreate, recordProjectDelete, recordProjectStatusChange, recordWorkerAssign, recordPriorityChange } = require('../utils/operationHistory');
 
 const router = express.Router();
 
@@ -737,13 +737,53 @@ router.put('/:id', authenticate, requireOperator, async (req, res) => {
 
     if (Object.keys(changes).length > 0) {
       try {
-        await recordProjectUpdate(
-          id,
-          updatedProject.name,
-          changes,
-          req.user.id,
-          req.user.name
-        );
+        // 使用专用函数记录不同类型的变更
+        if (changes.status) {
+          // 记录项目状态变更
+          await recordProjectStatusChange(
+            id,
+            updatedProject.name,
+            changes.oldStatus,
+            changes.status,
+            req.user.id,
+            req.user.name
+          );
+        }
+        
+        if (changes.assignedWorkerId !== undefined) {
+          // 记录工人分配变更
+          await recordWorkerAssign(
+            id,
+            updatedProject.name,
+            originalWorker ? { id: originalWorker.id, name: originalWorker.name } : null,
+            updatedProject.assignedWorker ? { id: updatedProject.assignedWorker.id, name: updatedProject.assignedWorker.name } : null,
+            req.user.id,
+            req.user.name
+          );
+        }
+
+        if (changes.priority) {
+          // 记录优先级变更
+          await recordPriorityChange(
+            id,
+            updatedProject.name,
+            changes.oldPriority,
+            changes.priority,
+            req.user.id,
+            req.user.name
+          );
+        }
+
+        // 对于其他变更（名称等），使用通用记录
+        if (changes.name) {
+          await recordProjectUpdate(
+            id,
+            updatedProject.name,
+            changes,
+            req.user.id,
+            req.user.name
+          );
+        }
       } catch (historyError) {
         console.error('记录项目更新历史失败:', historyError);
       }

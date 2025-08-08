@@ -83,10 +83,17 @@ export interface ProjectFormData {
   requiredThickness?: number[];
 }
 
-// 操作历史接口
+// 操作历史接口 - 扩展版，支持完整项目生命周期
 export interface OperationHistory {
   id: number;
-  operationType: string;
+  operationType: 
+    // 原有操作类型
+    | 'material_update' | 'drawing_upload' | 'project_update' | 'project_create' | 'project_delete'
+    // 新增的项目生命周期操作类型
+    | 'material_start' | 'material_complete' | 'material_transfer' | 'material_allocate'
+    | 'requirement_add' | 'requirement_allocate' | 'project_status_change' | 'worker_assign'
+    | 'project_milestone' | 'quality_check' | 'delivery_schedule' | 'resource_allocation'
+    | 'batch_operation' | 'system_backup' | 'data_export' | 'priority_change';
   operationDescription: string;
   created_at: string;
   operator: { id: number; name: string };
