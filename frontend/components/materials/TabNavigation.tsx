@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui';
 import { 
   CubeIcon, 
@@ -50,10 +49,10 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${
+            className={`relative flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-all duration-200 ease-out ${
               isActive
                 ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-b-2 border-transparent'
             }`}
           >
             <div className="flex items-center space-x-2">
@@ -67,18 +66,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
               </Badge>
             </div>
             
-            {/* 活跃指示器动画 */}
+            {/* 活跃指示器 - 使用简单CSS动画替代layoutId */}
             {isActive && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-                initial={false}
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }}
-              />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all duration-200 ease-out" />
             )}
           </button>
         );

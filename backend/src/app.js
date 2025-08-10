@@ -41,6 +41,11 @@ app.use(cors({
     // 允许同源请求 (origin为undefined)
     if (!origin) return callback(null, true);
     
+    // 如果配置了 * 则允许所有来源
+    if (config.cors.origins.includes('*')) {
+      return callback(null, true);
+    }
+    
     // 检查是否在允许的源列表中
     if (config.cors.origins.includes(origin)) {
       return callback(null, true);

@@ -8,7 +8,6 @@ import { audioManager, type SoundType } from '@/utils/audioManager';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   CogIcon,
-  WifiIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XMarkIcon,
@@ -30,7 +29,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   
   const [config, setConfig] = useState<AppConfig>(configManager.getConfig());
   const [tempConfig, setTempConfig] = useState<AppConfig>(config);
-  const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{
     success: boolean;
     message: string;
@@ -67,27 +65,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleReset = () => {
     setTempConfig(config);
     setConnectionResult(null);
-  };
-
-  // 测试API连接
-  const handleTestConnection = async () => {
-    setTestingConnection(true);
-    setConnectionResult(null);
-    
-    try {
-      const result = await configManager.testConnection(tempConfig.apiUrl);
-      setConnectionResult({
-        success: result.success,
-        message: result.message
-      });
-    } catch (error) {
-      setConnectionResult({
-        success: false,
-        message: `连接错误: ${error instanceof Error ? error.message : '未知错误'}`
-      });
-    } finally {
-      setTestingConnection(false);
-    }
   };
 
   // 保存配置
@@ -154,67 +131,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="系统设置"
+      
       size="3xl"
     >
       <div className="space-y-6">
-        {/* API配置 */}
-        <Card className="p-4">
-          <div className="flex items-center mb-4">
-            <WifiIcon className="w-5 h-5 mr-2 text-ios18-blue" />
-            <h3 className="font-semibold text-gray-900">API配置</h3>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                服务器地址
-              </label>
-              <div className="flex space-x-2">
-                <Input
-                  type="url"
-                  value={tempConfig.apiUrl}
-                  onChange={(e) => setTempConfig({
-                    ...tempConfig,
-                    apiUrl: e.target.value
-                  })}
-                  placeholder="http://localhost:35001"
-                  className="flex-1"
-                  disabled={!isAdmin}
-                  readOnly={!isAdmin}
-                />
-                <Button
-                  variant="secondary"
-                  onClick={handleTestConnection}
-                  loading={testingConnection}
-                  disabled={!tempConfig.apiUrl || testingConnection}
-                >
-                  测试连接
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                请求超时 (毫秒)
-              </label>
-              <Input
-                type="number"
-                value={tempConfig.apiTimeout}
-                onChange={(e) => setTempConfig({
-                  ...tempConfig,
-                  apiTimeout: parseInt(e.target.value) || 30000
-                })}
-                min="1000"
-                max="120000"
-                step="1000"
-                disabled={!isAdmin}
-                readOnly={!isAdmin}
-              />
-            </div>
-          </div>
-        </Card>
-
         {/* 功能开关 */}
         <Card className="p-4">
           <div className="flex items-center mb-4">

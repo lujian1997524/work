@@ -38,7 +38,7 @@ interface MaterialDimension {
 interface MaterialData {
   quantity: number;
   id: number | null;
-  notes: string | null;
+  notes?: string;
   dimensions: MaterialDimension[];
 }
 
@@ -101,10 +101,10 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       if (response.ok) {
         const result: ApiResponse = await response.json();
         setData(result);
-        console.log('📊 数据加载成功:', result);
+        // 数据加载成功
       }
     } catch (error) {
-      console.error('❌ 获取数据失败:', error);
+      // 获取数据失败
     } finally {
       setLoading(false);
     }
@@ -215,13 +215,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
     return hasInventory;
   });
 
-  console.log('🎯 筛选结果:', {
-    总工人数: data.workers.length,
-    筛选后工人数: filteredWorkers.length,
-    总材料规格数: data.thicknessSpecs.length,
-    筛选后材料规格数: filteredThicknessSpecs.length,
-    筛选条件: { materialTypeFilter, workerIdFilter, thicknessFilter }
-  });
+  // 筛选结果统计
 
   return (
     <div className={`h-full flex flex-col bg-white ${className}`}>
@@ -344,7 +338,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
                           setShowEditModal(true);
                         }}
                         className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                        title="编辑工人板材库存"
+                        
                       >
                         <PencilIcon className="w-4 h-4" />
                       </motion.button>
@@ -484,7 +478,7 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         setMaterialList(materials);
       }
     } catch (error) {
-      console.error('获取工人板材详情失败:', error);
+      // 获取工人板材详情失败
     } finally {
       setLoading(false);
     }
@@ -520,7 +514,7 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         window.dispatchEvent(new CustomEvent('materials-updated'));
       }
     } catch (error) {
-      console.error('更新板材数量失败:', error);
+      // 更新板材数量失败
     }
   };
 
@@ -551,7 +545,7 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         window.dispatchEvent(new CustomEvent('materials-updated'));
       } else if (response.status === 404) {
         // 记录已经不存在，立即从本地状态中移除并刷新数据
-        console.warn('要删除的板材记录不存在，可能已被其他操作删除');
+        // 要删除的板材记录不存在
         setMaterialList(prev => prev.filter(item => item.id !== materialId));
         await fetchWorkerMaterials();
         onSuccess();
@@ -559,7 +553,7 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         window.dispatchEvent(new CustomEvent('materials-updated'));
       }
     } catch (error) {
-      console.error('删除板材失败:', error);
+      // 删除板材失败
     }
   };
 

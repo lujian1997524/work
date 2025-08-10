@@ -23,7 +23,6 @@ class DataSyncTester {
     };
     
     this.eventLog.push(logEntry);
-    console.log(`📡 [${source}] ${eventType}:`, data);
     return logEntry.id;
   }
 
@@ -32,15 +31,12 @@ class DataSyncTester {
    */
   startSyncTest() {
     if (this.isRunning) {
-      console.log('⚠️ 同步测试已在运行中...');
       return;
     }
 
     this.isRunning = true;
     this.eventLog = [];
     this.testResults = [];
-    
-    console.log('🚀 开始数据同步测试...');
 
     // 监听所有数据更新事件
     this.setupEventListeners();
@@ -69,8 +65,6 @@ class DataSyncTester {
         this.logEvent(eventType, event.detail || {}, 'window-event');
       });
     });
-
-    console.log(`📋 已设置 ${events.length} 个事件监听器`);
   }
 
   /**
@@ -85,16 +79,12 @@ class DataSyncTester {
       this.testCrossComponentSync
     ];
 
-    console.log(`🧪 开始执行 ${tests.length} 个测试用例...`);
-
     for (let i = 0; i < tests.length; i++) {
       const test = tests[i];
       try {
-        console.log(`\n🧪 执行测试 ${i + 1}/${tests.length}: ${test.name}`);
         await test.call(this);
         this.testResults.push({ test: test.name, status: 'passed', time: Date.now() });
       } catch (error) {
-        console.error(`❌ 测试失败: ${test.name}`, error);
         this.testResults.push({ test: test.name, status: 'failed', error: error.message, time: Date.now() });
       }
       
@@ -135,8 +125,6 @@ class DataSyncTester {
     if (relatedEvents.length === 0) {
       throw new Error('材料状态更新未触发相关同步事件');
     }
-
-    console.log(`✅ 材料状态同步测试通过 - 触发了 ${relatedEvents.length} 个相关事件`);
   }
 
   /**
@@ -160,8 +148,6 @@ class DataSyncTester {
     if (relatedEvents.length === 0) {
       throw new Error('工人材料更新事件未正确传播');
     }
-
-    console.log('✅ 工人材料同步测试通过');
   }
 
   /**
@@ -196,8 +182,6 @@ class DataSyncTester {
     if (projectEvents.length === 0 && materialEvents.length === 0) {
       throw new Error('项目创建未触发相关同步事件');
     }
-
-    console.log('✅ 项目创建同步测试通过');
   }
 
   /**
@@ -226,16 +210,12 @@ class DataSyncTester {
     if (updates.length === 0) {
       throw new Error('板材分配未触发相关组件更新');
     }
-
-    console.log('✅ 板材分配同步测试通过');
   }
 
   /**
    * 测试5: 跨组件同步
    */
   async testCrossComponentSync() {
-    console.log('🔄 测试跨组件数据同步...');
-    
     // 连续触发多个事件，测试组件间的协调能力
     const events = [
       'materials-updated',
@@ -258,8 +238,6 @@ class DataSyncTester {
     if (recentEvents.length < events.length) {
       throw new Error('部分同步事件可能丢失');
     }
-
-    console.log('✅ 跨组件同步测试通过');
   }
 
   /**
@@ -271,17 +249,10 @@ class DataSyncTester {
     const passedTests = this.testResults.filter(r => r.status === 'passed').length;
     const failedTests = this.testResults.filter(r => r.status === 'failed').length;
     
-    console.log('\n📊 数据同步测试结果:');
-    console.log(`✅ 通过: ${passedTests} 个测试`);
-    console.log(`❌ 失败: ${failedTests} 个测试`);
-    console.log(`📡 总事件数: ${this.eventLog.length}`);
-    
     if (failedTests > 0) {
-      console.log('\n❌ 失败的测试:');
       this.testResults
         .filter(r => r.status === 'failed')
         .forEach(result => {
-          console.log(`  - ${result.test}: ${result.error}`);
         });
     }
 
@@ -310,10 +281,6 @@ class DataSyncTester {
 
     // 保存到localStorage供调试使用
     localStorage.setItem('dataSyncTestReport', JSON.stringify(report, null, 2));
-    
-    console.log('\n📋 测试报告已保存到 localStorage.dataSyncTestReport');
-    console.log('可以通过以下代码查看详细报告:');
-    console.log('JSON.parse(localStorage.getItem("dataSyncTestReport"))');
 
     return report;
   }
@@ -329,8 +296,6 @@ class DataSyncTester {
    * 手动触发刷新事件测试
    */
   testRefreshEvents() {
-    console.log('🔄 测试刷新事件...');
-    
     const refreshEvents = [
       'refresh-materials',
       'materials-updated',
@@ -338,7 +303,6 @@ class DataSyncTester {
     ];
 
     refreshEvents.forEach(eventType => {
-      console.log(`派发事件: ${eventType}`);
       window.dispatchEvent(new CustomEvent(eventType, {
         detail: { source: 'manual-test', timestamp: Date.now() }
       }));
@@ -357,7 +321,6 @@ class DataSyncTester {
       stats[log.eventType]++;
     });
 
-    console.table(stats);
     return stats;
   }
 }
@@ -369,9 +332,3 @@ window.dataSyncTester = new DataSyncTester();
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = DataSyncTester;
 }
-
-console.log('📡 数据同步测试工具已加载');
-console.log('使用方法:');
-console.log('  window.dataSyncTester.startSyncTest() - 开始完整测试');
-console.log('  window.dataSyncTester.testRefreshEvents() - 测试刷新事件');
-console.log('  window.dataSyncTester.getEventStats() - 查看事件统计');

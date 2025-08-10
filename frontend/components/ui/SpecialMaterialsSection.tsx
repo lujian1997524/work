@@ -223,7 +223,7 @@ export const SpecialMaterialsSection: React.FC<SpecialMaterialsSectionProps> = (
                                   onMaterialStatusChange(material.id, nextStatus);
                                 }
                               }}
-                              title={`${material.thickness}${material.unit} ${material.materialType}${material.notes ? `\n备注: ${material.notes}` : ''}${material.startDate ? `\n开始: ${formatDate(material.startDate)}` : ''}${material.completedDate ? `\n完成: ${formatDate(material.completedDate)}` : ''}`}
+                              
                             >
                               <div>{material.thickness}{material.unit}</div>
                               <div className="text-xs opacity-75">{material.materialType}</div>
@@ -308,7 +308,7 @@ export const SpecialMaterialsSection: React.FC<SpecialMaterialsSectionProps> = (
                             onMaterialStatusChange(material.id, nextStatus);
                           }
                         }}
-                        title={`${material.thickness}${material.unit} ${material.materialType}${material.notes ? `\n备注: ${material.notes}` : ''}${material.startDate ? `\n开始: ${formatDate(material.startDate)}` : ''}${material.completedDate ? `\n完成: ${formatDate(material.completedDate)}` : ''}`}
+                        
                       >
                         <div>{material.thickness}mm</div>
                         <div className="text-xs opacity-60">{material.materialType}</div>

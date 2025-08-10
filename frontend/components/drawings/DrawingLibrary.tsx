@@ -92,7 +92,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
         throw new Error('获取图纸列表失败');
       }
     } catch (error) {
-      console.error('获取图纸列表失败:', error);
+      // 获取图纸列表失败
       setError('获取图纸列表失败，请重试');
     } finally {
       setLoading(false);
@@ -131,9 +131,9 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
       // 新的统一接口会自动根据平台选择合适的操作
       // 这个函数已经被DrawingActionButton组件取代
       // 保留这里只是为了兼容性，实际应该使用DrawingActionButton
-      console.log('请使用DrawingActionButton组件代替直接调用handleOpen');
+      // 请使用DrawingActionButton组件
     } catch (error) {
-      console.error('处理图纸打开失败:', error);
+      // 处理图纸打开失败
       setError('打开图纸失败，请重试');
     }
   };
@@ -159,7 +159,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
         throw new Error(errorData.error || '删除失败');
       }
     } catch (error) {
-      console.error('删除图纸失败:', error);
+      // 删除图纸失败
       setError(error instanceof Error ? error.message : '删除图纸失败，请重试');
     }
   };
@@ -213,7 +213,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
         throw new Error(errorData.error || '更新失败');
       }
     } catch (error) {
-      console.error('更新图纸失败:', error);
+      // 更新图纸失败
       setError(error instanceof Error ? error.message : '更新图纸失败，请重试');
     }
   };
@@ -295,7 +295,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
         throw new Error('删除图纸失败');
       }
     } catch (error) {
-      console.error('删除图纸失败:', error);
+      // 删除图纸失败
       await alert('删除图纸失败，请重试');
     }
   };
@@ -362,14 +362,12 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
           </div>
         ) : drawings.length === 0 ? (
           <EmptyData
-            title="暂无图纸"
             description="还没有上传任何图纸"
-            action={
-              <Button variant="primary" onClick={() => onUploadModalChange?.(true)}>
-                上传第一个图纸
-              </Button>
-            }
-          />
+          >
+            <Button variant="primary" onClick={() => onUploadModalChange?.(true)}>
+              上传第一个图纸
+            </Button>
+          </EmptyData>
         ) : (
           <DrawingGrid
             drawings={drawings}
@@ -411,7 +409,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
           setEditDescription('');
           setEditStatus('可用');
         }}
-        title="编辑图纸信息"
+        
         size="md"
       >
         <div className="space-y-4">

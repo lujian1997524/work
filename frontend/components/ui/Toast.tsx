@@ -190,15 +190,11 @@ export const useToast = () => {
 export const toast = {
   success: (message: string, options?: Partial<ToastProps>) => {
     // 这里需要全局的 toast 管理器
-    console.log('Success toast:', message)
   },
   error: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Error toast:', message)
   },
   warning: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Warning toast:', message)
   },
   info: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Info toast:', message)
   }
 }

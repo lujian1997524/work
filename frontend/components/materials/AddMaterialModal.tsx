@@ -67,60 +67,47 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
   // 获取工人列表
   const fetchWorkers = async () => {
     if (!token) {
-      console.log('❌ fetchWorkers: 没有token');
       return;
     }
     
-    console.log('📡 开始获取工人列表...');
     try {
       const response = await apiRequest('/api/workers', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      console.log('📡 工人API响应状态:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ 工人数据获取成功:', data);
-        console.log('👥 工人数量:', data.workers?.length || 0);
         setWorkers(data.workers || []);
       } else {
-        console.error('❌ 获取工人列表失败:', response.status, response.statusText);
         const errorData = await response.text();
-        console.error('❌ 错误详情:', errorData);
       }
     } catch (error) {
-      console.error('❌ 获取工人列表异常:', error);
     }
   };
 
   // 获取厚度规格列表
   const fetchThicknessSpecs = async () => {
     if (!token) {
-      console.log('❌ fetchThicknessSpecs: 没有token');
       return;
     }
     
-    console.log('📡 开始获取厚度规格...');
     try {
       const response = await apiRequest('/api/thickness-specs', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      console.log('📡 厚度规格API响应状态:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ 厚度规格数据获取成功:', data);
         const specs = data.thicknessSpecs || [];
         setThicknessSpecs(specs);
         
         // 提取唯一的材料类型
         const types = [...new Set(specs
-          .filter(spec => spec.isActive && spec.materialType)
-          .map(spec => spec.materialType)
-        )];
-        console.log('🧱 提取的材料类型:', types);
+          .filter((spec: any) => spec.isActive && spec.materialType)
+          .map((spec: any) => spec.materialType)
+        )] as string[];
         
         // 确保碳板在首位
         const sortedTypes = types.sort((a, b) => {
@@ -129,30 +116,22 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
           return a.localeCompare(b);
         });
         setMaterialTypes(sortedTypes);
-        console.log('🔢 排序后的材料类型:', sortedTypes);
         
         // 设置默认材料类型
         if (sortedTypes.length > 0 && !formData.materialType) {
           setFormData(prev => ({ ...prev, materialType: sortedTypes[0] }));
         }
       } else {
-        console.error('❌ 获取厚度规格失败:', response.status, response.statusText);
         const errorData = await response.text();
-        console.error('❌ 错误详情:', errorData);
       }
     } catch (error) {
-      console.error('❌ 获取厚度规格异常:', error);
     }
   };
 
   useEffect(() => {
     if (isOpen && token) {
-      console.log('🔓 AddMaterialModal 打开，开始获取数据...');
-      console.log('🔑 Token存在:', !!token);
       fetchWorkers();
       fetchThicknessSpecs();
-    } else {
-      console.log('🔒 AddMaterialModal 条件不满足:', { isOpen, hasToken: !!token });
     }
   }, [isOpen, token]);
 
@@ -277,15 +256,6 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
         notes: formData.notes
       };
       
-      console.log('🚀 即将发送的请求数据:', requestData);
-      console.log('📊 数据验证:', {
-        workerId: typeof requestData.workerId + ' - ' + requestData.workerId,
-        materialType: typeof requestData.materialType + ' - ' + requestData.materialType,
-        thickness: typeof requestData.thickness + ' - ' + requestData.thickness,
-        quantity: typeof requestData.quantity + ' - ' + requestData.quantity,
-        notes: typeof requestData.notes + ' - ' + requestData.notes
-      });
-      
       const workerMaterialResponse = await apiRequest('/api/worker-materials', {
         method: 'POST',
         headers: {
@@ -295,11 +265,8 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
         body: JSON.stringify(requestData)
       });
 
-      console.log('📡 后端响应状态:', workerMaterialResponse.status);
-
       if (!workerMaterialResponse.ok) {
         const error = await workerMaterialResponse.json();
-        console.error('❌ 后端错误详情:', error);
         throw new Error(error.message || '添加板材失败');
       }
 
@@ -330,7 +297,6 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
         for (const response of dimensionResponses) {
           if (!response.ok) {
             const error = await response.json();
-            console.error('创建尺寸记录失败:', error);
             // 继续处理其他尺寸，不中断整个流程
           }
         }
@@ -345,7 +311,6 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
       window.dispatchEvent(new CustomEvent('materials-updated'));
 
     } catch (error) {
-      console.error('添加板材失败:', error);
       alert(error instanceof Error ? error.message : '添加板材失败，请重试');
     } finally {
       setSubmitting(false);
@@ -499,7 +464,7 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
                           onChange={(e) => updateDimension(index, 'width', e.target.value)}
                           step="0.01"
                           min="0"
-                          size="sm"
+                          className="text-sm"
                           required
                         />
                       </div>
@@ -512,7 +477,7 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
                           onChange={(e) => updateDimension(index, 'height', e.target.value)}
                           step="0.01"
                           min="0"
-                          size="sm"
+                          className="text-sm"
                           required
                         />
                       </div>
@@ -524,7 +489,7 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
                           value={dimension.quantity}
                           onChange={(e) => updateDimension(index, 'quantity', e.target.value)}
                           min="1"
-                          size="sm"
+                          className="text-sm"
                           required
                         />
                       </div>
@@ -532,10 +497,9 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
                         <label className="block text-xs font-medium text-gray-600 mb-1">操作</label>
                         <Button
                           type="button"
-                          size="sm"
                           variant="secondary"
                           onClick={() => removeDimensionRow(index)}
-                          className="w-full flex items-center justify-center"
+                          className="w-full flex items-center justify-center text-sm"
                         >
                           <TrashIcon className="w-4 h-4" />
                         </Button>
@@ -547,7 +511,7 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
                         placeholder="备注 (批次、供应商等)"
                         value={dimension.notes}
                         onChange={(e) => updateDimension(index, 'notes', e.target.value)}
-                        size="sm"
+                        className="text-sm"
                       />
                     </div>
                   </div>

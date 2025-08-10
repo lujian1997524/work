@@ -61,17 +61,13 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   // 获取工人列表
   const fetchWorkers = async () => {
-    console.log('🔍 TransferModal fetchWorkers - token:', !!token, 'user:', !!user);
-    
     if (!token) {
-      console.error('没有有效的认证token');
       setFetchingWorkers(false);
       return;
     }
 
     try {
       setFetchingWorkers(true);
-      console.log('📡 请求工人列表...');
       
       const response = await apiRequest('/api/workers', {
         headers: {
@@ -79,30 +75,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         }
       });
       
-      console.log('📡 工人列表响应:', response.status, response.ok);
-      
       if (response.ok) {
         const data = await response.json();
         const workerList = data.workers || [];
-        console.log('👥 获取到工人数量:', workerList.length);
         
         // 排除当前工人
         const availableWorkers = workerList.filter((worker: Worker) => 
           worker.name !== workerMaterial?.workerName
         );
-        console.log('👥 可选工人数量:', availableWorkers.length);
-        console.log('👥 可选工人列表:', availableWorkers);
         
         setWorkers(availableWorkers);
-        console.log('✅ 工人列表设置完成');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('获取工人列表失败:', response.status, errorData);
       }
     } catch (error) {
-      console.error('获取工人列表出错:', error);
     } finally {
-      console.log('🏁 设置fetchingWorkers为false');
       setFetchingWorkers(false);
     }
   };
@@ -126,7 +113,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   // 处理转移操作
   const handleTransfer = async () => {
-    console.log('🚀 开始转移操作...');
     
     if (!token) {
       await alert('认证已过期，请重新登录');
@@ -150,14 +136,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       return;
     }
 
-    console.log('📋 转移参数:', {
-      fromDimensionId: dimension.id,
-      toWorkerId: parseInt(selectedWorkerId),
-      quantity: quantity,
-      notes: notes || null
-    });
-
-    console.log('✅ 开始API调用...');
     setLoading(true);
     try {
       const response = await apiRequest('/api/material-dimensions/transfer', {
@@ -174,24 +152,18 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         })
       });
 
-      console.log('📡 转移API响应:', response.status, response.ok);
-
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ 转移成功:', result);
         // 移除成功提示，直接关闭模态框
         onSuccess();
         onClose();
       } else {
         const error = await response.json().catch(() => ({}));
-        console.error('❌ 转移失败:', response.status, error);
         await alert(`转移失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      console.error('❌ 转移请求异常:', error);
       await alert('转移失败，请检查网络连接');
     } finally {
-      console.log('🏁 转移操作结束');
       setLoading(false);
     }
   };

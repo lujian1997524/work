@@ -14,8 +14,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 interface ActivityBarProps {
-  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -51,7 +51,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
           size="sm"
           onClick={onSearchClick}
           className="w-12 h-12 p-0 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white/80"
-          title="搜索 (Ctrl+K)"
+          
         >
           <MagnifyingGlassIcon className="w-5 h-5" />
         </Button>
@@ -76,7 +76,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
                   ? 'bg-blue-100 text-blue-700 border border-blue-200' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-white/80'
               }`}
-              title={activity.label}
+              
             >
               <IconComponent className="w-5 h-5" />
               {isActive && (
@@ -106,7 +106,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
                       ? 'bg-blue-100 text-blue-700 border border-blue-200' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/80'
                   }`}
-                  title={activity.label}
+                  
                 >
                   <IconComponent className="w-5 h-5" />
                   {isActive && (

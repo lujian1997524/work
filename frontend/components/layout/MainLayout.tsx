@@ -43,38 +43,38 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   // SSE连接管理
   useEffect(() => {
     if (isAuthenticated && token) {
-      console.log('🔌 初始化SSE连接...')
+      // 初始化SSE连接
       
       // 建立SSE连接
       connectSSE(token).then((success) => {
         if (success) {
-          console.log('✅ SSE连接建立成功')
+          // SSE连接建立成功
         } else {
-          console.error('❌ SSE连接建立失败')
+          // SSE连接建立失败
         }
       })
 
       // 添加项目相关的SSE事件监听器
       const handleProjectCreated = (data: any) => {
-        console.log('📋 收到项目创建事件:', data)
+        // 收到项目创建事件
         // 刷新项目列表
         fetchProjects()
       }
 
       const handleProjectUpdated = (data: any) => {
-        console.log('🔄 收到项目更新事件:', data)
+        // 收到项目更新事件
         // 刷新项目列表
         fetchProjects()
       }
 
       const handleProjectDeleted = (data: any) => {
-        console.log('🗑️ 收到项目删除事件:', data)
+        // 收到项目删除事件
         // 刷新项目列表
         fetchProjects()
       }
 
       const handleProjectStatusChanged = (data: any) => {
-        console.log('📊 收到项目状态变更事件:', data)
+        // 收到项目状态变更事件
         // 刷新项目列表
         fetchProjects()
       }
@@ -87,7 +87,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
       // 清理函数
       return () => {
-        console.log('🔌 清理SSE连接...')
+        // 清理SSE连接
         sseManager.removeEventListener('project-created', handleProjectCreated)
         sseManager.removeEventListener('project-updated', handleProjectUpdated)
         sseManager.removeEventListener('project-deleted', handleProjectDeleted)
@@ -147,8 +147,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     )}
                     <div>
                       <Header
-                        title={headerTitle}
-                        subtitle={headerSubtitle}
+                        title={headerTitle || "系统标题"}
                       />
                     </div>
                   </div>

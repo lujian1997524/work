@@ -1,128 +1,62 @@
-// 前端CAD文件处理接口
-// 为渲染进程提供CAD文件检测和打开功能
+// Web环境CAD文件处理接口
+// 纯Web环境下的CAD文件处理功能
 
 class CADFileHandler {
-  private isElectron: boolean;
-  private detectedSoftware: any[];
   private supportedExtensions: string[];
 
   constructor() {
-    this.isElectron = typeof window !== 'undefined' && window.electronAPI != undefined;
-    this.detectedSoftware = [];
-    this.supportedExtensions = [];
+    this.supportedExtensions = ['.dxf', '.dwg', '.pdf', '.jpg', '.jpeg', '.png', '.svg'];
   }
 
-  // 检测CAD软件
+  // Web环境下的CAD软件检测（返回不支持）
   async detectCADSoftware() {
-    if (!this.isElectron) {
-      console.warn('CAD软件检测仅在Electron环境下可用');
-      return {
-        success: false,
-        error: 'CAD软件检测仅在桌面应用中可用'
-      };
-    }
-
-    try {
-      const result = await window.electronAPI!.invoke('detect-cad-software');
-      if (result.success) {
-        this.detectedSoftware = result.software;
-        this.supportedExtensions = result.supportedExtensions;
-      }
-      return result;
-    } catch (error) {
-      console.error('检测CAD软件失败:', error);
-      return {
-        success: false,
-        error: (error as Error).message
-      };
-    }
+    return {
+      success: false,
+      error: 'CAD软件检测仅在桌面应用中可用，Web环境下支持文件预览和下载'
+    };
   }
 
-  // 打开CAD文件
+  // Web环境下的文件处理（下载）
   async openCADFile(filePath: string) {
-    if (!this.isElectron) {
-      // 在浏览器环境下，尝试下载文件
-      try {
-        const link = document.createElement('a');
-        link.href = filePath;
-        link.download = filePath.split('/').pop() || '图纸文件';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        return {
-          success: true,
-          software: '浏览器下载',
-          message: '文件已下载到本地'
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: '文件下载失败'
-        };
-      }
-    }
-
     try {
-      const result = await window.electronAPI!.invoke('open-cad-file', filePath);
-      return result;
-    } catch (error) {
-      console.error('打开CAD文件失败:', error);
-      return {
-        success: false,
-        error: (error as Error).message
-      };
-    }
-  }
-
-  // 获取已检测的软件列表
-  async getDetectedSoftware() {
-    if (!this.isElectron) {
-      return {
-        success: false,
-        error: 'CAD软件检测仅在桌面应用中可用'
-      };
-    }
-
-    try {
-      const result = await window.electronAPI!.invoke('get-detected-cad-software');
-      if (result.success) {
-        this.detectedSoftware = result.software;
-        this.supportedExtensions = result.supportedExtensions;
-      }
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        error: (error as Error).message
-      };
-    }
-  }
-
-  // 检查文件是否为CAD文件
-  async isCADFile(filePath: string) {
-    if (!this.isElectron) {
-      // 在浏览器环境下，仅支持DXF格式
-      const cadExtensions = ['.dxf'];
-      const fileExtension = this.getFileExtension(filePath);
+      const link = document.createElement('a');
+      link.href = filePath;
+      link.download = filePath.split('/').pop() || '图纸文件';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
       return {
         success: true,
-        isCADFile: cadExtensions.includes(fileExtension.toLowerCase()),
-        extension: fileExtension,
-        supportedExtensions: cadExtensions
+        software: '浏览器下载',
+        message: '文件已下载到本地'
       };
-    }
-
-    try {
-      const result = await window.electronAPI!.invoke('is-cad-file', filePath);
-      return result;
     } catch (error) {
       return {
         success: false,
-        error: (error as Error).message
+        error: '文件下载失败'
       };
     }
+  }
+
+  // Web环境下的软件列表（空）
+  async getDetectedSoftware() {
+    return {
+      success: false,
+      error: 'CAD软件检测仅在桌面应用中可用'
+    };
+  }
+
+  // Web环境下的CAD文件检查
+  async isCADFile(filePath: string) {
+    const fileExtension = this.getFileExtension(filePath);
+    
+    return {
+      success: true,
+      isCADFile: this.supportedExtensions.includes(fileExtension.toLowerCase()),
+      extension: fileExtension,
+      supportedExtensions: this.supportedExtensions
+    };
   }
 
   // 获取文件扩展名
@@ -136,51 +70,38 @@ class CADFileHandler {
     return this.supportedExtensions;
   }
 
-  // 获取CAD软件信息
+  // Web环境下没有CAD软件信息
   getCADSoftwareInfo() {
-    return this.detectedSoftware;
+    return [];
   }
 
-  // 检查是否在Electron环境
+  // Web环境检查
   isElectronEnvironment() {
-    return this.isElectron;
+    return false;
   }
 
-  // 格式化软件信息用于显示
+  // Web环境下的软件信息格式化
   formatSoftwareInfo() {
-    if (!this.detectedSoftware.length) {
-      return '未检测到CAD软件';
-    }
-
-    const softwareNames = this.detectedSoftware.map((software: any) => software.name);
-    return `检测到 ${softwareNames.length} 个CAD软件: ${softwareNames.join(', ')}`;
+    return 'Web环境：支持文件预览和下载';
   }
 
-  // 根据文件类型推荐CAD软件
+  // Web环境下的软件推荐
   recommendCADSoftware(fileExtension: string) {
     const ext = fileExtension.toLowerCase();
-    const compatibleSoftware = this.detectedSoftware.filter((software: any) => 
-      software.extensions && software.extensions.includes(ext)
-    );
-
-    if (compatibleSoftware.length === 0) {
-      return null;
+    
+    if (ext === '.dxf') {
+      return {
+        name: 'DXF预览器',
+        type: 'web-viewer',
+        description: '在线DXF文件预览'
+      };
     }
-
-    // 优先推荐AutoCAD和CAXA
-    const priority = ['autocad', 'caxa', 'solidworks', 'fusion360'];
-    compatibleSoftware.sort((a: any, b: any) => {
-      const aIndex = priority.indexOf(a.type);
-      const bIndex = priority.indexOf(b.type);
-      
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      
-      return aIndex - bIndex;
-    });
-
-    return compatibleSoftware[0];
+    
+    return {
+      name: '文件下载',
+      type: 'download',
+      description: '下载文件到本地使用相应软件打开'
+    };
   }
 }
 

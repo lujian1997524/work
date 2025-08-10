@@ -25,8 +25,8 @@ import { VSCodeLayout } from '@/components/layout/VSCodeLayout';
 import { apiRequest } from '@/utils/api';
 
 export default function Home() {
-  const { isAuthenticated } = useAuth();
-
+  const { isAuthenticated, user } = useAuth();
+  
   return (
     <>
       {/* 登录模态框 - 未登录时显示，强制模态 */}
@@ -42,7 +42,7 @@ export default function Home() {
 
 function HomeContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'settings'>('active');
+  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings'>('active');
   const [workerNameFilter, setWorkerNameFilter] = useState('');
   const [thicknessFilter, setThicknessFilter] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -99,7 +99,7 @@ function HomeContent() {
         setThicknessSpecs(data.thicknessSpecs || []);
       }
     } catch (error) {
-      console.error('获取厚度规格失败:', error);
+      // 忽略获取厚度规格失败
     }
   };
 
@@ -126,7 +126,7 @@ function HomeContent() {
       // 刷新项目数据
       await fetchProjects();
     } catch (error) {
-      console.error('更新项目排序失败:', error);
+      // 忽略更新项目排序失败
       throw error;
     } finally {
       setIsSorting(false);
@@ -157,16 +157,17 @@ function HomeContent() {
         setDrawingStats(stats);
       }
     } catch (error) {
-      console.error('获取图纸统计失败:', error);
+      // 忽略获取图纸统计失败
     }
   };
 
-  // 初始加载
+  // 初始加载 - 依赖认证状态
   useEffect(() => {
-    console.log('🚀 初始化应用...');
-    fetchProjects();
-    fetchThicknessSpecs();
-    fetchDrawingStats();
+    if (isAuthenticated && token) {
+      fetchProjects();
+      fetchThicknessSpecs();
+      fetchDrawingStats();
+    }
     
     // 启动全局事件监听器
     startEventListeners();
@@ -175,30 +176,25 @@ function HomeContent() {
       // 清理事件监听器
       stopEventListeners();
     };
-  }, []);
+  }, [isAuthenticated, token]); // 添加认证状态依赖
 
   // SSE连接管理
   useEffect(() => {
     if (isAuthenticated && token) {
-      console.log('🔌 建立统一SSE连接...');
       connectSSE(token).then((success) => {
         if (success) {
-          console.log('✅ SSE连接建立成功');
           setupSSEListeners();
         }
       });
 
       return () => {
-        console.log('🔌 断开SSE连接...');
         disconnectSSE();
       };
     }
   }, [isAuthenticated, token]);
 
   // 处理视图切换
-  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'materials' | 'settings') => {
-    console.log('🔄 切换视图:', view);
-    
+  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'materials' | 'public-inventory' | 'settings') => {
     // 特殊处理
     if (view === 'settings') {
       setShowSettingsPage(true); // 系统设置页面
@@ -234,8 +230,54 @@ function HomeContent() {
     if (!confirmed) return;
 
     const success = await deleteProject(projectId);
-    if (!success) {
+    if (success) {
+      // 删除成功后刷新过往项目列表
+      if (viewType === 'completed') {
+        const { fetchPastProjects } = useProjectStore.getState();
+        await fetchPastProjects();
+      }
+      // 触发全局刷新事件
+      window.dispatchEvent(new CustomEvent('projects-updated'));
+    } else {
       await alert('删除项目失败，请重试');
+    }
+  };
+
+  // 恢复过往项目到活跃状态
+  const handleRestoreProject = async (projectId: number) => {
+    const confirmed = await confirm('确定要将此项目恢复到活跃状态吗？');
+    if (!confirmed) return;
+
+    try {
+      if (!token) {
+        await alert('请先登录');
+        return;
+      }
+
+      const response = await apiRequest(`/api/projects/${projectId}/restore-from-past`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // 刷新过往项目和活跃项目数据
+        await useProjectStore.getState().fetchPastProjects();
+        await useProjectStore.getState().fetchProjects();
+        
+        // 触发全局刷新事件
+        window.dispatchEvent(new CustomEvent('projects-updated'));
+        
+        await alert('项目已成功恢复到活跃状态！');
+      } else {
+        const errorData = await response.json();
+        await alert(`恢复项目失败: ${errorData.error || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('恢复项目失败:', error);
+      await alert(`恢复项目失败: ${error instanceof Error ? error.message : '网络错误'}`);
     }
   };
 
@@ -263,7 +305,7 @@ function HomeContent() {
         await fetchProjects();
       }
     } catch (error) {
-      console.error('静默刷新失败:', error);
+      // 忽略静默刷新失败
     }
   };
 
@@ -276,11 +318,64 @@ function HomeContent() {
         setSelectedProjectId(result.id);
         break;
         
+      case 'workers':
+        // 跳转到板材库存页面，并筛选到对应工人
+        setViewType('materials');
+        setMaterialInventoryTab('workers'); // 切换到工人Tab
+        setWorkerIdFilter(result.id); // 按工人ID筛选
+        // 清除其他筛选条件，专注于该工人
+        setWorkerNameFilter(result.name);
+        setMaterialTypeFilter('all');
+        setMaterialThicknessFilter('all');
+        break;
+        
+      case 'departments':
+        // 跳转到板材库存页面，并筛选到对应部门的工人
+        setViewType('materials');
+        setMaterialInventoryTab('workers');
+        setSelectedDepartment(result.name);
+        // 清除其他筛选
+        setWorkerIdFilter(null);
+        setWorkerNameFilter('');
+        break;
+        
       case 'drawings':
         // 跳转到图纸库，并筛选到对应分类
         setViewType('drawings');
         setDrawingCategory(result.category || 'all');
         break;
+        
+      case 'materials':
+        // 跳转到板材库存页面，筛选到对应工人和厚度
+        setViewType('materials');
+        setMaterialInventoryTab('inventory'); // 切换到库存Tab
+        if (result.worker?.id) {
+          setWorkerIdFilter(result.worker.id);
+          setWorkerNameFilter(result.worker.name || '');
+        }
+        // 根据厚度规格进行筛选
+        if (result.thicknessSpec) {
+          const thicknessValue = `${result.thicknessSpec.thickness}${result.thicknessSpec.unit}`;
+          setMaterialThicknessFilter(thicknessValue);
+          setMaterialTypeFilter(result.thicknessSpec.materialType || 'all');
+        }
+        break;
+        
+      case 'thicknessSpecs':
+        // 跳转到板材库存页面，按厚度规格筛选
+        setViewType('materials');
+        setMaterialInventoryTab('inventory');
+        // 设置厚度筛选
+        const specThickness = `${result.thickness}${result.unit || 'mm'}`;
+        setMaterialThicknessFilter(specThickness);
+        setMaterialTypeFilter(result.materialType || 'all');
+        // 清除工人筛选，显示所有工人的该厚度库存
+        setWorkerIdFilter(null);
+        setWorkerNameFilter('');
+        break;
+        
+      default:
+        // 忽略未处理的搜索结果类型
         break;
     }
   };
@@ -297,7 +392,6 @@ function HomeContent() {
 
     // 监听工人筛选事件
     const handleSetWorkerFilter = (event: CustomEvent) => {
-      console.log('🎯 设置工人筛选:', event.detail.workerId);
       setWorkerIdFilter(event.detail.workerId);
       // 切换到materials视图
       setViewType('materials');
@@ -410,7 +504,6 @@ function HomeContent() {
       onProfileClick={handleProfileClick}
       onMobileSidebarAutoClose={() => {
         // 移动端侧边栏自动关闭时的回调，可以在这里添加额外逻辑
-        console.log('移动端侧边栏已自动关闭');
       }}
       sidebar={renderSidebar()}
     >
@@ -472,6 +565,8 @@ function HomeContent() {
             <PastProjectsCardView
               selectedProjectId={selectedProjectId}
               onProjectSelect={handleSelectProject}
+              onRestore={handleRestoreProject}
+              onDelete={handleDeleteProject}
               className="h-full overflow-y-auto"
             />
           </motion.div>
@@ -503,27 +598,24 @@ function HomeContent() {
                 }
                 
                 if (targetProjectId && targetThicknessSpecId) {
-                  console.log('🔧 更新材料状态:', { materialId, targetProjectId, targetThicknessSpecId, newStatus });
-                  
                   // 使用共享的材料状态管理逻辑
                   const success = await updateMaterialStatusShared(targetProjectId, targetThicknessSpecId, newStatus, {
                     projects: projects as any[],
                     thicknessSpecs: thicknessSpecs,
                     user,
-                    updateProjectFn: updateProject,
+                    updateProjectFn: updateProject as any,
                     fetchProjectsFn: fetchProjects
                   });
                   
                   if (!success) {
-                    console.error('材料状态更新失败');
+                    // 材料状态更新失败
                   }
                 } else {
-                  console.error('无法找到材料对应的项目信息:', { materialId });
+                  // 无法找到材料对应的项目信息
                 }
               }}
               onJumpToMaterials={(projectId: number, workerId?: number) => {
                 // 跳转到板材管理，并筛选对应的工人
-                console.log('🎯 跳转到板材管理:', { projectId, workerId });
                 
                 // 切换到材料管理视图
                 setViewType('materials');

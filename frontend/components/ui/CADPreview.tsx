@@ -69,18 +69,10 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
       setLoading(true);
       setError(null);
 
-      console.log('🎯 开始加载DXF预览', { 
-        drawing: drawing?.id, 
-        drawingId, 
-        filePath, 
-        hasToken: !!token 
-      });
-
       // 动态导入 dxf-viewer
       const { DxfViewer } = await import('dxf-viewer');
       
       if (!mounted || !containerRef.current) {
-        console.log('⚠️ 组件已卸载或容器不存在');
         return;
       }
 
@@ -95,7 +87,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
       });
 
       setViewerInstance(viewer);
-      console.log('✅ DXF查看器创建成功');
 
       // 获取DXF文件内容
       let dxfContent: string;
@@ -107,7 +98,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
           throw new Error('认证令牌未获取到，请重新登录');
         }
         
-        console.log('📡 开始获取DXF内容，图纸ID:', id);
         
         // 通过API获取图纸内容
         const response = await apiRequest(`/api/drawings/${id}/content`, {
@@ -116,7 +106,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
           },
         });
         
-        console.log('📡 API响应状态:', response.status, response.statusText);
         
         if (!response.ok) {
           if (response.status === 401) {
@@ -126,7 +115,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
         }
         
         dxfContent = await response.text();
-        console.log('📄 DXF内容获取成功，长度:', dxfContent.length);
       } else if (filePath) {
         // 直接读取文件路径（开发模式）
         const response = await apiRequest(filePath);
@@ -139,7 +127,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
       }
 
       // 加载DXF到查看器
-      console.log('🎨 开始加载DXF到查看器...');
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfContent)}`,
         // 使用简化的字体配置 - 只使用URL数组格式
@@ -147,11 +134,9 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
           '/fonts/NotoSansSC-Thin.ttf'
         ],
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
-          console.log(`📊 加载进度: ${phase} - ${receivedBytes}/${totalBytes}`);
         },
         workerFactory: undefined
       } as any);
-      console.log('✅ DXF加载到查看器完成');
 
       if (mounted) {
         setLoading(false);
@@ -160,7 +145,6 @@ export const CADPreview: React.FC<CADPreviewProps> = ({
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '加载DXF文件失败';
-      console.error('DXF加载失败:', errorMessage, err);
       if (mounted) {
         setError(errorMessage);
         setLoading(false);

@@ -118,7 +118,6 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         setDimensionSearchResults(data.dimensions || []);
       }
     } catch (error) {
-      console.error('搜索板材尺寸失败:', error);
     } finally {
       setSearchLoading(false);
     }
@@ -157,7 +156,6 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         setRequirements(materialRequirements);
       }
     } catch (error) {
-      console.error('获取需求失败:', error);
     } finally {
       setLoading(false);
     }
@@ -209,7 +207,6 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         await alert(`添加失败: ${error.message}`);
       }
     } catch (error) {
-      console.error('添加需求失败:', error);
       await alert('添加失败，请检查网络连接');
     } finally {
       setSubmitting(false);
@@ -242,10 +239,8 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         setInventory(data.inventory || []);
         return data.inventory || [];
       } else {
-        console.error('库存检查失败:', await response.text());
       }
     } catch (error) {
-      console.error('检查库存失败:', error);
     }
     return [];
   };
@@ -261,7 +256,7 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
     let allocated = 0;
 
     // 优先从项目工人分配
-    const projectWorkerInventory = inventoryData.find(inv => inv.isProjectWorker);
+    const projectWorkerInventory = inventoryData.find((inv: InventoryItem) => inv.isProjectWorker);
     if (projectWorkerInventory && allocated < remainingQuantity) {
       const allocateFromProject = Math.min(
         projectWorkerInventory.quantity,
@@ -326,7 +321,6 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         await alert(`分配失败: ${error.message}`);
       }
     } catch (error) {
-      console.error('分配失败:', error);
       await alert('分配失败，请检查网络连接');
     } finally {
       setSubmitting(false);
@@ -352,7 +346,6 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         await alert(`删除失败: ${error.message}`);
       }
     } catch (error) {
-      console.error('删除需求失败:', error);
       await alert('删除失败，请检查网络连接');
     }
   };
@@ -387,13 +380,13 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
             {/* 统计信息 */}
             <div className="mb-6 grid grid-cols-2 gap-3">
               <InfoCard
-                title="需求总数"
+                title="需求总量"
                 value={`${requirements.reduce((sum, req) => sum + req.quantity, 0)} 张`}
                 color="blue"
                 size="sm"
               />
               <InfoCard
-                title="已分配"
+                title="已分配量"
                 value={`${requirements.reduce((sum, req) => sum + req.allocatedQuantity, 0)} 张`}
                 color="green"
                 size="sm"
@@ -664,7 +657,7 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
       {/* 分配弹窗 */}
       <AnimatePresence>
         {showAllocationModal && selectedRequirement && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

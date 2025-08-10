@@ -110,7 +110,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         setWorkers(data.workers || []);
       }
     } catch (error) {
-      console.error('获取工人列表失败:', error);
+      // 获取工人列表失败，忽略错误日志
     }
   };
 
@@ -126,7 +126,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         setThicknessSpecs(activeSpecs);
       }
     } catch (error) {
-      console.error('获取厚度规格失败:', error);
+      // 获取厚度规格失败，忽略错误日志
     }
   };
 
@@ -145,7 +145,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         setLocalWorkerMaterials(data);
       }
     } catch (error) {
-      console.error('获取工人板材失败:', error);
+      // 获取工人板材失败，忽略错误日志
       setLocalWorkerMaterials(null);
     } finally {
       setLoadingWorkerMaterials(false);
@@ -182,7 +182,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       errors.assignedWorkerId = '请选择分配的工人';
     }
 
-    if (formData.requiredThickness.length === 0) {
+    if (!formData.requiredThickness || formData.requiredThickness.length === 0) {
       errors.requiredThickness = '请至少选择一种板材厚度';
     }
 
@@ -222,10 +222,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   // 处理厚度规格选择
   const handleThicknessToggle = (thicknessSpecId: number) => {
-    const isSelected = formData.requiredThickness.includes(thicknessSpecId);
+    const currentThickness = formData.requiredThickness || [];
+    const isSelected = currentThickness.includes(thicknessSpecId);
     const newSelection = isSelected 
-      ? formData.requiredThickness.filter(id => id !== thicknessSpecId)
-      : [...formData.requiredThickness, thicknessSpecId];
+      ? currentThickness.filter(id => id !== thicknessSpecId)
+      : [...currentThickness, thicknessSpecId];
     
     handleInputChange('requiredThickness', newSelection);
   };
@@ -269,7 +270,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 ? 'border-green-300 bg-green-50 text-green-700 hover:border-green-500' 
                 : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-500'
         }`}
-        title={`${spec.thickness}${spec.unit} ${spec.materialType || '碳板'}${formData.assignedWorkerId ? `\n工人库存: ${stockQuantity} 张` : ''}`}
+        
       >
         <div className="text-center">
           <div className="font-medium">
@@ -367,7 +368,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   <Select
                     value={formData.status}
                     onChange={(value) => handleInputChange('status', value)}
-                    options={PROJECT_STATUS_OPTIONS}
+                    options={[...PROJECT_STATUS_OPTIONS]}
                   />
                 </FormField>
 
@@ -375,7 +376,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   <Select
                     value={formData.priority}
                     onChange={(value) => handleInputChange('priority', value)}
-                    options={PROJECT_PRIORITY_OPTIONS}
+                    options={[...PROJECT_PRIORITY_OPTIONS]}
                   />
                 </FormField>
               </div>
@@ -457,14 +458,14 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                             <Badge variant="primary" className="ml-2">主要材料</Badge>
                           </h4>
                           <span className="text-xs text-blue-600">
-                            {formData.requiredThickness.filter(id => 
+                            {(formData.requiredThickness || []).filter(id => 
                               carbonThicknessSpecs.some(spec => spec.id === id)
                             ).length} 已选择
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           {carbonThicknessSpecs.map((spec) => {
-                            const isSelected = formData.requiredThickness.includes(spec.id);
+                            const isSelected = (formData.requiredThickness || []).includes(spec.id);
                             
                             return (
                               <ThicknessButton
@@ -495,7 +496,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                           </span>
                           <div className="flex items-center space-x-2">
                             <span className="text-xs text-gray-500">
-                              {formData.requiredThickness.filter(id => 
+                              {(formData.requiredThickness || []).filter(id => 
                                 specialThicknessSpecs.some(spec => spec.id === id)
                               ).length} 已选择
                             </span>
@@ -517,7 +518,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                             <div className="p-3 pt-0">
                               <div className="grid grid-cols-4 gap-2">
                                 {specialThicknessSpecs.map((spec) => {
-                                  const isSelected = formData.requiredThickness.includes(spec.id);
+                                  const isSelected = (formData.requiredThickness || []).includes(spec.id);
                                   
                                   return (
                                     <ThicknessButton
@@ -537,11 +538,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     )}
 
                     {/* 选择统计 */}
-                    {formData.requiredThickness.length > 0 && (
+                    {(formData.requiredThickness || []).length > 0 && (
                       <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                         <div className="text-sm text-green-800 flex items-center">
                           <CheckCircleIcon className="w-4 h-4 mr-1" />
-                          已选择 {formData.requiredThickness.length} 种板材厚度
+                          已选择 {(formData.requiredThickness || []).length} 种板材厚度
                           <span className="text-green-600 ml-2">
                             （创建项目后将为工人生成对应厚度的板材记录，数量为0等待填写）
                           </span>

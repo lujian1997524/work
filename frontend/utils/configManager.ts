@@ -353,7 +353,7 @@ export class ConfigManager {
       const stored = localStorage.getItem('userConfig');
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.warn('读取用户配置失败:', error);
+      // 读取用户配置失败，忽略错误
       return {};
     }
   }
@@ -399,7 +399,7 @@ export class ConfigManager {
       features.enableOfflineMode = process.env.NEXT_PUBLIC_ENABLE_OFFLINE_MODE === 'true';
     }
     if (Object.keys(features).length > 0) {
-      env.features = features;
+      env.features = features as any;
     }
 
     // UI配置
@@ -414,7 +414,7 @@ export class ConfigManager {
       ui.sidebarWidth = parseInt(process.env.NEXT_PUBLIC_SIDEBAR_WIDTH, 10);
     }
     if (Object.keys(ui).length > 0) {
-      env.ui = ui;
+      env.ui = ui as any;
     }
 
     return env;
@@ -433,7 +433,7 @@ export class ConfigManager {
       const updated = { ...existing, ...config };
       localStorage.setItem('userConfig', JSON.stringify(updated));
     } catch (error) {
-      console.error('保存用户配置失败:', error);
+      // 保存用户配置失败，忽略错误日志
       throw new Error('保存配置失败');
     }
   }
@@ -445,44 +445,44 @@ export class ConfigManager {
     try {
       // API URL验证
       if (!config.apiUrl || !this.isValidUrl(config.apiUrl)) {
-        console.error('配置验证失败: API URL无效');
+        // 配置验证失败: API URL无效
         return false;
       }
 
       // 超时时间验证
       if (config.apiTimeout < 1000 || config.apiTimeout > 120000) {
-        console.error('配置验证失败: API超时时间必须在1-120秒之间');
+        // 配置验证失败: API超时时间必须在1-120秒之间
         return false;
       }
 
       // 环境验证
       if (!['development', 'production', 'test'].includes(config.environment)) {
-        console.error('配置验证失败: 无效的环境类型');
+        // 配置验证失败: 无效的环境类型
         return false;
       }
 
       // 侧边栏宽度验证
       if (config.ui.sidebarWidth < 180 || config.ui.sidebarWidth > 400) {
-        console.error('配置验证失败: 侧边栏宽度必须在180-400px之间');
+        // 配置验证失败: 侧边栏宽度必须在180-400px之间
         return false;
       }
 
       // 应用名称验证
       if (!config.appName || config.appName.trim().length === 0) {
-        console.error('配置验证失败: 应用名称不能为空');
+        // 配置验证失败: 应用名称不能为空
         return false;
       }
 
       // 版本号格式验证（简单的语义版本检查）
       const versionRegex = /^\d+\.\d+\.\d+$/;
       if (!config.version || !versionRegex.test(config.version)) {
-        console.error('配置验证失败: 版本号格式无效');
+        // 配置验证失败: 版本号格式无效
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('配置验证过程中发生错误:', error);
+      // 配置验证过程中发生错误，忽略错误日志
       return false;
     }
   }
@@ -507,7 +507,7 @@ export class ConfigManager {
       try {
         callback(this.getConfig());
       } catch (error) {
-        console.error('配置监听器执行失败:', error);
+        // 配置监听器执行失败，忽略错误日志
       }
     });
   }

@@ -83,7 +83,7 @@ export type { DatePickerProps } from './DatePicker'
 export { SearchBar } from './SearchBar'
 export type { SearchBarProps, SearchSuggestion } from './SearchBar'
 
-export { Empty, EmptyData, EmptySearch, EmptyFiles, EmptyNotifications, NetworkError } from './Empty'
+export { Empty, EmptyData, EmptySearch, EmptyFiles, EmptyNotifications } from './Empty'
 export type { EmptyProps } from './Empty'
 
 export { Loading, LoadingSpinner, LoadingDots, LoadingPulse, LoadingBars, LoadingOverlay, ButtonLoading, PageLoading, ContentLoading } from './Loading'

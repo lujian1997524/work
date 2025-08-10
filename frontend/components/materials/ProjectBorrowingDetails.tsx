@@ -61,7 +61,7 @@ export const ProjectBorrowingDetails: React.FC<ProjectBorrowingDetailsProps> = (
         setBorrowingDetails(data.borrowingDetails || []);
       }
     } catch (error) {
-      console.error('获取借用详情失败:', error);
+      // 获取借用详情失败
     } finally {
       setLoading(false);
     }

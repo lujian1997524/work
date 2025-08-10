@@ -72,7 +72,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         setProfile(userProfile);
         setTempProfile(userProfile);
       } else {
-        console.error('获取用户信息失败');
+        // 获取用户信息失败
         // 使用基本用户信息作为备用
         const basicProfile = {
           name: user.name || '',
@@ -85,7 +85,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         setTempProfile(basicProfile);
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error);
+      // 获取用户信息失败
       // 使用基本用户信息作为备用
       const basicProfile = {
         name: user.name || '',
@@ -152,7 +152,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         });
       }
     } catch (error) {
-      console.error('保存用户信息失败:', error);
+      // 保存用户信息失败
       setResult({
         success: false,
         message: '保存失败，请重试'
@@ -179,7 +179,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="个人信息"
+      
       size="md"
     >
       <div className="space-y-6">

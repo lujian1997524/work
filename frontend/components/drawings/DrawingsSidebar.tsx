@@ -21,6 +21,7 @@ interface DrawingsSidebarProps {
   onRefresh?: () => void;
   onUploadClick?: () => void;
   onMobileItemClick?: () => void;
+  inMobileDrawer?: boolean;
   className?: string;
 }
 
@@ -39,6 +40,7 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
   onRefresh,
   onUploadClick,
   onMobileItemClick,
+  inMobileDrawer = false,
   className = ''
 }) => {
   const { token, user } = useAuth();
@@ -84,7 +86,7 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
         setStats(newStats);
       }
     } catch (error) {
-      console.error('获取图纸统计失败:', error);
+      // 获取图纸统计失败
     } finally {
       setLoading(false);
     }
@@ -144,7 +146,7 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
   ];
 
   return (
-    <div className={`bg-white/80 backdrop-blur-xl border-r border-gray-200 flex flex-col h-full ${className}`}>
+    <div className={`bg-white/80 backdrop-blur-xl border-r border-gray-200 flex flex-col ${inMobileDrawer ? 'h-full' : 'h-full'} ${className}`}>
       {/* 标题区域 */}
       <div className="px-3 py-2.5 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -176,7 +178,7 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
       </div>
 
       {/* 侧边栏树 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 ${inMobileDrawer ? 'overflow-y-auto' : 'overflow-y-auto'}`}>
         {categories.map((group) => (
           <div key={group.key} className="border-b border-gray-100 last:border-b-0">
             {/* 分组标题 */}

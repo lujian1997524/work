@@ -105,7 +105,7 @@ export const DrawingPreviewModal: React.FC<DrawingPreviewModalProps> = ({
                 <button
                   onClick={onClose}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-                  title="关闭预览 (ESC)"
+                  
                 >
                   <XMarkIcon className="w-6 h-6 text-gray-500 group-hover:text-gray-700" />
                 </button>
@@ -124,7 +124,7 @@ export const DrawingPreviewModal: React.FC<DrawingPreviewModalProps> = ({
                         enableInteraction={false} // 禁用交互功能
                         showToolbar={false} // 隐藏工具栏
                         onError={(error) => {
-                          console.error('DXF预览失败:', error);
+                          // DXF预览失败，忽略错误处理
                         }}
                         onLoad={() => {
                           // DXF预览加载成功

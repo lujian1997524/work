@@ -137,7 +137,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         
         {/* Tooltip */}
         {!isOpen && (
-          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[9999]">
+          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
             {user?.name} ({user?.role === 'admin' ? '管理员' : '操作员'})
           </div>
         )}
@@ -186,11 +186,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             {/* 菜单项 */}
             <div className="py-1">
               {menuItems.map((item, index) => {
-                // 如果是管理员专用项目且用户不是管理员，跳过
-                if (item.adminOnly && user?.role !== 'admin') {
-                  return null;
-                }
-
                 const IconComponent = item.icon;
                 
                 return (

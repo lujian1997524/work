@@ -4,7 +4,6 @@
   "description": "激光切割生产管理系统",
   "author": "LaserCut Team",
   "private": true,
-  "homepage": "./",
   "scripts": {
     "dev": "next dev -p 4000 -H 0.0.0.0",
     "build": "next build",

@@ -68,7 +68,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
         setThicknessSpecs(data.thicknessSpecs || []);
       }
     } catch (error) {
-      console.error('获取厚度规格失败:', error);
+      // 获取厚度规格失败，忽略错误日志
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
         alert(error.error || '添加板材失败');
       }
     } catch (error) {
-      console.error('添加板材错误:', error);
+      // 添加板材错误，忽略错误日志
       alert('添加板材失败');
     } finally {
       setAddingMaterial(false);
@@ -138,7 +138,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
         alert(error.error || '删除板材失败');
       }
     } catch (error) {
-      console.error('删除板材错误:', error);
+      // 删除板材错误，忽略错误日志
       alert('删除板材失败');
     } finally {
       setDeletingMaterialId(null);
@@ -177,7 +177,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="板材管理"
+      
       size="lg"
       footer={
         <div className="flex justify-end">
@@ -195,7 +195,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
             <div className="flex-1">
               <Select
                 value={selectedThicknessSpecId}
-                onChange={setSelectedThicknessSpecId}
+                onChange={(value) => setSelectedThicknessSpecId(value as string)}
                 placeholder="选择厚度规格"
                 disabled={loading || addingMaterial}
                 options={availableSpecs.map(spec => ({
@@ -272,7 +272,7 @@ export const MaterialManagementModal: React.FC<MaterialManagementModalProps> = (
                         onClick={() => handleDeleteMaterial(material.id)}
                         disabled={deletingMaterialId === material.id}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="删除板材"
+                        
                       >
                         {deletingMaterialId === material.id ? (
                           <Loading size="sm" />

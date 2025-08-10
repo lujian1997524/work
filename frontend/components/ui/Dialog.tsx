@@ -125,7 +125,6 @@ export const Dialog: React.FC<DialogProps> = ({
       await onConfirm?.(value)
       onClose()
     } catch (error) {
-      console.error('Dialog confirm error:', error)
     } finally {
       setIsLoading(false)
     }
@@ -183,7 +182,6 @@ export const Dialog: React.FC<DialogProps> = ({
       await button.onClick?.(value)
       onClose()
     } catch (error) {
-      console.error('Dialog button click error:', error)
     } finally {
       setIsLoading(false)
     }

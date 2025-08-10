@@ -155,14 +155,14 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
           
           {/* 抽屉内容 */}
           <motion.div
-            className={`fixed z-50 bg-white/95 backdrop-blur-xl shadow-2xl ${drawerPositionClass}`}
+            className={`fixed z-50 bg-white/95 backdrop-blur-xl shadow-2xl ${drawerPositionClass} flex flex-col`}
             initial={slideVariants[position].closed}
             animate={slideVariants[position].open}
             exit={slideVariants[position].closed}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           >
             {title && (
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
                 <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
                 <button
                   onClick={onClose}
@@ -174,7 +174,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                 </button>
               </div>
             )}
-            <div className="overflow-y-auto flex-1 p-4">
+            <div className="flex-1 min-h-0 p-4 overflow-hidden">
               {children}
             </div>
           </motion.div>
@@ -218,19 +218,19 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           />
           
           <motion.div
-            className={`fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl rounded-t-2xl shadow-2xl ${heightClass}`}
+            className={`fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl rounded-t-2xl shadow-2xl ${heightClass} flex flex-col`}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           >
             {/* 拖拽指示器 */}
-            <div className="flex justify-center p-2">
+            <div className="flex justify-center p-2 flex-shrink-0">
               <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
             </div>
             
             {title && (
-              <div className="flex items-center justify-between px-4 pb-2">
+              <div className="flex items-center justify-between px-4 pb-2 flex-shrink-0">
                 <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
                 <button
                   onClick={onClose}
@@ -243,7 +243,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               </div>
             )}
             
-            <div className="overflow-y-auto flex-1 px-4 pb-4">
+            <div className="flex-1 min-h-0 px-4 pb-4 overflow-hidden">
               {children}
             </div>
           </motion.div>

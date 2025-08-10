@@ -2,7 +2,6 @@
 // 优先使用完整URL配置，兜底使用主机+端口配置
 const API_BASE_URL = (() => {
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
-    console.log('🔧 使用完整URL配置:', process.env.NEXT_PUBLIC_BACKEND_URL);
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
   
@@ -10,7 +9,6 @@ const API_BASE_URL = (() => {
   const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
   const url = `http://${backendHost}:${backendPort}`;
   
-  console.log('🔧 使用主机+端口配置:', { backendHost, backendPort, url });
   return url;
 })();
 
@@ -48,11 +46,6 @@ export const apiRequest = async (endpoint: string, options: RequestInit = {}) =>
     ...options,
   };
 
-  console.log(`📡 API 请求: ${options.method || 'GET'} ${url}`);
-  if (isFormData) {
-    console.log('📦 FormData请求，不设置Content-Type');
-  }
-  
   try {
     const response = await fetch(url, defaultOptions);
     
@@ -62,7 +55,6 @@ export const apiRequest = async (endpoint: string, options: RequestInit = {}) =>
     
     return response;
   } catch (error) {
-    console.error(`❌ API 请求失败 ${url}:`, error);
     throw error;
   }
 };

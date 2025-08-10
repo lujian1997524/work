@@ -63,13 +63,11 @@ class NotificationManager {
     
     // 检查是否启用桌面通知
     if (!config.notifications.desktop) {
-      console.log('桌面通知已禁用');
       return null;
     }
 
     // 检查浏览器支持
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      console.warn('当前浏览器不支持桌面通知');
       return null;
     }
 
@@ -77,7 +75,6 @@ class NotificationManager {
     if (this.permission !== 'granted') {
       const permission = await this.requestPermission();
       if (permission !== 'granted') {
-        console.log('桌面通知权限未授予，将只显示应用内通知');
         return null;
       }
     }
@@ -120,7 +117,6 @@ class NotificationManager {
 
       return notification;
     } catch (error) {
-      console.error('显示通知失败:', error);
       return null;
     }
   }

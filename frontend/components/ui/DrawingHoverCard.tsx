@@ -53,21 +53,16 @@ export const DrawingHoverCard: React.FC<DrawingHoverCardProps> = ({
           // 使用CAD软件打开
           const result = await cadFileHandler.openCADFile(drawing.filePath);
           if (result.success) {
-            console.log(`图纸已用 ${result.software} 打开`);
+            // 图纸已用CAD软件打开
           } else {
             alert(`打开图纸失败: ${result.error}`);
           }
         } else {
-          // 非CAD文件，使用默认方式打开
-          if (cadFileHandler.isElectronEnvironment() && window.electronAPI && window.electronAPI.openFile) {
-            await window.electronAPI.openFile(drawing.filePath);
-          } else {
-            // 网页环境下载文件
-            window.open(`/api/drawings/${drawing.id}/download`, '_blank');
-          }
+          // 非CAD文件，Web环境下载文件
+          window.open(`/api/drawings/${drawing.id}/download`, '_blank');
         }
       } catch (error) {
-        console.error('打开图纸失败:', error);
+        // 打开图纸失败，忽略错误日志
         alert('打开图纸失败');
       }
     }
@@ -125,7 +120,9 @@ export const DrawingHoverCard: React.FC<DrawingHoverCardProps> = ({
                   width={368}
                   height={200}
                   className="mb-4"
-                  onError={(error) => console.warn('DXF预览失败:', error)}
+                  onError={() => {
+                    // DXF预览失败，忽略错误处理
+                  }}
                 />
               )}
             </div>

@@ -99,16 +99,3 @@ export interface OperationHistory {
   operator: { id: number; name: string };
   details?: Record<string, any>;
 }
-
-// 导出所有类型
-export type {
-  ThicknessSpec,
-  Material,
-  Drawing,
-  BaseProject,
-  Project,
-  ProjectSummary,
-  ProjectCardData,
-  ProjectFormData,
-  OperationHistory
-};

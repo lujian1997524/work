@@ -64,15 +64,6 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
     formData.append('drawing', uploadFile.file); // 后端 upload.single('drawing') 
     formData.append('description', description || '');
     
-    console.log('🔍 FormData 调试信息:');
-    console.log('- FormData 实例:', formData);
-    console.log('- FormData instanceof FormData:', formData instanceof FormData);
-    console.log('- 文件信息:', uploadFile.file);
-    console.log('- 文件名:', uploadFile.file.name);
-    console.log('- 文件大小:', uploadFile.file.size);
-    console.log('- 文件类型:', uploadFile.file.type);
-    console.log('- 项目ID:', projectId);
-    
     // 根据是否有projectId选择API端点
     let uploadEndpoint: string;
     if (projectId) {
@@ -86,8 +77,6 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
       uploadEndpoint = '/api/drawings/upload';
     }
     
-    console.log('🚀 使用上传端点:', uploadEndpoint);
-
     try {
       // 更新文件状态为上传中
       setFiles(prev => prev.map(f => 
@@ -127,7 +116,6 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
         throw new Error(errorData.error || errorData.message || '上传失败');
       }
     } catch (error) {
-      console.error('文件上传失败:', error);
       setFiles(prev => prev.map(f => 
         f.id === uploadFile.id 
           ? { 
@@ -232,7 +220,7 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="上传图纸"
+      
       size="lg"
     >
       <div className="space-y-6">

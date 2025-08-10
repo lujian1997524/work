@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiRequest, isLocalStorageAvailable } from '@/utils/api';
-import { getApiBaseUrl } from '@/utils/envConfig';
 
 // 定义用户类型
 export interface User {
@@ -29,10 +28,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  // 在静态生成时设置isLoading为false，避免生成loading状态的HTML
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 独立的认证状态，确保及时更新
+  const isAuthenticated = !!user && !!token;
 
-  // 登出函数（使用新的API工具）
+  // 登出函数
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
@@ -50,11 +51,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-      }).catch(console.error);
+      }).catch(error => {
+      });
     }
   }, [token]);
 
-  // 验证token有效性（使用新的API工具）
+  // 验证token有效性
   const validateToken = async (tokenToValidate: string) => {
     try {
       const response = await apiRequest('/api/auth/me', {
@@ -64,69 +66,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        console.warn('Token验证失败，自动登出');
         logout();
+      } else {
       }
-    } catch (error) {
-      console.error('Token验证错误:', error);
+    } catch (error: any) {
       logout();
     }
   };
 
-  // 从localStorage获取token（仅在客户端执行）
+  // 初始化认证状态
   useEffect(() => {
-    // 只在客户端环境下执行认证检查
     if (typeof window === 'undefined') {
       return;
     }
 
-    console.log('🔑 AuthContext 客户端初始化...');
-    setIsLoading(true); // 客户端开始时设置loading
+    setIsLoading(true);
 
     const initAuth = async () => {
       try {
-        console.log('🔑 开始认证初始化，后端API地址:', getApiBaseUrl());
-        
-        // 检查localStorage是否可用
         if (isLocalStorageAvailable()) {
           const storedToken = localStorage.getItem('auth_token');
           const storedUser = localStorage.getItem('auth_user');
-          
-          console.log('📦 存储的认证数据:', { hasToken: !!storedToken, hasUser: !!storedUser });
           
           if (storedToken && storedUser) {
             try {
               setToken(storedToken);
               setUser(JSON.parse(storedUser));
-              console.log('✅ 从存储恢复认证状态');
-              // 验证token有效性（可能失败，但不影响加载状态）
+              
+              // 验证token（但不阻塞应用加载）
               validateToken(storedToken).catch(() => {
-                console.warn('⚠️ Token验证失败，但继续加载应用');
+                // 忽略验证失败
               });
             } catch (error) {
-              console.error('解析存储的用户信息失败:', error);
               logout();
             }
-          } else {
-            console.log('❌ 没有找到存储的认证信息');
           }
-        } else {
-          console.warn('⚠️ localStorage 不可用，跳过认证恢复');
         }
       } catch (error) {
-        console.error('❌ 访问localStorage失败:', error);
+        // 忽略初始化错误
       } finally {
-        // 无论如何都要结束loading状态
         setIsLoading(false);
-        console.log('✅ AuthContext 初始化完成');
       }
     };
 
-    // 添加超时保护，防止卡在loading状态
+    // 设置超时机制，防止初始化卡死
     const timeoutId = setTimeout(() => {
-      console.warn('⚠️ 认证初始化超时，强制结束loading状态');
       setIsLoading(false);
-    }, 3000); // 缩短到3秒超时
+    }, 3000);
 
     initAuth().finally(() => {
       clearTimeout(timeoutId);
@@ -137,7 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [logout]);
 
-  // 登录函数（使用新的API工具）
+  // 登录函数
   const login = async (username: string): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -145,6 +131,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await apiRequest('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ name: username }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       const data = await response.json();
@@ -153,7 +142,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken(data.token);
         setUser(data.user);
         
-        // 存储到localStorage（检查可用性）
+        // 存储到localStorage
         if (isLocalStorageAvailable()) {
           localStorage.setItem('auth_token', data.token);
           localStorage.setItem('auth_user', JSON.stringify(data.user));
@@ -161,10 +150,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         return true;
       } else {
-        throw new Error(data.error || '登录失败');
+        return false;
       }
-    } catch (error) {
-      console.error('登录错误:', error);
+    } catch (error: any) {
       return false;
     } finally {
       setIsLoading(false);
@@ -186,7 +174,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     logout,
     isLoading,
-    isAuthenticated: !!user && !!token,
+    isAuthenticated,
     hasRole,
   };
 

@@ -93,7 +93,7 @@ export const SortableTableRow = forwardRef<HTMLTableRowElement, SortableTableRow
             <div 
               {...(isMounted ? listeners : {})}
               className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-200 rounded"
-              title={dragHandle.title || '拖拽排序'}
+              
             >
               {dragHandle.icon || defaultDragIcon}
             </div>

@@ -125,7 +125,7 @@ export const PastProjectsTree: React.FC<PastProjectsTreeProps> = ({
             }}
             disabled={loading}
             className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-            title="刷新过往项目"
+            
           >
             <svg 
               className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} 

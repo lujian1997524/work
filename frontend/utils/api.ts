@@ -1,4 +1,4 @@
-// API配置工具 - 支持Electron环境，使用环境配置管理
+// API配置工具 - Web应用环境，使用环境配置管理
 import { getApiBaseUrl } from './envConfig';
 
 // 扩展RequestInit接口以支持params
@@ -28,7 +28,6 @@ export const apiRequest = async (
     }
   }
   
-  
   // 从options中提取params，避免传递给fetch
   const { params, ...fetchOptions } = options;
   
@@ -54,18 +53,15 @@ export const apiRequest = async (
     });
   }
   
-  if (isFormData) {
+  try {
+    // 在浏览器环境中使用标准fetch
+    return await fetch(url, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch (error: any) {
+    throw error;
   }
-  
-  return fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
-};
-
-// 检查是否在Electron环境
-export const isElectronEnvironment = (): boolean => {
-  return typeof window !== 'undefined' && window.location.protocol === 'file:';
 };
 
 // 检查localStorage是否可用

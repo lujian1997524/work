@@ -60,13 +60,6 @@ export const buildApiUrl = (endpoint: string): string => {
 export const logFrontendConfig = (): void => {
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     const config = getFrontendConfig();
-    console.log('🔧 前端配置信息:', {
-      环境: process.env.NODE_ENV,
-      后端API地址: config.BACKEND_URL,
-      API超时: config.API_TIMEOUT + 'ms',
-      开发模式: config.DEV_MODE,
-      前端端口: config.FRONTEND_PORT
-    });
   }
 };
 

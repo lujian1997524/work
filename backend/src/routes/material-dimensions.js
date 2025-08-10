@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { MaterialDimension, WorkerMaterial, Worker, ThicknessSpec } = require('../models');
+const { MaterialDimension, WorkerMaterial, Worker, ThicknessSpec, Department } = require('../models');
 const { authenticate } = require('../middleware/auth');
 
 // 搜索板材尺寸规格 (新增)
@@ -72,7 +72,8 @@ router.post('/search', authenticate, async (req, res) => {
       ]
     });
 
-    // 按尺寸聚合数据，合并相同尺寸的数量
+    // 为添加需求聚合显示：按尺寸合并，只显示总库存，不显示具体工人
+    // 职责分离：添加需求时只关心总体可行性，分配时才关心具体来源
     const dimensionMap = new Map();
     
     dimensions.forEach(dim => {
@@ -81,6 +82,8 @@ router.post('/search', authenticate, async (req, res) => {
       if (dimensionMap.has(key)) {
         const existing = dimensionMap.get(key);
         existing.totalQuantity += dim.quantity;
+        existing.workerCount += 1;
+        // 收集所有工人信息（分配时可能需要）
         existing.workers.push({
           workerId: dim.workerMaterial.worker.id,
           workerName: dim.workerMaterial.worker.name,
@@ -92,7 +95,11 @@ router.post('/search', authenticate, async (req, res) => {
           width: parseFloat(dim.width),
           height: parseFloat(dim.height),
           totalQuantity: dim.quantity,
-          workerName: dim.workerMaterial.worker.name, // 主要工人名称
+          workerCount: 1,
+          // 添加需求时不显示具体工人，只显示系统总库存
+          workerName: '系统库存', // 统一显示为系统库存
+          workerId: null, // 不指定具体工人
+          department: '多个工人', // 可能来自多个工人
           workers: [{
             workerId: dim.workerMaterial.worker.id,
             workerName: dim.workerMaterial.worker.name,
@@ -103,7 +110,7 @@ router.post('/search', authenticate, async (req, res) => {
       }
     });
 
-    // 转换为数组并按匹配度和数量排序
+    // 按尺寸聚合后的搜索结果
     const searchResults = Array.from(dimensionMap.values())
       .sort((a, b) => {
         // 优先显示完全匹配的
@@ -114,7 +121,7 @@ router.post('/search', authenticate, async (req, res) => {
           return bExactMatch - aExactMatch; // 完全匹配的排在前面
         }
         
-        // 然后按数量降序
+        // 然后按总数量降序
         return b.totalQuantity - a.totalQuantity;
       })
       .slice(0, 20); // 限制返回数量

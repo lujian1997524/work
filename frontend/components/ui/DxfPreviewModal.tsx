@@ -92,15 +92,8 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       setLoading(true);
       setError(null);
 
-      console.log('🎯 开始加载DXF预览', { 
-        drawingId: drawing?.id,
-        hasToken: !!token,
-        containerExists: !!containerRef.current
-      });
-
       // 检查容器是否存在
       if (!containerRef.current) {
-        console.log('⚠️ 容器不存在，等待DOM准备');
         // 再次尝试等待
         await new Promise(resolve => setTimeout(resolve, 200));
         if (!containerRef.current) {
@@ -115,7 +108,6 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       containerRef.current.innerHTML = '';
 
       // 创建查看器
-      console.log('🔧 创建DXF查看器...');
       const viewer = new DxfViewer(containerRef.current, {
         autoResize: true,
         colorCorrection: true
@@ -123,17 +115,13 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       });
 
       setViewerInstance(viewer);
-      console.log('✅ DXF查看器创建成功');
 
       // 获取DXF内容
-      console.log('📡 获取DXF内容，图纸ID:', drawing?.id);
       const response = await apiRequest(`/api/drawings/${drawing?.id}/content`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-
-      console.log('📡 API响应状态:', response.status);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -143,10 +131,8 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       }
 
       const dxfContent = await response.text();
-      console.log('📄 DXF内容获取成功，长度:', dxfContent.length);
 
       // 加载到查看器
-      console.log('🎨 加载DXF到查看器...');
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfContent)}`,
         // 使用简化的字体配置 - 只使用URL数组格式
@@ -154,17 +140,15 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
           '/fonts/NotoSansSC-Thin.ttf'
         ],
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
-          console.log(`📊 加载进度: ${phase} - ${receivedBytes}/${totalBytes}`);
+          // 进度回调
         },
         workerFactory: undefined
       } as any);
 
-      console.log('✅ DXF加载完成');
       setLoading(false);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '加载DXF失败';
-      console.error('❌ DXF加载失败:', errorMessage, err);
       setError(errorMessage);
       setLoading(false);
     }
@@ -175,9 +159,7 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       try {
         viewerInstance.Dispose();
         setViewerInstance(null);
-        console.log('🧹 DXF查看器已清理');
       } catch (error) {
-        console.error('清理查看器失败:', error);
       }
     }
   };
@@ -232,7 +214,7 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
               <button
                 onClick={handleClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-                title="关闭预览 (ESC)"
+                
               >
                 <XMarkIcon className="w-6 h-6 text-gray-500 group-hover:text-gray-700" />
               </button>

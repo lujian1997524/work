@@ -184,7 +184,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={title}
+      
       size="sm"
     >
       <div className="text-center space-y-4">

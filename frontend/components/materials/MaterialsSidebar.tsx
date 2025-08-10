@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Badge, Input, Loading, Modal } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,7 +16,10 @@ import {
   PlusIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  PhoneIcon
+  PhoneIcon,
+  EllipsisVerticalIcon,
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 
 interface MaterialsSidebarProps {
@@ -26,6 +29,8 @@ interface MaterialsSidebarProps {
   onWorkerFilter?: (workerId: number | null) => void;
   onThicknessFilter?: (thickness: string) => void;
   onRefresh?: () => void;
+  onMobileItemClick?: () => void;
+  inMobileDrawer?: boolean;
   className?: string;
 }
 
@@ -62,6 +67,8 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   onWorkerFilter,
   onThicknessFilter,
   onRefresh,
+  onMobileItemClick,
+  inMobileDrawer = false,
   className = ''
 }) => {
   const [materialSummary, setMaterialSummary] = useState<MaterialSummary[]>([]);
@@ -203,7 +210,6 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
         setWorkerSummary(workerSummaries.sort((a, b) => b.totalQuantity - a.totalQuantity));
       }
     } catch (error) {
-      console.error('获取材料汇总失败:', error);
     } finally {
       setLoading(false);
     }
@@ -225,7 +231,6 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
         setAllWorkers(data.workers || []);
       }
     } catch (error) {
-      console.error('获取工人数据失败:', error);
     }
   };
 
@@ -239,20 +244,14 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
     const newSelection = selectedMaterialType === materialType ? 'all' : materialType;
     setSelectedMaterialType(newSelection);
     onMaterialTypeFilter?.(newSelection);
+    onMobileItemClick?.(); // 移动端自动收起侧边栏
   };
 
   // 处理厚度筛选
   const handleThicknessClick = (materialType: string, thickness: string) => {
-    console.log('🔧 厚度点击事件:', { materialType, thickness });
     
     const thicknessKey = `${materialType}_${thickness}`;
     const newSelection = selectedThickness === thicknessKey ? 'all' : thicknessKey;
-    
-    console.log('🔄 厚度筛选状态变化:', { 
-      当前选中: selectedThickness, 
-      点击厚度: thicknessKey, 
-      新选择: newSelection 
-    });
     
     setSelectedThickness(newSelection);
     
@@ -267,6 +266,8 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
       setSelectedMaterialType('all');
       onMaterialTypeFilter?.('all');
     }
+    
+    onMobileItemClick?.(); // 移动端自动收起侧边栏
   };
 
   // 处理工人筛选
@@ -274,6 +275,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
     const newSelection = selectedWorkerId === workerId ? null : workerId;
     setSelectedWorkerId(newSelection);
     onWorkerFilter?.(newSelection);
+    onMobileItemClick?.(); // 移动端自动收起侧边栏
   };
 
   // 处理快速筛选
@@ -314,6 +316,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   // 处理Tab切换
   const handleTabChange = (tab: 'inventory' | 'workers') => {
     onTabChange?.(tab);
+    // 注意：Tab切换不应自动收起侧边栏，保持侧边栏打开
   };
 
   if (loading) {
@@ -325,7 +328,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   }
 
   return (
-    <div className={`h-full flex flex-col bg-white ${className}`}>
+    <div className={`${inMobileDrawer ? 'h-full' : 'h-full'} flex flex-col bg-white ${className}`}>
       {/* 标题栏 */}
       <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -345,8 +348,9 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
               fetchMaterialSummary();
               fetchAllWorkers();
               onRefresh?.();
+              onMobileItemClick?.(); // 移动端自动收起侧边栏
             }}
-            title="刷新数据"
+            
           >
             刷新
           </Button>
@@ -382,7 +386,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className={`flex-1 ${inMobileDrawer ? 'overflow-y-auto' : 'overflow-y-auto'} px-4 py-4`}>
         {activeTab === 'inventory' ? (
           <div className="space-y-4">
             {/* 材料类型汇总 */}
@@ -566,6 +570,8 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
             onRefresh={fetchAllWorkers}
+            onMobileItemClick={onMobileItemClick}
+            inMobileDrawer={inMobileDrawer}
           />
         )}
       </div>
@@ -579,18 +585,26 @@ interface WorkerManagementSidebarProps {
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   onRefresh: () => void;
+  onMobileItemClick?: () => void;
+  inMobileDrawer?: boolean;
 }
 
 const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
   workers,
   searchQuery,
   onSearchQueryChange,
-  onRefresh
+  onRefresh,
+  onMobileItemClick,
+  inMobileDrawer = false
 }) => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [departments, setDepartments] = useState<any[]>([]);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
+  const [showEditWorkerModal, setShowEditWorkerModal] = useState(false);
+  const [editingWorker, setEditingWorker] = useState<any>(null);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState('');
   const [newWorkerData, setNewWorkerData] = useState({
     name: '',
@@ -599,46 +613,61 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
     departmentId: undefined as number | undefined,
     position: ''
   });
+  const [editWorkerData, setEditWorkerData] = useState({
+    name: '',
+    phone: '',
+    department: '',
+    departmentId: undefined as number | undefined,
+    position: ''
+  });
   const { token, user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  
+  // refs for outside click detection
+  const addDropdownRef = useRef<HTMLDivElement>(null);
+  const departmentDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle outside clicks to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(event.target as Node)) {
+        setShowAddDropdown(false);
+      }
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target as Node)) {
+        setShowDepartmentDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 获取部门列表
   const fetchDepartments = async () => {
     if (!token) return;
     
     try {
-      console.log('🔄 开始获取部门列表...');
       const response = await apiRequest('/api/workers/departments', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      console.log('📡 部门API响应状态:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 获取到的部门数据:', data);
         setDepartments(data.departments || []);
-        console.log('✅ 设置部门列表:', data.departments || []);
       } else {
         const errorData = await response.json();
-        console.error('❌ 获取部门失败:', errorData);
       }
     } catch (error) {
-      console.error('获取部门列表失败:', error);
     }
   };
 
   // 添加部门
   const addDepartment = async () => {
     if (!token || !newDepartmentName.trim()) {
-      console.log('❌ 添加部门失败: 缺少token或部门名称');
       return;
     }
-
-    console.log('🔄 开始添加部门:', newDepartmentName.trim());
-    console.log('👤 当前用户角色:', user?.role);
 
     try {
       const response = await apiRequest('/api/workers/departments', {
@@ -650,33 +679,25 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         body: JSON.stringify({ name: newDepartmentName.trim() })
       });
 
-      console.log('📡 API响应状态:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ 部门创建成功:', data);
         setNewDepartmentName('');
         setShowAddDepartmentModal(false);
         fetchDepartments();
       } else {
         const errorData = await response.json();
-        console.error('❌ API返回错误:', errorData);
         alert(`创建部门失败: ${errorData.message || '未知错误'}`);
       }
     } catch (error) {
-      console.error('❌ 添加部门失败:', error);
-      alert(`创建部门失败: ${error.message}`);
+      alert(`创建部门失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
   // 添加工人
   const addWorker = async () => {
     if (!token || !newWorkerData.name.trim()) {
-      console.log('❌ 添加工人失败: 缺少token或工人姓名');
       return;
     }
-
-    console.log('🔄 开始添加工人:', newWorkerData);
 
     try {
       // 构建提交数据
@@ -687,8 +708,6 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         position: newWorkerData.position.trim() || undefined
       };
 
-      console.log('📤 提交数据:', submitData);
-
       const response = await apiRequest('/api/workers', {
         method: 'POST',
         headers: {
@@ -698,11 +717,8 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         body: JSON.stringify(submitData)
       });
 
-      console.log('📡 API响应状态:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ 工人创建成功:', data);
         setNewWorkerData({ 
           name: '', 
           phone: '', 
@@ -714,13 +730,95 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         onRefresh();
       } else {
         const errorData = await response.json();
-        console.error('❌ API返回错误:', errorData);
         alert(`创建工人失败: ${errorData.message || '未知错误'}`);
       }
     } catch (error) {
-      console.error('❌ 添加工人失败:', error);
-      alert(`创建工人失败: ${error.message}`);
+      alert(`创建工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
+  };
+
+  // 编辑工人
+  const editWorker = async () => {
+    if (!token || !editingWorker || !editWorkerData.name.trim()) {
+      return;
+    }
+
+    try {
+      const submitData = {
+        name: editWorkerData.name.trim(),
+        phone: editWorkerData.phone.trim() || undefined,
+        departmentId: editWorkerData.departmentId,
+        position: editWorkerData.position.trim() || undefined
+      };
+
+      const response = await apiRequest(`/api/workers/${editingWorker.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(submitData)
+      });
+
+      if (response.ok) {
+        setEditWorkerData({ 
+          name: '', 
+          phone: '', 
+          department: '', 
+          departmentId: undefined,
+          position: '' 
+        });
+        setEditingWorker(null);
+        setShowEditWorkerModal(false);
+        onRefresh();
+      } else {
+        const errorData = await response.json();
+        alert(`更新工人失败: ${errorData.message || '未知错误'}`);
+      }
+    } catch (error) {
+      alert(`更新工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  };
+
+  // 删除工人
+  const deleteWorker = async (workerId: number, workerName: string) => {
+    if (!token) return;
+
+    if (!confirm(`确定要删除工人 "${workerName}" 吗？此操作无法撤销。`)) {
+      return;
+    }
+
+    try {
+      const response = await apiRequest(`/api/workers/${workerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        onRefresh();
+        alert('工人删除成功');
+      } else {
+        const errorData = await response.json();
+        alert(`删除工人失败: ${errorData.message || '未知错误'}`);
+      }
+    } catch (error) {
+      alert(`删除工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  };
+
+  // 开始编辑工人
+  const startEditWorker = (worker: any) => {
+    setEditingWorker(worker);
+    setEditWorkerData({
+      name: worker.name || '',
+      phone: worker.phone || '',
+      department: worker.department || '',
+      departmentId: worker.departmentId,
+      position: worker.position || ''
+    });
+    setShowEditWorkerModal(true);
   };
   useEffect(() => {
     fetchDepartments();
@@ -761,84 +859,139 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
   );
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* 管理操作按钮 */}
-      {isAdmin && (
-        <div className="flex-shrink-0 px-4 pt-4">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setShowAddDepartmentModal(true)}
-              className="flex items-center justify-center space-x-1"
-            >
-              <PlusIcon className="w-3 h-3" />
-              <span className="text-xs">添加部门</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowAddWorkerModal(true)}
-              className="flex items-center justify-center space-x-1"
-            >
-              <PlusIcon className="w-3 h-3" />
-              <span className="text-xs">添加工人</span>
-            </Button>
+    <div className={`${inMobileDrawer ? 'h-full' : 'h-full'} flex flex-col`}>
+      {/* 紧凑型顶部操作栏：搜索 + 添加按钮下拉 */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-4">
+        <div className="flex items-center space-x-2">
+          {/* 搜索框 */}
+          <div className="flex-1">
+            <Input
+              variant="glass"
+              className="text-sm"
+              placeholder="搜索工人姓名、部门或电话..."
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
+              leftIcon={<MagnifyingGlassIcon className="w-4 h-4" />}
+            />
           </div>
+          
+          {/* 添加操作下拉菜单 */}
+          {isAdmin && (
+            <div className="relative" ref={addDropdownRef}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowAddDropdown(!showAddDropdown)}
+                className="p-2"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </Button>
+              
+              {/* 下拉菜单 */}
+              {showAddDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setShowAddDepartmentModal(true);
+                        setShowAddDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    >
+                      <PlusIcon className="w-3 h-3" />
+                      <span>添加部门</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddWorkerModal(true);
+                        setShowAddDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    >
+                      <PlusIcon className="w-3 h-3" />
+                      <span>添加工人</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-
-      {/* 搜索框 */}
-      <div className="flex-shrink-0 px-4">
-        <Input
-          variant="glass"
-          size="sm"
-          placeholder="搜索工人姓名、部门或电话..."
-          value={searchQuery}
-          onChange={(e) => onSearchQueryChange(e.target.value)}
-          leftIcon={<MagnifyingGlassIcon className="w-4 h-4" />}
-        />
       </div>
 
-      {/* 部门筛选 */}
-      <div className="flex-shrink-0 px-4">
-        <h4 className="text-xs font-medium text-gray-500 mb-2">按部门筛选</h4>
-        <div className="space-y-1">
+      {/* 下拉式部门选择器 */}
+      <div className="flex-shrink-0 px-4 pb-4">
+        <div className="relative" ref={departmentDropdownRef}>
           <button
-            onClick={() => setSelectedDepartment('all')}
-            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-              selectedDepartment === 'all'
-                ? 'bg-blue-100 text-blue-900'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+            className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            全部部门
-            <Badge variant="outline" size="sm" className="ml-2">
-              {workers.length}
-            </Badge>
-          </button>
-          {Object.entries(workersByDepartment).map(([dept, deptWorkers]: [string, any]) => (
-            <button
-              key={dept}
-              onClick={() => setSelectedDepartment(dept)}
-              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                selectedDepartment === dept
-                  ? 'bg-blue-100 text-blue-900'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {dept}
-              <Badge variant="outline" size="sm" className="ml-2">
-                {deptWorkers.length}
+            <div className="flex items-center space-x-2">
+              <span className="font-medium">部门筛选:</span>
+              <span className="text-blue-600">
+                {selectedDepartment === 'all' ? '全部部门' : selectedDepartment}
+              </span>
+              <Badge variant="outline" size="sm">
+                {selectedDepartment === 'all' 
+                  ? workers.length 
+                  : workersByDepartment[selectedDepartment]?.length || 0
+                }人
               </Badge>
-            </button>
-          ))}
+            </div>
+            <ChevronDownIcon className={`w-4 h-4 transition-transform ${showDepartmentDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {/* 部门选择下拉 */}
+          {showDepartmentDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-48 overflow-y-auto">
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setSelectedDepartment('all');
+                    setShowDepartmentDropdown(false);
+                    onMobileItemClick?.();
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
+                    selectedDepartment === 'all'
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>全部部门</span>
+                  <Badge variant="outline" size="sm">
+                    {workers.length}
+                  </Badge>
+                </button>
+                {Object.entries(workersByDepartment).map(([dept, deptWorkers]: [string, any]) => (
+                  <button
+                    key={dept}
+                    onClick={() => {
+                      setSelectedDepartment(dept);
+                      setShowDepartmentDropdown(false);
+                      onMobileItemClick?.();
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
+                      selectedDepartment === dept
+                        ? 'bg-blue-100 text-blue-900'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{dept}</span>
+                    <Badge variant="outline" size="sm">
+                      {deptWorkers.length}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 工人列表 */}
-      <div className="flex-1 overflow-y-auto px-4 space-y-2">
-        {filteredWorkers
+      <div className={`flex-1 ${inMobileDrawer ? 'overflow-y-auto' : 'overflow-y-auto'} px-4`}>
+        <div className="space-y-2">
+          {filteredWorkers
           .filter(worker => 
             selectedDepartment === 'all' || 
             (worker.department || '未分配部门') === selectedDepartment
@@ -850,7 +1003,14 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">{worker.name}</div>
+                  <div className="flex items-center space-x-2">
+                    <div className="font-medium text-sm truncate">{worker.name}</div>
+                    {worker.projectCount > 0 && (
+                      <Badge variant="primary" size="sm">
+                        {worker.projectCount}个项目
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-gray-500 truncate">
                     {worker.department || '未分配部门'}
                   </div>
@@ -868,7 +1028,7 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
                 </div>
               </div>
               
-              {/* 简化的操作按钮 */}
+              {/* 操作按钮 */}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                 <div className="flex space-x-1">
                   <Button
@@ -879,15 +1039,39 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
                       window.dispatchEvent(new CustomEvent('switch-to-inventory', {
                         detail: { workerId: worker.id }
                       }));
+                      onMobileItemClick?.(); // 移动端自动收起侧边栏
                     }}
                     className="text-blue-600 hover:text-blue-700 px-2 py-1 text-xs"
                   >
                     板材分配
                   </Button>
+                  
+                  {/* 编辑按钮 */}
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => startEditWorker(worker)}
+                    className="text-gray-600 hover:text-gray-700 p-1"
+                  >
+                    <PencilIcon className="w-3 h-3" />
+                  </Button>
+                  
+                  {/* 删除按钮 - 仅管理员可见 */}
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => deleteWorker(worker.id, worker.name)}
+                      className="text-red-600 hover:text-red-700 p-1"
+                    >
+                      <TrashIcon className="w-3 h-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
           ))}
+        </div>
       </div>
 
       {filteredWorkers.length === 0 && (
@@ -906,8 +1090,6 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
           setShowAddDepartmentModal(false);
           setNewDepartmentName('');
         }}
-        title="添加部门"
-        maxWidth="md"
       >
         <div className="p-6">
           <Input
@@ -937,8 +1119,6 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
           setShowAddWorkerModal(false);
           setNewWorkerData({ name: '', phone: '', department: '', departmentId: undefined, position: '' });
         }}
-        title="添加工人"
-        maxWidth="md"
       >
         <div className="p-6">
           <div className="space-y-3">
@@ -976,6 +1156,60 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
             <Button variant="secondary" onClick={() => {
               setShowAddWorkerModal(false);
               setNewWorkerData({ name: '', phone: '', department: '', departmentId: undefined, position: '' });
+            }}>
+              取消
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 编辑工人模态框 */}
+      <Modal
+        isOpen={showEditWorkerModal}
+        onClose={() => {
+          setShowEditWorkerModal(false);
+          setEditWorkerData({ name: '', phone: '', department: '', departmentId: undefined, position: '' });
+          setEditingWorker(null);
+        }}
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-4">编辑工人信息</h3>
+          <div className="space-y-3">
+            <Input
+              placeholder="工人姓名*"
+              value={editWorkerData.name}
+              onChange={(e) => setEditWorkerData(prev => ({ ...prev, name: e.target.value }))}
+            />
+            <Input
+              placeholder="联系电话"
+              value={editWorkerData.phone}
+              onChange={(e) => setEditWorkerData(prev => ({ ...prev, phone: e.target.value }))}
+            />
+            <DepartmentSelector
+              placeholder="选择或创建部门*"
+              value={editWorkerData.department}
+              onChange={(departmentName, departmentId) => {
+                setEditWorkerData(prev => ({ 
+                  ...prev, 
+                  department: departmentName,
+                  departmentId: departmentId 
+                }));
+              }}
+            />
+            <Input
+              placeholder="职位"
+              value={editWorkerData.position}
+              onChange={(e) => setEditWorkerData(prev => ({ ...prev, position: e.target.value }))}
+            />
+          </div>
+          <div className="flex space-x-2 mt-4">
+            <Button variant="primary" onClick={editWorker} disabled={!editWorkerData.name.trim()}>
+              保存更改
+            </Button>
+            <Button variant="secondary" onClick={() => {
+              setShowEditWorkerModal(false);
+              setEditWorkerData({ name: '', phone: '', department: '', departmentId: undefined, position: '' });
+              setEditingWorker(null);
             }}>
               取消
             </Button>

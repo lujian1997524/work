@@ -17,6 +17,7 @@ export interface SidebarProps {
   items: SidebarItem[]
   collapsed?: boolean
   onToggleCollapse?: () => void
+  inMobileDrawer?: boolean
   className?: string
 }
 
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   items,
   collapsed = false,
   onToggleCollapse,
+  inMobileDrawer = false,
   className = ''
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
@@ -118,11 +120,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       animate={{ width: collapsed ? '64px' : '150px' }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
     >
-      <Card className="h-full" padding="md" glass={true}>
+      <Card className={`${inMobileDrawer ? 'h-full' : 'h-full'} flex flex-col`} padding="md" glass={true}>
         {/* 折叠按钮 */}
         {onToggleCollapse && (
           <motion.button
-            className="w-full mb-4 p-2 rounded-ios-md hover:bg-macos15-control transition-colors"
+            className="w-full mb-4 p-2 rounded-ios-md hover:bg-macos15-control transition-colors flex-shrink-0"
             onClick={onToggleCollapse}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -138,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* 侧边栏项目 */}
-        <div className="space-y-1">
+        <div className={`flex-1 space-y-1 ${inMobileDrawer ? 'overflow-y-auto min-h-0' : ''}`}>
           {items.map(item => renderSidebarItem(item))}
         </div>
       </Card>

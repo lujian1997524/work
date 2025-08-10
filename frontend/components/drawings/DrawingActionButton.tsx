@@ -32,7 +32,7 @@ export const DrawingActionButton: React.FC<DrawingActionProps> = ({
     try {
       await handleDrawingAction(drawing);
     } catch (error) {
-      console.error('图纸操作失败:', error);
+      // 图纸操作失败
     }
   };
   
@@ -64,7 +64,6 @@ export const DrawingActionButton: React.FC<DrawingActionProps> = ({
       size={size}
       onClick={handleClick}
       className="flex items-center space-x-2"
-      title={getButtonText()}
     >
       {getButtonIcon()}
       {showText && <span>{getButtonText()}</span>}
@@ -86,7 +85,6 @@ export const DrawingAdvancedActions: React.FC<{drawing: Drawing}> = ({ drawing }
         variant="ghost"
         size="sm"
         onClick={() => handleDrawingAction(drawing)}
-        title="在CAD软件中打开"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -97,7 +95,6 @@ export const DrawingAdvancedActions: React.FC<{drawing: Drawing}> = ({ drawing }
         variant="ghost"
         size="sm"
         onClick={() => handleDrawingAction(drawing)}
-        title="保存到指定位置"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />

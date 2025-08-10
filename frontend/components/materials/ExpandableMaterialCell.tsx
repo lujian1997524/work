@@ -73,7 +73,7 @@ export const ExpandableMaterialCell: React.FC<ExpandableMaterialCellProps> = ({
             <button
               onClick={handleEditClick}
               className="p-1 rounded hover:bg-white/50 transition-colors"
-              title="编辑板材"
+              
             >
               <PencilIcon className="w-3 h-3" />
             </button>

@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Badge } from '@/components/ui';
 import { MaterialStatusManager } from '@/components/ui/MaterialStatusManager';
+import { useAuth } from '@/contexts/AuthContext'; // 添加 useAuth 导入
 import type { StatusType } from '@/components/ui';
 import type { MaterialInfo, MaterialStatusType } from '@/components/ui/MaterialStatusManager';
+import type { Material, ThicknessSpec } from '@/types/project';
 import { 
   EyeIcon, 
   PencilIcon, 
@@ -21,26 +23,6 @@ import { ProjectBorrowingDetails } from '@/components/materials/ProjectBorrowing
 import { audioManager } from '@/utils/audioManager';
 
 // 类型定义
-interface ThicknessSpec {
-  id: number;
-  thickness: string;
-  unit: string;
-  materialType: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface Material {
-  id: number;
-  projectId: number;
-  thicknessSpecId: number;
-  status: 'pending' | 'in_progress' | 'completed';
-  completedBy?: { id: number; name: string };
-  startDate?: string;
-  completedDate?: string;
-  notes?: string;
-  thicknessSpec: ThicknessSpec;
-}
 
 interface ProjectCardData {
   id: number;
@@ -136,11 +118,11 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
       thickness: material.thicknessSpec.thickness,
       unit: material.thicknessSpec.unit,
       status: material.status as MaterialStatusType,
-      quantity: material.quantity || 1,
+      quantity: 1,
       assignedWorker: project.assignedWorker,
       startDate: material.startDate,
       completedDate: material.completedDate,
-      completedBy: material.completedBy,
+      completedBy: material.completedByUser,
       notes: material.notes,
       priority: (project.priority === 'urgent' ? 'urgent' : 
                 project.priority === 'high' ? 'high' : 
@@ -258,7 +240,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
             <h4 
               className="font-semibold text-base truncate cursor-pointer hover:text-blue-600 transition-colors"
               onClick={() => onViewDetail?.(project.id)}
-              title="点击查看项目详情"
+              
             >
               {project.name}
             </h4>
@@ -285,7 +267,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
                   size="sm" 
                   className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
                   onClick={onManageMaterials}
-                  title="管理板材"
+                  
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -301,7 +283,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
                   className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                   onClick={() => onMoveToPast(project.id)}
                   disabled={movingToPast}
-                  title="移至过往项目"
+                  
                 >
                   <ArchiveBoxIcon className="w-3 h-3" />
                 </Button>
@@ -327,7 +309,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
             {/* 优先级标签 - 靠右对齐 */}
             <Badge
               variant={
-                project.priority === 'urgent' ? 'destructive' :
+                project.priority === 'urgent' ? 'danger' :
                 project.priority === 'high' ? 'warning' :
                 project.priority === 'medium' ? 'info' :
                 'secondary'
@@ -391,7 +373,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
               <button
                 className={`w-full py-2 rounded text-xs font-medium transition-colors ${statusConfig[material.status as keyof typeof statusConfig]?.color || statusConfig.pending.color} ${statusConfig[material.status as keyof typeof statusConfig]?.textColor || statusConfig.pending.textColor} hover:opacity-80`}
                 onClick={() => handleMaterialManagerStatusChange(material.id, getNextStatus(material.status) as MaterialStatusType)}
-                title={`${material.thicknessSpec.thickness}${material.thicknessSpec.unit} ${material.thicknessSpec.materialType || '碳板'} - ${statusConfig[material.status as keyof typeof statusConfig]?.label || material.status}\n点击切换状态`}
+                
               >
                 {getMaterialCode(material.thicknessSpec.materialType)}{parseFloat(material.thicknessSpec.thickness)}
               </button>
@@ -430,7 +412,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
             materialType: selectedMaterial.thicknessSpec.materialType || '碳板',
             thickness: selectedMaterial.thicknessSpec.thickness,
             unit: selectedMaterial.thicknessSpec.unit,
-            currentQuantity: selectedMaterial.quantity || 0,
+            currentQuantity: 0,
             assignedWorkerName: project.assignedWorker?.name
           }}
         />
@@ -443,12 +425,19 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
 interface PastProjectCardProps {
   project: ProjectCardData;
   onView?: (projectId: number) => void;
+  onRestore?: (projectId: number) => void; // 新增恢复回调
+  onDelete?: (projectId: number) => void; // 新增删除回调
 }
 
 export const PastProjectCard: React.FC<PastProjectCardProps> = ({
   project,
-  onView
+  onView,
+  onRestore,
+  onDelete
 }) => {
+  // 获取用户权限信息
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   // 按照碳板优先策略排序材料（95/5策略）
   const sortedMaterials = [...project.materials].sort((a, b) => {
     const aType = a.thicknessSpec.materialType || '碳板';
@@ -473,11 +462,11 @@ export const PastProjectCard: React.FC<PastProjectCardProps> = ({
       thickness: material.thicknessSpec.thickness,
       unit: material.thicknessSpec.unit,
       status: material.status as MaterialStatusType,
-      quantity: material.quantity || 1,
+      quantity: 1,
       assignedWorker: project.assignedWorker,
       startDate: material.startDate,
       completedDate: material.completedDate,
-      completedBy: material.completedBy,
+      completedBy: material.completedByUser,
       notes: material.notes,
       priority: (project.priority === 'urgent' ? 'urgent' : 
                 project.priority === 'high' ? 'high' : 
@@ -541,166 +530,158 @@ export const PastProjectCard: React.FC<PastProjectCardProps> = ({
   const stats = getProjectStats();
   const carbonStats = getCarbonUsageStats();
 
+  // 材料代码映射函数（与活跃项目保持一致）
+  const getMaterialCode = (materialType?: string) => {
+    const typeMap: { [key: string]: string } = {
+      '碳板': 'T',     // T = 碳板
+      '不锈钢': 'B',   // B = 不锈钢  
+      '锰板': 'M',     // M = 锰板
+      '钢板': 'S'      // S = 钢板
+    };
+    return typeMap[materialType || '碳板'] || 'T';
+  };
+
+  // 格式化日期显示
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '未知';
+    return new Date(dateString).toLocaleDateString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   return (
-    <motion.div
-      className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden"
-      whileHover={{ y: -4, scale: 1.01 }}
-      transition={{ duration: 0.2 }}
-    >
-      {/* 项目头部 - 重新设计 */}
-      <div className="relative p-6 bg-gradient-to-br from-slate-50 to-gray-50 border-b border-gray-100">
-        {/* 归档标识 */}
-        <div className="absolute top-4 right-4">
-          <div className="flex items-center space-x-2">
-            <Badge variant="secondary" size="sm" className="bg-emerald-100 text-emerald-700 border-emerald-200">
-              <ArchiveBoxIcon className="w-3 h-3 mr-1" />
-              已归档
-            </Badge>
+    <div className="relative border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
+      {/* 项目头部 */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h4 
+              className="font-semibold text-base truncate cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={() => onView?.(project.id)}
+            >
+              {project.name}
+            </h4>
+            <div className="flex items-center space-x-1">
+              <Badge variant="secondary" size="sm">
+                已归档
+              </Badge>
+              {/* 恢复到活跃项目按钮 */}
+              {onRestore && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => onRestore(project.id)}
+                  title="恢复到活跃项目"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </Button>
+              )}
+              {/* 删除按钮 - 仅管理员可见 */}
+              {onDelete && isAdmin && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => onDelete(project.id)}
+                  title="删除项目"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </Button>
+              )}
+              {onView && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="p-1"
+                  onClick={() => onView(project.id)}
+                >
+                  <EyeIcon className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center space-x-2">
+              <span>{project.assignedWorker?.name || '未分配'}</span>
+              <Badge variant="success" size="sm">
+                {statusConfig[project.status as keyof typeof statusConfig]?.label || project.status}
+              </Badge>
+            </div>
             <Badge
               variant={
-                project.priority === 'urgent' ? 'destructive' :
+                project.priority === 'urgent' ? 'danger' :
                 project.priority === 'high' ? 'warning' :
                 project.priority === 'medium' ? 'info' :
                 'secondary'
               }
               size="sm"
+              className="flex-shrink-0"
             >
               {priorityConfig[project.priority as keyof typeof priorityConfig]?.label || project.priority}
             </Badge>
           </div>
         </div>
-
-        <div className="pr-24">
-          <h4 
-            className="font-bold text-xl text-gray-900 cursor-pointer hover:text-blue-600 transition-colors mb-2"
-            onClick={() => onView?.(project.id)}
-          >
-            {project.name}
-          </h4>
-          
-          <div className="space-y-2 text-sm text-gray-600">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center">
-                <UsersIcon className="w-4 h-4 mr-1.5 text-gray-400" />
-                <span>负责工人：{project.assignedWorker?.name || '未分配'}</span>
-              </div>
-              <div className="flex items-center">
-                <ArchiveBoxIcon className="w-4 h-4 mr-1.5 text-gray-400" />
-                <span>归档时间：{project.movedToPastAt ? new Date(project.movedToPastAt).toLocaleDateString('zh-CN') : '未知'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
-      
-      {/* 项目统计概览 - 重新设计 */}
-      <div className="p-6 bg-white">
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="text-2xl font-bold text-blue-600">{stats.totalMaterials}</div>
-            <div className="text-xs text-blue-500 mt-1">板材种类</div>
-          </div>
-          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-            <div className="text-2xl font-bold text-green-600">{stats.completedMaterials}</div>
-            <div className="text-xs text-green-500 mt-1">已完成</div>
-          </div>
-          <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-            <div className="text-2xl font-bold text-emerald-600">{stats.completionRate}%</div>
-            <div className="text-xs text-emerald-500 mt-1">完成率</div>
-          </div>
-          <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-            <div className="text-2xl font-bold text-indigo-600">{project.drawings?.length || 0}</div>
-            <div className="text-xs text-indigo-500 mt-1">图纸数量</div>
-          </div>
+
+      {/* 完成情况概览 */}
+      <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-emerald-100 rounded-lg border border-green-200">
+        <div className="text-xs font-semibold text-green-800 mb-2 flex items-center">
+          <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+          项目完成情况
         </div>
-        
-        {/* 碳板使用分析 - 优化设计 */}
-        <div className="mb-4 p-4 bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg border border-slate-200">
-          <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-            碳板使用分析
-          </h4>
-          
-          {/* 材料类型占比 */}
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="bg-white/80 rounded-lg p-3 text-center border border-slate-100">
-              <div className="text-lg font-bold text-blue-600">{carbonStats.overall.carbonPercentage}%</div>
-              <div className="text-xs text-slate-600">碳板占比</div>
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="text-green-700 font-medium">{stats.completionRate}%</span>
+              <span className="text-green-600">({stats.completedMaterials}/{stats.totalMaterials})</span>
             </div>
-            <div className="bg-white/80 rounded-lg p-3 text-center border border-slate-100">
-              <div className="text-lg font-bold text-orange-600">{carbonStats.overall.specialPercentage}%</div>
-              <div className="text-xs text-slate-600">特殊材料</div>
-            </div>
-          </div>
-          
-          {/* 完成情况进度条 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-700 font-medium">碳板完成进度</span>
-              <span className="text-slate-600">{carbonStats.carbon.completed}/{carbonStats.carbon.total}</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2">
+            <div className="w-full bg-green-200 rounded-full h-1.5 mt-1">
               <div 
-                className="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${carbonStats.carbon.rate}%` }}
+                className="bg-green-600 h-1.5 rounded-full transition-all duration-300" 
+                style={{ width: `${stats.completionRate}%` }}
               />
             </div>
-            
-            {carbonStats.special.total > 0 && (
-              <>
-                <div className="flex items-center justify-between text-sm mt-3">
-                  <span className="text-slate-700 font-medium">特殊材料完成进度</span>
-                  <span className="text-slate-600">{carbonStats.special.completed}/{carbonStats.special.total}</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${carbonStats.special.rate}%` }}
-                  />
-                </div>
-              </>
-            )}
           </div>
-        </div>
-
-        {/* 板材详情 - 简化展示 */}
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-            <CogIcon className="w-4 h-4 mr-1.5" />
-            板材使用详情
-          </div>
-          <MaterialStatusManager
-            materials={convertMaterialsToManagerFormat()}
-            onStatusChange={() => {}} // 过往项目不允许状态变更
-            displayMode="compact"
-            showAddButton={false}
-            enableBatchOperations={false}
-            enableSoundFeedback={false}
-            className="bg-gray-50 border border-gray-200 rounded-lg"
-          />
-        </div>
-      </div>
-      
-      {/* 底部操作区域 */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-gray-500">
-            项目ID: {project.id} • 创建于 {project.createdAt ? new Date(project.createdAt).toLocaleDateString('zh-CN') : '未知'}
-          </div>
-          {onView && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => onView(project.id)}
-              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-            >
-              <EyeIcon className="w-4 h-4 mr-1" />
-              查看详情
-            </Button>
+          {project.drawings && project.drawings.length > 0 && (
+            <div className="ml-3 text-xs text-gray-600">
+              图纸: {project.drawings.length}个
+            </div>
           )}
         </div>
       </div>
-    </motion.div>
+      
+      {/* 板材网格（与活跃项目保持一致的风格） */}
+      <div className="flex-1">
+        <div className="grid grid-cols-6 gap-2">
+          {sortedMaterials.map((material) => (
+            <div key={material.id} className="text-center">
+              <div
+                className={`w-full py-2 rounded text-xs font-medium ${statusConfig[material.status as keyof typeof statusConfig]?.color || statusConfig.pending.color} ${statusConfig[material.status as keyof typeof statusConfig]?.textColor || statusConfig.pending.textColor}`}
+              >
+                {getMaterialCode(material.thicknessSpec.materialType)}{parseFloat(material.thicknessSpec.thickness)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* 时间信息和统计 - 固定在底部 */}
+      <div className="mt-3 pt-2 border-t border-gray-100 space-y-1">
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>归档: {formatDate(project.movedToPastAt)}</span>
+          <span>创建: {formatDate(project.createdAt)}</span>
+        </div>
+        <div className="text-xs text-gray-500 text-center font-medium">
+          {stats.completedMaterials}/{stats.totalMaterials} 已完成
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -751,11 +732,11 @@ export const ProjectDetailCard: React.FC<ProjectDetailCardProps> = ({
       thickness: material.thicknessSpec.thickness,
       unit: material.thicknessSpec.unit,
       status: material.status as MaterialStatusType,
-      quantity: material.quantity || 1,
+      quantity: 1,
       assignedWorker: project.assignedWorker,
       startDate: material.startDate,
       completedDate: material.completedDate,
-      completedBy: material.completedBy,
+      completedBy: material.completedByUser,
       notes: material.notes,
       priority: (project.priority === 'urgent' ? 'urgent' : 
                 project.priority === 'high' ? 'high' : 
@@ -801,7 +782,7 @@ export const ProjectDetailCard: React.FC<ProjectDetailCardProps> = ({
               {/* 优先级标签 */}
               <Badge
                 variant={
-                  project.priority === 'urgent' ? 'destructive' :
+                  project.priority === 'urgent' ? 'danger' :
                   project.priority === 'high' ? 'warning' :
                   project.priority === 'medium' ? 'info' :
                   'secondary'
@@ -869,7 +850,7 @@ export const ProjectDetailCard: React.FC<ProjectDetailCardProps> = ({
           materialId={selectedMaterialForRequirement.id}
           materialType={selectedMaterialForRequirement.thicknessSpec.materialType || '碳板'}
           thickness={selectedMaterialForRequirement.thicknessSpec.thickness}
-          projectWorker={project.assignedWorker}
+          projectWorker={project.assignedWorker as any}
           onClose={() => {
             setShowRequirementManager(false);
             setSelectedMaterialForRequirement(null);
@@ -892,13 +873,26 @@ export const ProjectDetailCard: React.FC<ProjectDetailCardProps> = ({
       {/* 原有的分配弹窗 */}
       {showAllocationModal && selectedMaterial && (
         <MaterialAllocationModal
-          material={selectedMaterial}
+          isOpen={showAllocationModal}
+          projectMaterial={{
+            id: selectedMaterial.id,
+            projectId: selectedMaterial.projectId,
+            projectName: project.name,
+            thicknessSpecId: selectedMaterial.thicknessSpecId,
+            materialType: selectedMaterial.thicknessSpec.materialType || '碳板',
+            thickness: selectedMaterial.thicknessSpec.thickness,
+            unit: selectedMaterial.thicknessSpec.unit,
+            currentQuantity: 0,
+            assignedWorkerName: project.assignedWorker?.name
+          }}
           onClose={() => {
             setShowAllocationModal(false);
             setSelectedMaterial(null);
           }}
-          onUpdate={() => {
+          onSuccess={() => {
             // 处理更新逻辑
+            setShowAllocationModal(false);
+            setSelectedMaterial(null);
           }}
         />
       )}

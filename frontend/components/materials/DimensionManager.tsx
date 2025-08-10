@@ -72,7 +72,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         setDimensions(data.dimensions || []);
       }
     } catch (error) {
-      console.error('获取尺寸数据失败:', error);
+      // 获取尺寸数据失败
     }
   }, [workerMaterialId]);
 
@@ -106,7 +106,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         await alert(`添加失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      console.error('添加尺寸失败:', error);
+      // 添加尺寸失败
       await alert('添加失败，请检查网络连接');
     } finally {
       setLoading(false);
@@ -144,7 +144,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         await alert(`更新失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      console.error('更新尺寸失败:', error);
+      // 更新尺寸失败
       await alert('更新失败，请检查网络连接');
     } finally {
       setLoading(false);
@@ -170,7 +170,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         await alert(`删除失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      console.error('删除尺寸失败:', error);
+      // 删除尺寸失败
       await alert('删除失败，请检查网络连接');
     } finally {
       setLoading(false);
@@ -227,10 +227,9 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
           <div className="flex justify-between items-center">
             <h4 className="font-medium text-gray-900">现有尺寸</h4>
             <Button
-              size="sm"
               onClick={() => setShowAddForm(true)}
               disabled={showAddForm || loading}
-              className="flex items-center space-x-1"
+              className="flex items-center space-x-1 text-sm"
             >
               <PlusIcon className="w-4 h-4" />
               <span>添加尺寸</span>
@@ -302,7 +301,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
               </div>
               <div className="flex justify-end space-x-2">
                 <Button 
-                  size="sm" 
+                  className="text-sm" 
                   variant="secondary" 
                   onClick={() => {
                     setShowAddForm(false);
@@ -313,7 +312,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
                   取消
                 </Button>
                 <Button 
-                  size="sm" 
+                  className="text-sm" 
                   onClick={addDimension}
                   loading={loading}
                 >
@@ -399,7 +398,7 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
             onChange={(e) => setFormData(prev => ({ ...prev, width: e.target.value }))}
             step="0.01"
             min="0"
-            size="sm"
+            className="text-sm"
           />
           <Input
             type="number"
@@ -408,7 +407,7 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
             onChange={(e) => setFormData(prev => ({ ...prev, height: e.target.value }))}
             step="0.01"
             min="0"
-            size="sm"
+            className="text-sm"
           />
           <Input
             type="number"
@@ -416,13 +415,13 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
             value={formData.quantity}
             onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
             min="1"
-            size="sm"
+            className="text-sm"
           />
           <Input
             placeholder="备注"
             value={formData.notes}
             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            size="sm"
+            className="text-sm"
           />
         </div>
         <div className="flex justify-end space-x-1">
@@ -456,7 +455,7 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
         <button
           onClick={() => onTransfer(dimension)}
           className="p-1.5 hover:bg-green-100 rounded text-green-600 transition-colors"
-          title="转移给其他工人"
+          
           disabled={loading}
         >
           <ArrowRightIcon className="w-4 h-4" />
@@ -464,7 +463,7 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
         <button
           onClick={onEdit}
           className="p-1.5 hover:bg-blue-100 rounded text-blue-600 transition-colors"
-          title="编辑"
+          
           disabled={loading}
         >
           <PencilIcon className="w-4 h-4" />
@@ -472,7 +471,7 @@ const DimensionEditItem: React.FC<DimensionEditItemProps> = ({
         <button
           onClick={onDelete}
           className="p-1.5 hover:bg-red-100 rounded text-red-600 transition-colors"
-          title="删除"
+          
           disabled={loading}
         >
           <TrashIcon className="w-4 h-4" />

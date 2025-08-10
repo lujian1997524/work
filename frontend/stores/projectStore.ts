@@ -17,18 +17,15 @@ const getAuthToken = (): string | null => {
 let refreshTimer: NodeJS.Timeout | null = null;
 const debouncedRefresh = (fetchProjects: () => Promise<void>) => {
   if (refreshTimer) {
-    console.log('⏰ 清除之前的防抖定时器');
     clearTimeout(refreshTimer);
   }
   refreshTimer = setTimeout(() => {
-    console.log('🔄 执行防抖刷新...');
     fetchProjects().then(() => {
-      console.log('✅ 防抖刷新完成');
+      // 防抖刷新完成
     }).catch(error => {
-      console.error('❌ 防抖刷新失败:', error);
+      // 防抖刷新失败，忽略错误
     });
   }, 300); // 300ms防抖
-  console.log('⏰ 已设置新的防抖定时器，300ms后执行');
 };
 
 // 项目Store接口
@@ -182,17 +179,27 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       
       const url = `/api/projects/past${params.toString() ? '?' + params.toString() : ''}`;
       
-      const response = await apiRequest(url, {
+      // 添加超时处理
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('请求超时，请检查网络连接')), 15000);
+      });
+      
+      const fetchPromise = apiRequest(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
       
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
       if (!response.ok) {
-        throw new Error('获取过往项目失败');
+        const errorText = await response.text();
+        // API响应错误，忽略日志输出
+        throw new Error(`获取过往项目失败 (${response.status})`);
       }
       
       const data = await response.json();
+      // 获取到过往项目数据，无需日志输出
       
       if (year && month) {
         // 如果指定了年月，返回项目列表
@@ -200,8 +207,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({ 
           pastProjects, 
           loading: false, 
+          error: null,
           lastUpdated: Date.now() 
         });
+        // 设置指定月份过往项目完成，无需日志输出
       } else {
         // 如果没有指定年月，返回按月分组的数据
         const pastProjectsByMonth = data.projectsByMonth || {};
@@ -209,14 +218,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({ 
           pastProjects,
           pastProjectsByMonth, 
-          loading: false, 
+          loading: false,
+          error: null,
           lastUpdated: Date.now() 
         });
+        // 设置按月分组过往项目完成，无需日志输出
       }
     } catch (error) {
+      // 获取过往项目失败，忽略错误日志
+      const errorMessage = error instanceof Error ? error.message : '获取过往项目失败';
       set({ 
-        error: error instanceof Error ? error.message : '获取过往项目失败',
-        loading: false 
+        error: errorMessage,
+        loading: false,
+        pastProjects: [],
+        pastProjectsByMonth: {}
       });
     }
   },
@@ -476,18 +491,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setupSSEListeners: () => {
     const state = get();
     if (state.sseListenersSetup) {
-      console.log('🔄 SSE监听器已设置，跳过重复设置');
+      // SSE监听器已设置，跳过重复设置
       return;
     }
-
-    console.log('🎧 设置SSE事件监听器...');
+    // 设置SSE事件监听器开始
     
     // 先清理可能存在的旧监听器
     get().cleanupSSEListeners();
     
     // 监听项目创建事件
     const projectCreatedHandler = (data: any) => {
-      console.log('🆕 收到项目创建事件:', data);
+      // 收到项目创建事件，开始处理
       if (data.project) {
         const existingProject = get().projects.find(p => p.id === data.project.id);
         if (!existingProject) {
@@ -500,7 +514,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目更新事件
     const projectUpdatedHandler = (data: any) => {
-      console.log('📝 收到项目更新事件:', data);
+      // 收到项目更新事件，开始处理
       if (data.project) {
         get().updateProjectInStore(data.project.id, data.project);
         set({ lastUpdated: Date.now() });
@@ -510,7 +524,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目状态变更事件
     const projectStatusChangedHandler = (data: any) => {
-      console.log('🔄 收到项目状态变更事件:', data);
+      // 收到项目状态变更事件，开始处理
       if (data.projectId) {
         // 更新项目状态
         get().updateProjectInStore(data.projectId, { status: data.newStatus });
@@ -521,7 +535,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目删除事件
     const projectDeletedHandler = (data: any) => {
-      console.log('🗑️ 收到项目删除事件:', data);
+      // 收到项目删除事件，开始处理
       if (data.projectId) {
         get().removeProject(data.projectId);
         set({ lastUpdated: Date.now() });
@@ -534,8 +548,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听板材状态变更事件
     const materialStatusChangedHandler = (data: any) => {
-      console.log('🔧 收到板材状态变更事件:', data);
-      console.log('🔧 当前项目数量:', get().projects.length);
+      // 收到板材状态变更事件，开始处理
+      // 当前项目数量信息已收集
       if (data.projectId && data.material) {
         // 使用乐观更新而不是全量刷新
         const { optimisticUpdateMaterialStatus } = get();
@@ -555,7 +569,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         
         set({ lastUpdated: Date.now() });
         
-        console.log('📡 SSE材料状态变更：使用乐观更新，避免全量刷新');
+        // SSE材料状态变更：使用乐观更新，避免全量刷新
         
         // 发送事件通知其他组件（带特殊标记表示来自SSE）
         window.dispatchEvent(new CustomEvent('materials-updated', { 
@@ -573,7 +587,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听批量板材状态变更事件
     const materialBatchStatusChangedHandler = (data: any) => {
-      console.log('🔧 收到批量板材状态变更事件:', data);
+      // 收到批量板材状态变更事件，开始处理
       
       // 批量操作由于复杂性，仍然使用防抖刷新
       set({ lastUpdated: Date.now() });
@@ -593,7 +607,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目移动到过往事件
     const projectMovedToPastHandler = (data: any) => {
-      console.log('📁 收到项目移动到过往事件:', data);
+      // 收到项目移动到过往事件，开始处理
       if (data.project) {
         get().removeProject(data.project.id);
         set({ lastUpdated: Date.now() });
@@ -603,7 +617,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目从过往恢复事件
     const projectRestoredFromPastHandler = (data: any) => {
-      console.log('🔄 收到项目从过往恢复事件:', data);
+      // 收到项目从过往恢复事件，开始处理
       if (data.project) {
         get().addProject(data.project);
         set({ lastUpdated: Date.now() });
@@ -641,7 +655,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   cleanupSSEListeners: () => {
     const state = get();
     if (state._sseHandlers) {
-      console.log('🧹 清理SSE事件监听器...');
+      // 清理SSE事件监听器中
       Object.entries(state._sseHandlers).forEach(([eventType, handler]) => {
         sseManager.removeEventListener(eventType as any, handler);
       });
@@ -653,20 +667,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setProjects: (projects) => set({ projects, lastUpdated: Date.now() }),
   
   addProject: (project) => {
-    console.log('📋 Zustand addProject被调用:', project);
+    // Zustand addProject被调用，开始处理
     set(state => {
       const newProjects = [...state.projects, project];
       const newState = {
         projects: newProjects,
         lastUpdated: Date.now()
       };
-      console.log('📋 Zustand项目数量:', state.projects.length, '->', newState.projects.length);
+      // Zustand项目数量更新完成
       return newState;
     });
   },
   
   updateProjectInStore: (id, updates) => {
-    console.log('📝 Zustand updateProjectInStore被调用:', id, updates);
+    // Zustand updateProjectInStore被调用，开始处理
     set(state => ({
       projects: state.projects.map(p => 
         p.id === id ? { ...p, ...updates } : p
@@ -676,7 +690,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
   
   optimisticUpdateMaterialStatus: (projectId, materialId, newStatus, user) => {
-    console.log('🚀 乐观更新材料状态:', { projectId, materialId, newStatus });
+    // 乐观更新材料状态开始
     const currentTime = new Date().toISOString();
     
     set(state => ({
@@ -737,13 +751,13 @@ if (typeof window !== 'undefined') {
     
     // 如果事件来自SSE，则跳过处理（因为Store层已经处理了）
     if (eventDetail?.fromSSE) {
-      console.log('⏭️ Store层跳过SSE事件（已由SSE处理器处理）');
+      // Store层跳过SSE事件（已由SSE处理器处理）
       return;
     }
     
     // 防止重复处理相同的事件
     if (eventTimestamp <= lastUpdateTimestamp) {
-      console.log('⏭️ 跳过重复的materials-updated事件');
+      // 跳过重复的materials-updated事件
       return;
     }
     
@@ -751,7 +765,7 @@ if (typeof window !== 'undefined') {
     
     // 防抖：避免短时间内多次刷新
     if (refreshTimeout) {
-      console.log('⏰ 清除之前的刷新定时器');
+      // 清除之前的刷新定时器
       clearTimeout(refreshTimeout);
     }
     
@@ -759,10 +773,10 @@ if (typeof window !== 'undefined') {
       const store = useProjectStore.getState();
       // 只有在没有正在进行乐观更新时才进行全量刷新
       if (!store.isOptimisticUpdating) {
-        console.log('📡 Store层收到materials-updated事件，静默同步数据...');
+        // Store层收到materials-updated事件，静默同步数据
         store.fetchProjects();
       } else {
-        console.log('🚀 乐观更新进行中，跳过Store层刷新');
+        // 乐观更新进行中，跳过Store层刷新
       }
     }, 800); // 增加防抖时间到800ms
   });
@@ -772,7 +786,7 @@ if (typeof window !== 'undefined') {
     const eventDetail = event.detail;
     const { projectId, thicknessSpecId, newStatus, action } = eventDetail;
     
-    console.log('📡 Store层收到material-status-updated事件，进行乐观更新:', eventDetail);
+    // Store层收到material-status-updated事件，进行乐观更新
     
     const store = useProjectStore.getState();
     
@@ -799,7 +813,7 @@ if (typeof window !== 'undefined') {
             startDate: newStatus === 'in_progress' ? new Date().toISOString().split('T')[0] : undefined,
             completedDate: newStatus === 'completed' ? new Date().toISOString().split('T')[0] : undefined
           };
-          targetProject.materials = [...materials, newMaterial];
+          targetProject.materials = [...materials, newMaterial as any];
         } else if (action === 'update') {
           // 更新现有材料记录
           targetProject.materials = materials.map(m => 
@@ -846,11 +860,7 @@ if (typeof window !== 'undefined') {
         // 直接更新Store，触发UI更新但避免全量刷新
         store.setProjects(updatedProjects);
         
-        console.log('✅ 材料状态和项目状态乐观更新完成，无需全量刷新', {
-          项目ID: projectId,
-          新材料状态: newStatus,
-          新项目状态: newProjectStatus
-        });
+        // 材料状态和项目状态乐观更新完成，无需全量刷新
       }
     }
   });

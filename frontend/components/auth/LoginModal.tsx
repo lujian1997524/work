@@ -24,10 +24,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen }) => {
 
     setError('');
     const success = await login(username);
+    
     if (!success) {
-      setError('登录失败，请重试');
+      setError('登录失败，请检查用户名或网络连接');
     }
-    // 登录成功后模态框会自动关闭（通过isAuthenticated状态变化）
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

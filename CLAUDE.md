@@ -66,7 +66,7 @@ curl http://localhost:4000          # 前端服务
 ### 关键开发端点
 - **主应用**: http://localhost:4000
 - **组件系统**: http://localhost:4000/design-system
-- **API测试**: http://localhost:4000/api-test
+- **API测试**: http://localhost:4000/debug-api
 - **数据库管理**: http://localhost:8880 (phpMyAdmin)
 - **后端健康检查**: http://localhost:35001/health
 
@@ -90,7 +90,7 @@ curl http://localhost:4000          # 前端服务
 - **前端**: Next.js 15.4.3 + React 18 + TypeScript + Zustand状态管理
 - **UI系统**: Tailwind CSS + @heroicons/react + iOS 18设计规范  
 - **实时通信**: Server-Sent Events (SSE) + 音频通知
-- **桌面应用**: Electron多平台打包
+- **桌面应用**: Tauri多平台打包 (Rust + Web技术)
 
 ### 端口和服务
 - 前端开发服务器: http://localhost:4000
@@ -106,9 +106,10 @@ curl http://localhost:4000          # 前端服务
 
 ### 状态管理架构
 - **禁止WebSocket**: 用户明确要求弃用WebSocket复杂方案
-- **强制Zustand**: 所有状态管理必须使用4个核心Store
+- **强制Zustand**: 所有状态管理必须使用5个核心Store
   - `projectStore.ts` - 项目数据管理
   - `materialStore.ts` - 材料状态管理
+  - `workerMaterialStore.ts` - 工人材料关联
   - `globalSyncStore.ts` - 全局状态同步
   - `notificationStore.ts` - 通知系统
 - **事件驱动通信**: 使用浏览器原生事件系统实现组件间状态同步
@@ -148,6 +149,10 @@ cd backend && npm run dev          # 后端端口35001 (nodemon热重载)
 # 生产环境运行
 cd frontend && npm run start       # 前端生产服务器
 cd backend && npm run start        # 后端生产服务器
+
+# Tauri桌面应用开发
+cd frontend && npm run tauri dev   # 开发模式启动桌面应用
+cd frontend && npm run tauri build # 构建桌面应用(Windows/macOS/Linux)
 ```
 
 ### 后端API架构
@@ -173,6 +178,10 @@ cd backend && npm run start        # 后端生产服务器
 - **materials** (id, project_id, thickness_spec_id, status, completed_by, completed_date) - 板材表
 - **drawings** (id, project_id, filename, file_path, version, uploaded_by) - 图纸表
 - **operation_history** - 操作历史日志
+- **worker_materials** - 工人材料关联表
+- **material_dimensions** - 材料尺寸管理表
+- **material_requirements** - 材料需求表
+- **material_allocations** - 材料分配表
 - 扩展表：material_inventory、material_borrowing、cutting_records等
 
 ### 前端架构特点
@@ -183,12 +192,39 @@ cd backend && npm run start        # 后端生产服务器
 - **组件化架构**: 40+自研UI组件，高度模块化
 
 #### 关键前端功能
-- **实时状态管理**: 4个Zustand Store（projectStore、materialStore、notificationStore、globalSyncStore）
+- **实时状态管理**: 5个Zustand Store（projectStore、materialStore、workerMaterialStore、notificationStore、globalSyncStore）
 - **事件驱动通信**: 使用浏览器原生事件系统实现组件间通信
 - **全局搜索**: Ctrl+K/Cmd+K快捷键，跨模块搜索功能
-- **CAD文件处理**: DXF解析和Three.js 3D预览
-- **音频通知系统**: 5种智能音效，操作反馈
+- **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染
+- **音频通知系统**: 5种智能音效(success/error/warning/info/wancheng)，操作反馈
 - **实时通知**: SSE + 桌面通知 + 音频提示的多重反馈
+- **Tauri桌面集成**: Rust后端处理系统级操作，Web前端负责UI
+
+### Zustand Store架构详细说明
+```javascript
+// projectStore.ts - 核心项目数据管理
+interface ProjectState {
+  projects: Project[];
+  currentProject: Project | null;
+  loading: boolean;
+  fetchProjects(): Promise<void>;
+  updateProject(id: number, data: Partial<Project>): Promise<void>;
+  deleteProject(id: number): Promise<void>;
+}
+
+// materialStore.ts - 材料状态管理
+interface MaterialState {
+  materials: Material[];
+  thicknessSpecs: ThicknessSpec[];
+  loading: boolean;
+  updateMaterialStatus(id: number, status: MaterialStatus): Promise<void>;
+  fetchMaterials(): Promise<void>;
+}
+
+// workerMaterialStore.ts - 工人材料关联管理
+// globalSyncStore.ts - 全局同步状态
+// notificationStore.ts - 通知消息管理
+```
 
 ### 开发流程
 ```bash
@@ -223,6 +259,10 @@ cd frontend && npx tsc --noEmit      # 语法验证，推荐方式
 # 代码质量检查
 cd frontend && npm run lint          # ESLint检查
 
+# 单独构建前端（生产部署时）
+cd frontend && npm run build         # 仅在部署时使用，生成优化后的静态文件
+
+# 注意：项目无单元测试框架，主要依靠开发服务器热重载和类型检查
 # 注意：Claude 不能自动运行这些命令，只能建议用户运行
 ```
 
@@ -246,6 +286,23 @@ curl http://localhost:8880          # phpMyAdmin
 ```
 
 ## 关键开发模式和工作流程
+
+### 材料状态管理核心逻辑
+材料状态采用四阶段循环，严格按顺序流转：
+1. **empty** - 空白状态，未分配给任何项目
+2. **pending** - 已分配但未开始加工
+3. **in_progress** - 正在加工中
+4. **completed** - 加工完成，可回收为empty状态
+
+```javascript
+// 状态切换示例
+const nextStatus = {
+  'empty': 'pending',
+  'pending': 'in_progress', 
+  'in_progress': 'completed',
+  'completed': 'empty'
+};
+```
 
 ### 代码修改确认流程
 1. **讨论阶段**: 分析需求，讨论实现方案
@@ -365,13 +422,18 @@ audioManager.play('success');
 - `frontend/components/ui/StatusIndicator.tsx` - 四状态切换组件
 - `frontend/components/layout/VSCodeLayout.tsx` - 主布局容器
 - `frontend/components/layout/ActivityBar.tsx` - 活动栏导航
-- `frontend/components/materials/MaterialsTable.tsx` - 主数据表格
+- `frontend/components/materials/MaterialInventoryManagerNew.tsx` - 主数据表格
+- `frontend/components/ui/ModernTable.tsx` - 通用表格组件
+- `frontend/components/ui/DxfPreviewModal.tsx` - DXF文件预览组件
 
 ### 配置文件
 - `frontend/.env.local` - 前端环境配置
 - `backend/src/config/envConfig.js` - 后端环境配置
 - `docker-compose.yml` - 数据库容器配置
 - `database/init/01-create-tables.sql` - 数据库结构
+- `frontend/next.config.js` - Next.js开发配置(标准模式，非export)
+- `frontend/tailwind.config.js` - iOS 18/macOS 15 设计系统配置
+- `deploy-to-server.sh` - 云服务器部署脚本
 
 ### 数据模型文件
 - `backend/src/models/index.js` - Sequelize模型汇总和关联定义

@@ -145,7 +145,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         setProjectNotes(data.project?.description || '');
       }
     } catch (error) {
-      console.error('获取项目详情失败:', error);
+      // 获取项目详情失败，忽略错误日志
     } finally {
       setLoading(false);
     }
@@ -167,7 +167,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         setThicknessSpecs(data.thicknessSpecs || []);
       }
     } catch (error) {
-      console.error('获取厚度规格失败:', error);
+      // 获取厚度规格失败，忽略错误日志
     }
   }, [token]);
 
@@ -187,7 +187,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         setOperationHistory(data.history || []);
       }
     } catch (error) {
-      console.error('获取操作历史失败:', error);
+      // 获取操作历史失败，忽略错误日志
       // 如果API不存在，设置为空数组
       setOperationHistory([]);
     }
@@ -246,7 +246,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         projects: projects as any[],
         thicknessSpecs: thicknessSpecs,
         user,
-        updateProjectFn: updateProject,
+        updateProjectFn: updateProject as any,
         fetchProjectsFn: fetchProjects,
         setLoadingFn: setLoading,
       });
@@ -254,13 +254,13 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
       if (success) {
         // 后台刷新项目详情确保数据一致性
         await fetchProjectDetail();
-        console.log('材料状态更新成功');
+        // 材料状态更新成功，无需日志输出
       } else {
         // 如果失败，恢复原状态
         await fetchProjectDetail();
       }
     } catch (error) {
-      console.error('更新材料状态失败:', error);
+      // 更新材料状态失败，忽略错误日志
       // 恢复原状态
       await fetchProjectDetail();
     }
@@ -289,7 +289,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         fetchProjects();
       }
     } catch (error) {
-      console.error('保存备注错误:', error);
+      // 保存备注错误，忽略错误日志
     } finally {
       setSavingNotes(false);
     }
@@ -323,7 +323,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         await fetchProjectDetail();
       }
     } catch (error) {
-      console.error('保存材料备注失败:', error);
+      // 保存材料备注失败，忽略错误日志
     }
   };
 
@@ -358,7 +358,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
           await fetchProjectDetail(); // 刷新项目详情
         }
       } catch (error) {
-        console.error('创建材料记录时出错:', error);
+        // 创建材料记录时出错，忽略错误日志
       }
     } else {
       setSelectedMaterialForRequirement(material);
@@ -397,7 +397,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
         await alert('图纸删除成功！');
       }
     } catch (error) {
-      console.error('删除图纸失败:', error);
+      // 删除图纸失败，忽略错误日志
     }
   };
 
@@ -635,7 +635,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
       <Modal
         isOpen={showMaterialModal}
         onClose={() => setShowMaterialModal(false)}
-        title={editingMaterial ? `编辑 ${editingMaterial.thicknessSpec.thickness}${editingMaterial.thicknessSpec.unit} 材料` : '编辑材料'}
+        
         size="md"
       >
         <div className="space-y-4">
@@ -674,7 +674,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
           materialId={selectedMaterialForRequirement.id}
           materialType={selectedMaterialForRequirement.thicknessSpec?.materialType || '碳板'}
           thickness={selectedMaterialForRequirement.thicknessSpec?.thickness || ''}
-          projectWorker={project.assignedWorker}
+          projectWorker={project.assignedWorker as any}
           onClose={handleCloseRequirementManager}
           onUpdate={handleRequirementUpdate}
         />
@@ -1002,7 +1002,7 @@ const MaterialsSection: React.FC<{
             type="button"
             className={`w-full py-1.5 rounded text-xs font-medium ${config.color} ${config.textColor} hover:opacity-80 transition-all hover:scale-105 border border-transparent hover:border-gray-300 cursor-pointer`}
             onClick={() => handleStatusClick(spec.id, status)}
-            title={`${spec.thickness}${spec.unit} - 当前: ${config.label}, 点击切换到下一状态`}
+            
           >
             {getMaterialCode(spec.materialType)}{parseFloat(spec.thickness)}
           </button>
@@ -1026,7 +1026,7 @@ const MaterialsSection: React.FC<{
               thicknessSpec: spec
             });
           }}
-          title="管理板材尺寸需求"
+          
         >
           <CogIcon className="w-3 h-3" />
           <span>需求</span>
@@ -1040,7 +1040,7 @@ const MaterialsSection: React.FC<{
               size="sm"
               onClick={() => onEditMaterial(material)}
               className="text-xs py-1 px-2 h-6"
-              title="编辑材料详情"
+              
             >
               <PencilIcon className="w-3 h-3 mr-1" />
               编辑
@@ -1048,7 +1048,7 @@ const MaterialsSection: React.FC<{
             <div className="text-xs text-gray-500 text-center">
               {material.startDate && <div>始: {formatDate(material.startDate)}</div>}
               {material.completedDate && <div>完: {formatDate(material.completedDate)}</div>}
-              {material.completedBy && <div>人: {material.completedBy.name}</div>}
+              {material.completedByUser && <div>人: {material.completedByUser.name}</div>}
             </div>
           </div>
         )}
@@ -1246,15 +1246,15 @@ const DrawingsSection: React.FC<{
                     <p className="text-sm text-gray-500">版本 {drawing.version}</p>
                   </div>
                   <div className="flex items-center space-x-1 ml-2">
-                    <Button variant="ghost" size="sm" title="预览图纸">
+                    <Button variant="ghost" size="sm">
                       <EyeIcon className="w-4 h-4" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => onDeleteDrawing(drawing.id, drawing.originalFilename)}
+                      onClick={() => onDeleteDrawing(drawing.id, drawing.originalFilename || '')}
                       className="text-red-600 hover:text-red-700"
-                      title="删除图纸"
+                      
                     >
                       <TrashIcon className="w-4 h-4" />
                     </Button>

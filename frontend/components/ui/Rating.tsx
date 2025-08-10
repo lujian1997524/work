@@ -139,7 +139,7 @@ export const Rating: React.FC<RatingProps> = ({
         `}
         whileHover={!disabled && !readonly ? { scale: 1.1 } : {}}
         whileTap={!disabled && !readonly ? { scale: 0.9 } : {}}
-        title={tooltip}
+        
         onMouseLeave={handleMouseLeave}
       >
         {/* 整星点击区域 */}

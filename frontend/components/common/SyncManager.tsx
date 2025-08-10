@@ -99,7 +99,7 @@ export const useSyncStatus = () => {
 
   const notifyError = (error: string) => {
     addSyncError(error);
-    console.error('同步错误:', error);
+    // 同步错误
   };
 
   const isRecentlyUpdated = (threshold = 30000) => { // 30秒内

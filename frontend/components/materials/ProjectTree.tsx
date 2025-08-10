@@ -226,7 +226,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
               onClick={openSortModal}
               disabled={isSorting || !onBatchSort || (filteredProjects && filteredProjects.length === 0)}
               className="flex items-center space-x-1"
-              title="调整项目排序"
+              
             >
               <ArrowsUpDownIcon className="w-3 h-3" />
               <span>{isSorting ? '处理中...' : '排序'}</span>
@@ -378,7 +378,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
           currentPosition: index + 1
         }))}
         onSave={handleBatchSort}
-        title="调整项目排序"
+        
       />
     </div>
   );

@@ -60,7 +60,7 @@ export const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
         setDepartments(data.departments || []);
       }
     } catch (error) {
-      console.error('获取部门列表失败:', error);
+      // 获取部门列表失败
     }
   };
 
@@ -95,7 +95,7 @@ export const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
         return newDepartment;
       }
     } catch (error) {
-      console.error('创建部门失败:', error);
+      // 创建部门失败
     } finally {
       setLoading(false);
     }
@@ -138,7 +138,7 @@ export const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
       const newDept = await createDepartment(searchQuery.trim());
       if (!newDept) {
         // 创建失败，显示错误提示
-        console.error('部门创建失败');
+        // 部门创建失败
       }
     }
   };

@@ -99,7 +99,7 @@ export const MaterialAllocationModal: React.FC<MaterialAllocationModalProps> = (
         setAvailableWorkerMaterials(matchingMaterials);
       }
     } catch (error) {
-      console.error('获取可用工人材料失败:', error);
+      // 获取可用工人材料失败
     } finally {
       setLoading(false);
     }
@@ -188,7 +188,7 @@ export const MaterialAllocationModal: React.FC<MaterialAllocationModalProps> = (
         throw new Error(error.message || '分配失败');
       }
     } catch (error) {
-      console.error('板材分配失败:', error);
+      // 板材分配失败
       alert(error instanceof Error ? error.message : '分配失败，请重试');
     } finally {
       setSubmitting(false);
@@ -258,19 +258,16 @@ export const MaterialAllocationModal: React.FC<MaterialAllocationModalProps> = (
                 <Select
                   value={selectedWorkerMaterialId ? selectedWorkerMaterialId.toString() : ''}
                   onChange={(value) => {
-                    setSelectedWorkerMaterialId(value ? parseInt(value) : null);
+                    setSelectedWorkerMaterialId(value ? parseInt(value.toString()) : null);
                     setSelectedDimensionId(null);
                     setAllocationMode('general');
                   }}
                   placeholder="选择工人及其库存"
-                >
-                  {availableWorkerMaterials.map(wm => (
-                    <option key={wm.id} value={wm.id}>
-                      {wm.workerName} - 总量: {wm.quantity}张
-                      {wm.dimensions.length > 0 && ` (含 ${wm.dimensions.length} 种尺寸)`}
-                    </option>
-                  ))}
-                </Select>
+                  options={availableWorkerMaterials.map(wm => ({
+                    value: wm.id,
+                    label: `${wm.workerName} - 总量: ${wm.quantity}张${wm.dimensions.length > 0 ? ` (含 ${wm.dimensions.length} 种尺寸)` : ''}`
+                  }))}
+                />
               </div>
 
               {/* 分配模式选择 */}
@@ -312,16 +309,13 @@ export const MaterialAllocationModal: React.FC<MaterialAllocationModalProps> = (
                   </label>
                   <Select
                     value={selectedDimensionId ? selectedDimensionId.toString() : ''}
-                    onChange={(value) => setSelectedDimensionId(value ? parseInt(value) : null)}
+                    onChange={(value) => setSelectedDimensionId(value ? parseInt(value.toString()) : null)}
                     placeholder="选择具体尺寸"
-                  >
-                    {selectedWorkerMaterial.dimensions.map(dim => (
-                      <option key={dim.id} value={dim.id}>
-                        {dim.width}×{dim.height}mm - {dim.quantity}张
-                        {dim.notes && ` (${dim.notes})`}
-                      </option>
-                    ))}
-                  </Select>
+                    options={selectedWorkerMaterial.dimensions.map(dim => ({
+                      value: dim.id,
+                      label: `${dim.width}×${dim.height}mm - ${dim.quantity}张${dim.notes ? ` (${dim.notes})` : ''}`
+                    }))}
+                  />
                 </div>
               )}
 

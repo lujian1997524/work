@@ -52,11 +52,11 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           workers
             .map((worker: any) => worker.department)
             .filter((dept: string) => dept && dept.trim())
-        )].sort();
+        )].sort() as string[];
         setDepartments(uniqueDepartments);
       }
     } catch (error) {
-      console.error('获取部门列表失败:', error);
+      // 获取部门列表失败，忽略错误日志
     }
   };
 

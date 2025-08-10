@@ -90,7 +90,6 @@ export const BatchSortModal: React.FC<BatchSortModalProps> = ({
       await onSave(reorderedItems);
       onClose();
     } catch (error) {
-      console.error('保存排序失败:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +112,7 @@ export const BatchSortModal: React.FC<BatchSortModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={title}
+      
       size="lg"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -218,7 +217,7 @@ export const BatchSortModal: React.FC<BatchSortModalProps> = ({
                         size="sm"
                         onClick={() => resetPosition(item.id)}
                         className="p-1"
-                        title="重置位置"
+                        
                       >
                         <XMarkIcon className="w-4 h-4" />
                       </Button>

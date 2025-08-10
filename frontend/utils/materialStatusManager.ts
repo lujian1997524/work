@@ -118,7 +118,6 @@ export class MaterialStatusUpdater {
         }
         
       } catch (error) {
-        console.error('更新项目状态失败:', error);
       }
     }
   }
@@ -138,10 +137,8 @@ export class MaterialStatusUpdater {
       
       if (response.ok) {
         const result = await response.json();
-        console.log(`项目${projectId}图纸归档成功:`, result.message);
       }
     } catch (error) {
-      console.error(`项目${projectId}图纸归档失败:`, error);
     }
   }
 }
@@ -202,7 +199,6 @@ export const updateMaterialStatusShared = async (
     return true;
     
   } catch (error) {
-    console.error('更新材料状态失败:', error);
     // 通过自定义事件发送错误通知，而不是使用原生alert
     window.dispatchEvent(new CustomEvent('material-status-error', { 
       detail: { 

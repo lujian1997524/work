@@ -120,7 +120,6 @@ class AudioManager {
     } catch (error) {
       // 静默处理音频播放错误
       if (error instanceof Error && error.name !== 'NotAllowedError' && error.name !== 'AbortError') {
-        console.error(`音效播放失败: ${type}`, error.message);
       }
     }
   }
@@ -206,13 +205,11 @@ class AudioManager {
    * 测试播放音效
    */
   async testSound(type: SoundType) {
-    console.log(`测试音效: ${type}`);
     
     // 首先尝试获取音频播放权限
     try {
       await this.requestAudioPermission();
     } catch (error) {
-      console.warn('获取音频权限失败:', error);
     }
     
     await this.playNotificationSound(type);

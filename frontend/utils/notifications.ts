@@ -58,10 +58,6 @@ function getNotificationIcon(type: NotificationOptions['type']): string {
 function fallbackNotification(options: NotificationOptions): void {
   const { type, title, message } = options;
   
-  // 控制台输出
-  const emoji = getConsoleEmoji(type);
-  console.log(`${emoji} ${title}: ${message}`);
-  
   // 如果有自定义通知系统，可以在这里调用
   // 例如：window.dispatchEvent(new CustomEvent('show-notification', { detail: options }));
   

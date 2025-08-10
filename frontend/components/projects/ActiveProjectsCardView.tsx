@@ -7,6 +7,7 @@ import { useProjectStore } from '@/stores';
 import { Loading, Empty, EmptyData, Button } from '@/components/ui';
 import { ActiveProjectCard } from '@/components/projects/ProjectCard';
 import { StatusType } from '@/components/ui';
+import { Material } from '@/types/project';
 import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon } from '@heroicons/react/24/outline';
 
 interface ActiveProject {
@@ -18,7 +19,7 @@ interface ActiveProject {
   created_at?: string;
   creator?: { id: number; name: string };
   assignedWorker?: { id: number; name: string };
-  materials?: any[];
+  materials?: Material[];
   drawings?: any[];
   description?: string;
 }
@@ -109,7 +110,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
         fetchProjects();
       }
     } catch (error) {
-      console.error('移至过往项目失败:', error);
+      // 移至过往项目失败，忽略错误日志
     } finally {
       setMovingToPastIds(prev => {
         const newSet = new Set(prev);
@@ -212,7 +213,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   if (projects.length === 0) {
     return (
       <EmptyData 
-        title="暂无活跃项目"
+        
         description="还没有正在进行的项目"
         className="py-12"
       />

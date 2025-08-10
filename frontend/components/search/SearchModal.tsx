@@ -77,6 +77,12 @@ const SEARCH_CATEGORIES = {
     weight: 9,
     color: 'text-indigo-600'
   },
+  thicknessSpecs: {
+    name: '厚度规格',
+    icon: Squares2X2Icon,
+    weight: 8.5,
+    color: 'text-cyan-600'
+  },
   workers: { 
     name: '工人', 
     icon: UsersIcon, 
@@ -141,15 +147,25 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     return flat;
   }, [results]);
 
-  // 执行搜索
+  // 执行搜索 - 移除调试阻断，恢复正常功能
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim() || searchQuery.length < 2 || !token) {
+    // 执行搜索，查询词已准备
+    
+    // 严格验证输入条件
+    const trimmedQuery = searchQuery?.trim();
+    if (!trimmedQuery || trimmedQuery.length < 1 || !token || !isOpen) {
+      setResults({});
+      return;
+    }
+
+    // 检查是否包含有效字符（避免只有空格或特殊字符的搜索）
+    if (!/[\u4e00-\u9fa5a-zA-Z0-9]/.test(trimmedQuery)) {
       setResults({});
       return;
     }
 
     // 检查缓存
-    const cacheKey = searchQuery.toLowerCase();
+    const cacheKey = trimmedQuery.toLowerCase();
     if (searchCache.current.has(cacheKey)) {
       setResults(searchCache.current.get(cacheKey)!);
       return;
@@ -163,6 +179,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
     setLoading(true);
     try {
+      // 发送搜索请求到API
       const response = await apiRequest(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -172,24 +189,26 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
+        // 搜索响应成功，无需日志输出
         const formattedResults = formatSearchResults(data, searchQuery);
         
         // 缓存结果
         searchCache.current.set(cacheKey, formattedResults);
         setResults(formattedResults);
       } else {
-        console.error('搜索请求失败');
+        const errorText = await response.text();
+        // 搜索请求失败，忽略错误日志
         setResults({});
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
-        console.error('搜索失败:', error);
+        // 搜索失败，忽略错误日志
         setResults({});
       }
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, isOpen]);
 
   // 格式化搜索结果（碳板优先排序）
   const formatSearchResults = (rawResults: any, searchQuery: string): SearchResults => {
@@ -368,15 +387,18 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     return score;
   };
 
-  // 监听搜索查询变化
+  // 监听搜索查询变化 - 恢复正常搜索功能
   useEffect(() => {
-    if (debouncedQuery) {
-      performSearch(debouncedQuery);
+    // 搜索触发条件检查，无需日志输出
+    
+    if (debouncedQuery && debouncedQuery.trim().length >= 1 && isOpen) {
+      // 将要执行搜索，无需日志输出
+      performSearch(debouncedQuery.trim());
     } else {
       setResults({});
       setSelectedIndex(-1);
     }
-  }, [debouncedQuery, performSearch]);
+  }, [debouncedQuery, performSearch, isOpen]);
 
   // 键盘导航
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -437,6 +459,26 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const handleSelect = (result: SearchResultItem) => {
     onNavigate(result);
     onClose();
+  };
+
+  // 获取结果项的跳转提示
+  const getNavigationHint = (item: SearchResultItem) => {
+    switch (item.type) {
+      case 'projects':
+        return item.status === 'completed' ? '跳转到已完成项目' : '跳转到进行中项目';
+      case 'workers':
+        return '查看工人详情和库存';
+      case 'departments':
+        return '查看部门下的工人';
+      case 'drawings':
+        return '跳转到图纸库';
+      case 'materials':
+        return '查看库存详情';
+      case 'thicknessSpecs':
+        return '查看该厚度的所有库存';
+      default:
+        return '查看详情';
+    }
   };
 
   // 获取结果项的元信息（包含碳板使用情况和增强信息）
@@ -511,6 +553,15 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         
         return `${thickness} ${materialType} • 库存${quantity}张 • ${workerName}(${workerDept})`;
         
+      case 'thicknessSpecs':
+        // 新增：厚度规格元信息
+        const specThickness = (item as any).thickness || '';
+        const specUnit = (item as any).unit || 'mm';
+        const specMaterialType = (item as any).materialType || '碳板';
+        const specDescription = (item as any).description || '';
+        
+        return `${specThickness}${specUnit} • ${specMaterialType} • 规格定义`;
+        
       default:
         return item.meta || '';
     }
@@ -528,6 +579,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       case 'drawings':
         return DocumentTextIcon;
       case 'materials':
+        return Squares2X2Icon;
+      case 'thicknessSpecs':
         return Squares2X2Icon;
       default:
         return FolderIcon;
@@ -551,7 +604,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             ref={inputRef}
             variant="glass"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const inputValue = e.target.value;
+              setQuery(inputValue);
+            }}
             placeholder="搜索项目、工人、部门、图纸..."
             leftIcon={<MagnifyingGlassIcon className="w-5 h-5" />}
             rightIcon={loading ? <Loading type="dots" size="sm" /> : null}
@@ -590,7 +646,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                 >
                   {/* 分类标题 */}
                   <div className="flex items-center mb-3">
-                    <categoryData.icon className={`w-4 h-4 mr-2 ${categoryData.color}`} />
+                    <categoryData.icon className={`w-4 h-4 mr-2 ${(categoryData as any).color || 'text-blue-600'}`} />
                     <span className="font-medium text-gray-700">{categoryData.name}</span>
                     <Badge variant="secondary" size="sm" className="ml-2">
                       {categoryData.count}
@@ -626,14 +682,30 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                                 <div className={`text-sm truncate ${isSelected ? 'text-ios18-blue/70' : 'text-gray-500'}`}>
                                   {getResultMeta(item)}
                                 </div>
+                                {/* 新增：跳转提示 */}
+                                {isSelected && (
+                                  <div className="text-xs text-ios18-blue/60 mt-1 truncate">
+                                    → {getNavigationHint(item)}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <Badge 
-                              variant={isSelected ? 'primary' : 'secondary'} 
-                              size="sm"
-                            >
-                              {item.category}
-                            </Badge>
+                            <div className="flex items-center space-x-2">
+                              <Badge 
+                                variant={isSelected ? 'primary' : 'secondary'} 
+                                size="sm"
+                              >
+                                {item.category}
+                              </Badge>
+                              {/* 新增：点击提示图标 */}
+                              {isSelected && (
+                                <div className="text-ios18-blue">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </motion.div>
                       );
@@ -647,7 +719,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
           {/* 空状态 */}
           {totalCount === 0 && query.length > 0 && !loading && (
             <EmptySearch 
-              title="未找到相关结果"
+              
               description="尝试调整搜索关键词或查看其他内容"
               size="sm"
             />
@@ -662,15 +734,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                 <div className="text-xs text-gray-400 space-y-3">
                   <div>支持搜索项目、工人、部门、图纸、板材库存等内容</div>
                   
-                  {/* 厚度搜索示例 */}
+                  {/* 厚度搜索示例 - 更新示例 */}
                   <div className="border-t pt-2">
-                    <div className="font-medium text-indigo-600 mb-1">板材厚度搜索示例：</div>
+                    <div className="font-medium text-indigo-600 mb-1">智能厚度搜索示例：</div>
                     <div className="flex flex-wrap gap-1 justify-center">
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">4</kbd>
                       <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">3mm</kbd>
-                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">2.5mm</kbd>
+                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">2.5</kbd>
                       <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">厚度</kbd>
-                      <kbd className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">库存</kbd>
                     </div>
+                    <div className="text-xs text-gray-400 mt-1">搜索"4"会自动匹配"4mm"板材和相关内容</div>
                   </div>
                   
                   {/* 材料类型搜索示例 */}

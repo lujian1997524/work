@@ -127,7 +127,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
       ref={ref}
       className={buttonClasses}
       disabled={disabled}
-      title={tooltip}
+      
       {...props}
     >
       <Icon className={sizes.icon} />

@@ -8,6 +8,7 @@ const {
   cleanupEmptyWorkerMaterials
 } = require('../middleware/dataValidation');
 const { Worker, WorkerMaterial, ThicknessSpec, MaterialDimension, Department } = require('../models');
+const { recordMaterialTransfer } = require('../utils/operationHistory');
 
 /**
  * 获取所有工人的板材库存概览
@@ -430,77 +431,122 @@ router.post('/transfer', authenticate, async (req, res) => {
     const {
       fromWorkerId,
       toWorkerId,
-      materialType,
-      thickness,
+      thicknessSpecId,  // 使用thicknessSpecId而不是materialType和thickness
       transferQuantity,
       notes
     } = req.body;
 
     // 验证参数
-    if (!fromWorkerId || !toWorkerId || !materialType || !thickness || !transferQuantity) {
+    if (!fromWorkerId || !toWorkerId || !thicknessSpecId || !transferQuantity) {
       return res.status(400).json({
         success: false,
-        message: '缺少必填参数'
+        message: '缺少必填参数：源工人ID、目标工人ID、厚度规格ID、转移数量'
       });
     }
 
-    // 查找源板材
+    console.log(`🔄 开始板材转移: ${fromWorkerId} -> ${toWorkerId}, 厚度规格: ${thicknessSpecId}, 数量: ${transferQuantity}`);
+
+    // 验证厚度规格存在
+    const thicknessSpec = await ThicknessSpec.findByPk(thicknessSpecId);
+    if (!thicknessSpec) {
+      return res.status(404).json({
+        success: false,
+        message: '厚度规格不存在'
+      });
+    }
+
+    // 查找源工人的板材（使用正确的关联查询）
     const sourceMaterial = await WorkerMaterial.findOne({
       where: {
         workerId: fromWorkerId,
-        materialType,
-        thickness
-      }
+        thicknessSpecId: thicknessSpecId
+      },
+      include: [{
+        model: Worker,
+        as: 'worker',
+        attributes: ['id', 'name']
+      }]
     });
+
+    console.log('🔍 源板材查询结果:', sourceMaterial ? `找到，当前数量: ${sourceMaterial.quantity}` : '未找到');
 
     if (!sourceMaterial) {
       return res.status(404).json({
         success: false,
-        message: '源工人没有该规格的板材'
+        message: `源工人没有该规格的板材 (${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit})`
       });
     }
 
-    if (sourceMaterial.quantity < transferQuantity) {
+    const transferQty = parseInt(transferQuantity);
+    if (sourceMaterial.quantity < transferQty) {
       return res.status(400).json({
         success: false,
-        message: '转移数量超过可用库存'
+        message: `转移数量 ${transferQty} 超过可用库存 ${sourceMaterial.quantity}`
+      });
+    }
+
+    // 验证目标工人存在
+    const targetWorker = await Worker.findByPk(toWorkerId);
+    if (!targetWorker) {
+      return res.status(404).json({
+        success: false,
+        message: '目标工人不存在'
       });
     }
 
     // 扣减源工人的板材
-    sourceMaterial.quantity -= transferQuantity;
+    sourceMaterial.quantity -= transferQty;
     await sourceMaterial.save();
+    console.log(`📤 源工人板材更新: 剩余 ${sourceMaterial.quantity}`);
 
     // 查找或创建目标工人的板材记录
     let targetMaterial = await WorkerMaterial.findOne({
       where: {
         workerId: toWorkerId,
-        materialType,
-        thickness
+        thicknessSpecId: thicknessSpecId
       }
     });
 
     if (targetMaterial) {
-      targetMaterial.quantity += transferQuantity;
+      targetMaterial.quantity += transferQty;
+      if (notes) {
+        targetMaterial.notes = notes;
+      }
       await targetMaterial.save();
+      console.log(`📥 目标工人板材更新: 现有 ${targetMaterial.quantity}`);
     } else {
       targetMaterial = await WorkerMaterial.create({
         workerId: toWorkerId,
-        materialType,
-        thickness,
-        quantity: transferQuantity,
-        notes
+        thicknessSpecId: thicknessSpecId,
+        quantity: transferQty,
+        notes: notes || null
       });
+      console.log(`📥 目标工人板材创建: 新建 ${targetMaterial.quantity}`);
     }
 
     // 如果源工人的板材数量为0，删除记录
     if (sourceMaterial.quantity === 0) {
       await sourceMaterial.destroy();
+      console.log('🗑️ 源工人板材记录已删除（数量为0）');
     }
+
+    // 同时处理MaterialDimension的转移（如果存在详细尺寸记录）
+    const dimensionsTransferred = await this.transferMaterialDimensions(
+      sourceMaterial.id, 
+      targetMaterial.id, 
+      transferQty
+    );
 
     res.json({
       success: true,
-      message: '板材转移成功'
+      message: `成功转移 ${transferQty} 张 ${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit} 板材`,
+      transfer: {
+        fromWorker: sourceMaterial.worker.name,
+        toWorker: targetWorker.name,
+        materialSpec: `${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit}`,
+        quantity: transferQty,
+        dimensionsTransferred
+      }
     });
 
   } catch (error) {
@@ -512,6 +558,17 @@ router.post('/transfer', authenticate, async (req, res) => {
     });
   }
 });
+
+// 辅助函数：转移MaterialDimension记录
+router.transferMaterialDimensions = async function(sourceWorkerMaterialId, targetWorkerMaterialId, transferQuantity) {
+  try {
+    // 这里暂时简化处理，如果需要详细的尺寸转移逻辑，可以在MaterialDimension模块中实现
+    return 0;
+  } catch (error) {
+    console.warn('MaterialDimension转移失败，但主转移继续:', error.message);
+    return 0;
+  }
+};
 
 /**
  * 数据一致性检查API

@@ -167,18 +167,13 @@ export const NotificationContainer = () => {
 
   // 调试日志：监控通知数组变化
   React.useEffect(() => {
-    console.log('📱 NotificationContainer - 通知列表更新:', notifications.map(n => ({
-      id: n.id,
-      title: n.title,
-      timestamp: n.timestamp
-    })));
+    // 通知列表更新，无需日志输出
   }, [notifications]);
 
   return (
     <div className="fixed bottom-6 right-6 z-50 space-y-3 pointer-events-none">
       <AnimatePresence mode="popLayout">
         {notifications.map((notification) => {
-          console.log('🗝️ 渲染通知key:', notification.id);
           return (
             <div key={notification.id} className="pointer-events-auto">
               <NotificationItem

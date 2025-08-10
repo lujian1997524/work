@@ -177,7 +177,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.2);
       } catch (error) {
-        console.warn('音频播放失败:', error);
+        // 音频播放失败，忽略错误
       }
     }
   }, [soundEnabled]);
@@ -321,7 +321,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
           damping: 20,
           delay: Math.random() * 0.1 
         }}
-        title={`${material.projectName} - ${config.description}\n点击切换到下一状态`}
+        
       >
         <div className="flex flex-col items-center justify-center p-2 space-y-1">
           <div className="flex items-center space-x-1">
@@ -398,7 +398,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
             </h3>
             {material.priority && (
               <Badge 
-                variant={material.priority === 'urgent' ? 'destructive' : 'secondary'}
+                variant={material.priority === 'urgent' ? 'danger' : 'secondary'}
                 size="sm"
               >
                 {priorityConfig[material.priority].label}
@@ -531,7 +531,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            title={soundEnabled ? '关闭音效' : '开启音效'}
+            
           >
             {soundEnabled ? (
               <SpeakerWaveIcon className="w-4 h-4" />
@@ -550,7 +550,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
               <Button variant="secondary" size="sm" onClick={() => handleBatchStatusChange('completed')}>
                 批量完成
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
+              <Button variant="danger" size="sm" onClick={handleBatchDelete}>
                 批量删除
               </Button>
             </div>
@@ -664,7 +664,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
                         onClick={() => handleStatusChange(material.id, material.status)}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        title={`${material.projectName} - ${displayText} - ${config.label}\n点击切换状态`}
+                        
                       >
                         <span className="font-bold">{displayText}</span>
                         {material.priority && material.priority !== 'low' && (
@@ -708,7 +708,7 @@ export const MaterialStatusManager: React.FC<MaterialStatusManagerProps> = ({
             setShowEditModal(false);
             setEditingMaterial(null);
           }}
-          title="编辑材料"
+          
           footer={
             <div className="flex justify-end space-x-3">
               <Button

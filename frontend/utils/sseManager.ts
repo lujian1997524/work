@@ -63,7 +63,6 @@ class SSEManager {
     // 优先使用完整URL配置
     if (process.env.NEXT_PUBLIC_BACKEND_URL) {
       const sseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/sse/connect?token=${encodeURIComponent(token)}`;
-      console.log('📡 使用完整URL SSE:', sseUrl.substring(0, 80) + '...');
       return sseUrl;
     }
     
@@ -72,7 +71,6 @@ class SSEManager {
     const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
     
     const sseUrl = `http://${backendHost}:${backendPort}/api/sse/connect?token=${encodeURIComponent(token)}`;
-    console.log('📡 使用主机+端口SSE URL:', sseUrl.substring(0, 80) + '...');
     return sseUrl;
   }
 
@@ -82,24 +80,20 @@ class SSEManager {
       // 检查是否启用SSE功能
       const config = configManager.getConfig();
       if (!config.features.enableSSE) {
-        console.log('SSE功能已禁用，跳过连接');
         resolve(false);
         return;
       }
 
       if (this.eventSource) {
-        console.log('SSE连接已存在，先关闭现有连接');
         this.disconnect();
       }
 
-      console.log('正在建立SSE连接...');
       this.isManuallyDisconnected = false;
       this.currentToken = token; // 保存token用于重连
 
       try {
         // 创建EventSource连接，将token作为查询参数传递
         const sseUrl = this.getSSEUrl(token);
-        console.log(`SSE连接URL: ${sseUrl}`);
         this.eventSource = new EventSource(sseUrl);
 
         // 设置事件监听器
@@ -140,7 +134,6 @@ class SSEManager {
         }, config.apiTimeout || 10000);
 
       } catch (error) {
-        console.error('创建SSE连接失败:', error);
         reject(error);
       }
     });
@@ -148,7 +141,6 @@ class SSEManager {
 
   // 断开SSE连接
   disconnect() {
-    console.log('正在断开SSE连接...');
     this.isManuallyDisconnected = true;
     this.currentToken = null; // 清空保存的token
     
@@ -163,12 +155,10 @@ class SSEManager {
     }
 
     this.reconnectAttempts = 0;
-    console.log('SSE连接已断开');
   }
 
   // 处理连接打开
   private handleOpen(event: Event) {
-    console.log('✅ SSE连接建立成功');
     this.reconnectAttempts = 0;
     
     if (this.reconnectTimer) {
@@ -181,7 +171,6 @@ class SSEManager {
   private handleMessage(event: MessageEvent, eventType: SSEEventType) {
     try {
       const eventData: SSEEventData = JSON.parse(event.data);
-      console.log('📨 收到SSE事件:', eventType, eventData);
 
       // 生成事件唯一标识符用于去重（使用事件类型+时间戳+数据的关键字段）
       let eventId: string;
@@ -201,10 +190,7 @@ class SSEManager {
         eventId = `${eventType}-${eventData.timestamp}`;
       }
       
-      console.log('🔍 事件ID:', eventId);
-      
       if (this.recentEvents.has(eventId)) {
-        console.log('⚠️ 检测到重复事件，跳过处理:', eventId);
         return;
       }
 
@@ -212,7 +198,6 @@ class SSEManager {
       this.recentEvents.add(eventId);
       setTimeout(() => {
         this.recentEvents.delete(eventId);
-        console.log('🧹 清理事件ID:', eventId);
       }, 5000); // 5秒后清理，防止短时间内的重复事件
 
       // 触发对应类型的监听器
@@ -222,7 +207,6 @@ class SSEManager {
           try {
             callback(eventData.data);
           } catch (error) {
-            console.error(`SSE事件监听器执行失败 (${eventType}):`, error);
           }
         });
       }
@@ -233,14 +217,11 @@ class SSEManager {
       }
 
     } catch (error) {
-      console.error('解析SSE消息失败:', error, event.data);
     }
   }
 
   // 处理项目通知
   private handleProjectNotification(eventType: SSEEventType, data: any) {
-    console.log('🔔 处理项目通知:', { eventType, data });
-    
     let notification: NotificationMessage | null = null;
     const timestamp = Date.now();
 
@@ -265,12 +246,6 @@ class SSEManager {
         
         // 从项目对象或直接字段获取项目名称
         const projectName = data.project?.name || data.projectName || '未知项目';
-        console.log('🏷️ 项目状态变更通知 - 获取项目名称:', {
-          projectName,
-          fromProject: data.project?.name,
-          fromDirect: data.projectName,
-          fullData: data
-        });
         
         notification = {
           id: `project-status-${data.projectId}-${timestamp}`,
@@ -302,7 +277,6 @@ class SSEManager {
     }
 
     if (notification) {
-      console.log('🔔 生成通知:', notification.id);
       this.showNotification(notification);
     }
   }
@@ -313,7 +287,6 @@ class SSEManager {
       try {
         callback(notification);
       } catch (error) {
-        console.error('通知回调执行失败:', error);
       }
     });
   }
@@ -331,8 +304,6 @@ class SSEManager {
 
   // 处理连接错误
   private handleError(event: Event) {
-    console.error('SSE连接错误:', event);
-
     // 如果是手动断开，不进行重连
     if (this.isManuallyDisconnected) {
       return;
@@ -340,7 +311,6 @@ class SSEManager {
 
     // 达到最大重连次数
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('SSE重连失败，已达到最大重连次数');
       return;
     }
 
@@ -348,13 +318,9 @@ class SSEManager {
     this.reconnectAttempts++;
     const delay = this.reconnectInterval * this.reconnectAttempts;
     
-    console.log(`SSE连接断开，${delay}ms后进行第${this.reconnectAttempts}次重连...`);
-    
     this.reconnectTimer = setTimeout(() => {
       if (!this.isManuallyDisconnected && this.currentToken) {
-        console.log(`尝试重连SSE，使用保存的token...`);
         this.connect(this.currentToken).catch(error => {
-          console.error('SSE重连失败:', error);
         });
       }
     }, delay);

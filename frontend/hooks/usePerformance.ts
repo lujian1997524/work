@@ -66,7 +66,7 @@ export const usePerformance = () => {
       observer.observe({ type: 'navigation', buffered: true });
       observer.observe({ type: 'resource', buffered: true });
     } catch (error) {
-      console.warn('Performance observer not supported:', error);
+      // Performance observer not supported
     }
 
     return () => observer.disconnect();

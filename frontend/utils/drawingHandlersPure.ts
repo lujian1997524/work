@@ -1,5 +1,5 @@
 /**
- * 纯Web图纸处理器 - 完全避免Tauri依赖
+ * 纯Web图纸处理器 - Web环境图纸处理功能
  */
 
 import { apiRequest } from '@/utils/api';
@@ -22,7 +22,7 @@ interface NotificationOptions {
 function showNotification(options: NotificationOptions): void {
   const { type, title, message } = options;
   const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
-  console.log(`${emoji} ${title}: ${message}`);
+  // 通知信息：${emoji} ${title}: ${message}
   
   // 可以在这里添加自定义通知组件的调用
   // 例如：window.dispatchEvent(new CustomEvent('show-notification', { detail: options }));
@@ -67,7 +67,7 @@ export async function downloadDrawingWeb(drawing: Drawing): Promise<void> {
     });
     
   } catch (error) {
-    console.error('Web下载失败:', error);
+    // Web下载失败，忽略错误日志
     showNotification({
       type: 'error',
       title: '下载失败',
@@ -77,40 +77,28 @@ export async function downloadDrawingWeb(drawing: Drawing): Promise<void> {
   }
 }
 
-// ==================== 平台检测（简化版） ====================
+// ==================== 平台检测（Web版） ====================
 
 export function detectPlatform() {
-  // 检查是否在Tauri环境
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
-  
+  // Web环境检测
   return {
-    type: isTauri ? 'tauri-desktop' : 'web',
-    canOpenCADFiles: isTauri,
+    type: 'web',
+    canOpenCADFiles: false,
     canDownloadFiles: true,
-    hasFileSystem: isTauri
+    hasFileSystem: false
   };
 }
 
 // ==================== 统一操作接口 ====================
 
 export async function handleDrawingAction(drawing: Drawing): Promise<void> {
-  const platform = detectPlatform();
-  
-  if (platform.canOpenCADFiles) {
-    // Tauri环境：未来可以调用CAD软件打开
-    // 目前降级到下载
-    console.log('Tauri环境检测到，但CAD集成功能待实现，降级到下载');
-    await downloadDrawingWeb(drawing);
-  } else {
-    // Web环境：直接下载
-    await downloadDrawingWeb(drawing);
-  }
+  // Web环境：直接下载图纸文件
+  await downloadDrawingWeb(drawing);
 }
 
-// 导出其他函数以保持接口兼容性
-export const openCADFileWithTauri = handleDrawingAction;
-export const downloadDrawingToTauri = handleDrawingAction;
-export const shareDrawingAndroid = handleDrawingAction;
+// 导出简化的接口
+export const openCADFile = handleDrawingAction;
+export const downloadDrawing = handleDrawingAction;
 
 export async function getAvailableCADApplications(): Promise<string[]> {
   // Web环境下返回空数组
