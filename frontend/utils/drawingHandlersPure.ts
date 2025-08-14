@@ -43,7 +43,7 @@ export async function downloadDrawingWeb(drawing: Drawing): Promise<void> {
       throw new Error('未登录');
     }
     
-    // 使用统一的apiRequest调用，这样会正确调用35001端口
+    // 使用统一的apiRequest调用，这样会正确调用后端API
     const response = await apiRequest(`/api/drawings/${drawing.id}/download`, {
       headers: {
         'Authorization': `Bearer ${token}`

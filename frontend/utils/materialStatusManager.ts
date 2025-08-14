@@ -4,6 +4,7 @@
 import type { StatusType } from '@/components/ui';
 import type { Project, Material, ThicknessSpec } from '@/types/project';
 import { notificationManager } from './notificationManager';
+import { materialToastHelper } from './materialToastHelper';
 import { apiRequest } from '@/utils/api';
 
 // 获取认证token的辅助函数
@@ -160,7 +161,7 @@ export const updateMaterialStatusShared = async (
     setLoadingFn?: (loading: boolean) => void;
   }
 ): Promise<boolean> => {
-  const { projects, thicknessSpecs, updateProjectFn, setLoadingFn } = options;
+  const { projects, thicknessSpecs, user, updateProjectFn, setLoadingFn } = options;
   
   try {
     setLoadingFn?.(true);
@@ -172,6 +173,17 @@ export const updateMaterialStatusShared = async (
     if (!project) throw new Error('项目不存在');
     
     const existingMaterial = project.materials?.find(m => m.thicknessSpecId === thicknessSpecId);
+    const thicknessSpec = thicknessSpecs.find(s => s.id === thicknessSpecId);
+    
+    // 获取材料信息用于Toast显示
+    const materialTypeText = thicknessSpec 
+      ? `${thicknessSpec.thickness}mm${thicknessSpec.materialType}` 
+      : `厚度规格${thicknessSpecId}`;
+    const workerName = user?.name || project.assignedWorker?.name || '未知工人';
+    const projectName = project.name;
+    
+    // 获取之前的状态（如果存在）
+    const previousStatus = existingMaterial?.status;
     
     // 更新或创建材料记录
     const success = existingMaterial 
@@ -179,6 +191,14 @@ export const updateMaterialStatusShared = async (
       : await createNewMaterial(projectId, thicknessSpecId, newStatus, token);
     
     if (!success) return false;
+    
+    // 根据状态变更触发相应的Toast通知
+    triggerMaterialStatusToast(previousStatus, newStatus, {
+      materialType: materialTypeText,
+      workerName,
+      projectName,
+      isNewMaterial: !existingMaterial
+    });
     
     // 更新项目状态
     await MaterialStatusUpdater.updateProjectStatus(
@@ -191,6 +211,7 @@ export const updateMaterialStatusShared = async (
         projectId, 
         thicknessSpecId, 
         newStatus,
+        previousStatus,
         timestamp: Date.now(),
         action: existingMaterial ? 'update' : 'create'
       } 
@@ -199,7 +220,10 @@ export const updateMaterialStatusShared = async (
     return true;
     
   } catch (error) {
-    // 通过自定义事件发送错误通知，而不是使用原生alert
+    // 通过Toast显示错误信息
+    materialToastHelper.error('更新材料状态失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    
+    // 保留原有的事件通知机制作为备份
     window.dispatchEvent(new CustomEvent('material-status-error', { 
       detail: { 
         message: '更新材料状态失败: ' + (error instanceof Error ? error.message : '未知错误'),
@@ -282,6 +306,76 @@ export const getProjectMaterialStatus = (projects: Project[], projectId: number,
   const project = projects.find(p => p.id === projectId);
   const material = project?.materials?.find(m => m.thicknessSpecId === thicknessSpecId);
   return material?.status || null;
+};
+
+/**
+ * 根据材料状态变更触发相应的Toast通知
+ * 处理四状态循环：empty → pending → in_progress → completed → empty
+ */
+const triggerMaterialStatusToast = (
+  previousStatus: StatusType | undefined,
+  newStatus: StatusType,
+  context: {
+    materialType: string;
+    workerName: string;
+    projectName: string;
+    isNewMaterial: boolean;
+  }
+) => {
+  const { materialType, workerName, projectName, isNewMaterial } = context;
+  
+  // 如果是新创建的材料，根据初始状态触发相应通知
+  if (isNewMaterial) {
+    switch (newStatus) {
+      case 'pending':
+        // 新材料直接分配到项目（empty → pending）
+        materialToastHelper.materialAllocated(materialType, projectName, 1);
+        break;
+      case 'in_progress':
+        // 新材料直接开始加工
+        materialToastHelper.materialStarted(materialType, workerName);
+        break;
+      case 'completed':
+        // 新材料直接完成（少见情况）
+        materialToastHelper.materialCompleted(materialType, workerName);
+        break;
+    }
+    return;
+  }
+  
+  // 处理状态转换Toast通知
+  switch (newStatus) {
+    case 'pending':
+      if (previousStatus === 'completed') {
+        // completed → pending: 材料被回收后重新分配
+        materialToastHelper.materialAllocated(materialType, projectName, 1);
+      } else if ((previousStatus as string) === 'empty' || !previousStatus) {
+        // empty → pending: 材料分配给项目
+        materialToastHelper.materialAllocated(materialType, projectName, 1);
+      }
+      break;
+      
+    case 'in_progress':
+      if (previousStatus === 'pending') {
+        // pending → in_progress: 开始加工材料
+        materialToastHelper.materialStarted(materialType, workerName);
+      }
+      break;
+      
+    case 'completed':
+      if (previousStatus === 'in_progress') {
+        // in_progress → completed: 完成材料加工
+        materialToastHelper.materialCompleted(materialType, workerName);
+      }
+      break;
+      
+    default: // 处理 'empty' 状态
+      if (previousStatus === 'completed') {
+        // completed → empty: 材料回收循环
+        materialToastHelper.materialRecycled(materialType);
+      }
+      break;
+  }
 };
 
 /**

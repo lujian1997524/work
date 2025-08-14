@@ -17,12 +17,12 @@ const nextConfig = {
   
   // 静态资源配置
   images: {
-    domains: ['localhost']
+    domains: ['api.gei5.com', 'localhost']
   },
   
   // 环境变量配置
   env: {
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:35001'
+    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.gei5.com'
   }
 }
 

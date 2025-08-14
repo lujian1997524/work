@@ -7,7 +7,7 @@ import type { AppConfig } from '@/utils/configManager';
 
 export const DEFAULT_CONFIG: AppConfig = {
   // API配置
-  apiUrl: 'http://localhost:35001',
+  apiUrl: 'https://api.gei5.com',
   apiTimeout: 30000,
 
   // 应用配置

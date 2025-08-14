@@ -5,11 +5,8 @@ const API_BASE_URL = (() => {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
   
-  const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost';
-  const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
-  const url = `http://${backendHost}:${backendPort}`;
-  
-  return url;
+  // 兜底使用生产服务器配置
+  return 'https://api.gei5.com';
 })();
 
 export { API_BASE_URL };

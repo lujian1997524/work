@@ -1,1 +1,98 @@
-{}
+{
+  "name": "laser-cutting-manager",
+  "version": "2.0.1",
+  "description": "激光切割生产管理系统",
+  "major_version": 2,
+  "minor_version": 0,
+  "patch_version": 1,
+  "build_date": "2024-08-14",
+  "build_number": 2,
+  "changelog": {
+    "2.0.1": {
+      "date": "2024-08-14",
+      "type": "patch",
+      "features": [
+        "移动端考勤界面适配优化",
+        "响应式设计全面改进",
+        "触屏交互体验提升"
+      ],
+      "fixes": [
+        "修复考勤表格移动端显示问题",
+        "优化Modal弹窗移动端布局",
+        "改进搜索栏响应式适配",
+        "修复按钮文字在小屏幕的显示"
+      ]
+    },
+    "2.0.0": {
+      "date": "2024-08-14",
+      "type": "major",
+      "features": [
+        "全新考勤管理系统",
+        "智能Toast提示系统重构",
+        "完善的TypeScript类型安全",
+        "新增UI组件库扩展"
+      ],
+      "fixes": [
+        "修复54个TypeScript编译错误",
+        "优化Tooltip定位逻辑",
+        "解决组件属性类型匹配问题"
+      ],
+      "breaking_changes": [
+        "Toast系统API重构",
+        "考勤模块数据库结构变更",
+        "部分组件属性名称调整"
+      ]
+    }
+  },
+  "modules": {
+    "frontend": {
+      "version": "2.0.1",
+      "framework": "Next.js 15.4.3",
+      "ui_library": "Custom + Tailwind CSS",
+      "state_management": "Zustand",
+      "new_components": [
+        "AttendanceGrid",
+        "MonthSelector", 
+        "SearchableSelect",
+        "AttendanceDetailTooltip"
+      ]
+    },
+    "backend": {
+      "version": "2.0.1",
+      "runtime": "Node.js",
+      "framework": "Express.js",
+      "database": "MySQL 8.0",
+      "new_apis": [
+        "/api/attendance/*",
+        "/api/employees/*"
+      ]
+    },
+    "database": {
+      "version": "2.0.1",
+      "engine": "MySQL 8.0",
+      "new_tables": [
+        "employees",
+        "attendance_exceptions", 
+        "attendance_settings",
+        "monthly_attendance_summary",
+        "attendance_approvals",
+        "annual_leave_balance"
+      ]
+    }
+  },
+  "compatibility": {
+    "min_node_version": "18.0.0",
+    "min_mysql_version": "8.0.0",
+    "browsers": ["Chrome 90+", "Firefox 88+", "Safari 14+", "Edge 90+"]
+  },
+  "deployment": {
+    "docker_support": true,
+    "build_command": "npm run build",
+    "start_command": "npm run start",
+    "env_required": [
+      "DATABASE_URL",
+      "JWT_SECRET",
+      "NODE_ENV"
+    ]
+  }
+}

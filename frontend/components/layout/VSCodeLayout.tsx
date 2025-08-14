@@ -5,8 +5,7 @@ import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { ActivityBar } from './ActivityBar';
 import { useResponsive } from '@/hooks/useResponsive';
-import { MobileDrawer, BottomSheet } from '@/components/ui/ResponsiveLayout';
-import { IconButton } from '@/components/ui';
+import { MobileDrawer, BottomSheet, IconButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ClipboardDocumentListIcon,
@@ -16,14 +15,15 @@ import {
   UserCircleIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
-  Bars3Icon
+  Bars3Icon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 
 interface VSCodeLayoutProps {
   children: ReactNode;
   sidebar?: ReactNode;
-  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -91,7 +91,7 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
         {/* 简化活动栏 */}
         <div className="w-16 bg-gray-100/80 backdrop-blur-xl border-r border-gray-200 flex-shrink-0">
           <div className="p-2 space-y-2">
-            {['active', 'completed', 'drawings', 'materials'].map((view) => (
+            {['active', 'completed', 'drawings', 'materials', 'attendance'].map((view) => (
               <button
                 key={view}
                 onClick={() => onViewChange(view as any)}
@@ -105,7 +105,9 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
               >
                 {view === 'active' ? '活跃' : 
                  view === 'completed' ? '过往' :
-                 view === 'drawings' ? '图纸' : '工人'}
+                 view === 'drawings' ? '图纸' : 
+                 view === 'materials' ? '板材' :
+                 view === 'attendance' ? '考勤' : '其他'}
               </button>
             ))}
           </div>
@@ -246,7 +248,8 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
             { key: 'completed', label: '过往', icon: CheckCircleIcon },
             { key: 'search', label: '搜索', icon: MagnifyingGlassIcon, isSearch: true },
             { key: 'drawings', label: '图纸', icon: DocumentIcon },
-            { key: 'materials', label: '板材', icon: ClipboardDocumentListIcon }
+            { key: 'materials', label: '板材', icon: ClipboardDocumentListIcon },
+            { key: 'attendance', label: '考勤', icon: CalendarDaysIcon }
           ].map((item) => (
             <button
               key={item.key}

@@ -224,17 +224,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               </svg>
             </motion.button>
           )}
-
-          <motion.button
-            onClick={() => handleSearch()}
-            className="p-1 text-ios18-blue hover:bg-ios18-blue/10 rounded-full"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </motion.button>
         </div>
       </div>
 

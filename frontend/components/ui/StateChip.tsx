@@ -3,7 +3,7 @@ import { CheckCircleIcon, ExclamationTriangleIcon, ClockIcon, PlayIcon } from '@
 import { cn } from '@/utils/cn';
 
 export interface StateChipProps {
-  status: 'completed' | 'in_progress' | 'pending' | 'warning' | 'error';
+  status: 'completed' | 'in_progress' | 'pending' | 'warning' | 'error' | 'success' | 'info';
   text?: string;
   size?: 'sm' | 'md' | 'lg';
   variant?: 'filled' | 'outlined' | 'subtle';
@@ -56,6 +56,25 @@ const statusConfig = {
       subtle: 'bg-red-100 text-red-800'
     },
     defaultText: '错误'
+  },
+  // 新增考勤状态配置
+  success: {
+    icon: CheckCircleIcon,
+    colors: {
+      filled: 'bg-green-500 text-white',
+      outlined: 'border-green-500 text-green-700 bg-white',
+      subtle: 'bg-green-100 text-green-800'
+    },
+    defaultText: '成功'
+  },
+  info: {
+    icon: ClockIcon,
+    colors: {
+      filled: 'bg-blue-500 text-white',
+      outlined: 'border-blue-500 text-blue-700 bg-white',
+      subtle: 'bg-blue-100 text-blue-800'
+    },
+    defaultText: '信息'
   }
 };
 
@@ -82,7 +101,7 @@ export const StateChip: React.FC<StateChipProps> = ({
   showIcon = true,
   className
 }) => {
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig['pending']; // 默认使用pending状态
   const Icon = config.icon;
   const displayText = text || config.defaultText;
 

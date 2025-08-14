@@ -18,10 +18,11 @@ import { UserProfileModal } from '@/components/user/UserProfileModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectStore, useMaterialStore, useGlobalSyncStore } from '@/stores';
 import { updateMaterialStatusShared } from '@/utils/materialStatusManager';
-import { NotificationContainer } from '@/components/ui/NotificationContainer';
+import { NotificationContainer } from '@/components/ui';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { Card, Button, useDialog } from '@/components/ui';
 import { VSCodeLayout } from '@/components/layout/VSCodeLayout';
+import { AttendanceManagement } from '@/components/attendance/AttendanceManagement';
 import { apiRequest } from '@/utils/api';
 
 export default function Home() {
@@ -42,7 +43,7 @@ export default function Home() {
 
 function HomeContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings'>('active');
+  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance'>('active');
   const [workerNameFilter, setWorkerNameFilter] = useState('');
   const [thicknessFilter, setThicknessFilter] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -194,7 +195,7 @@ function HomeContent() {
   }, [isAuthenticated, token]);
 
   // 处理视图切换
-  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'materials' | 'public-inventory' | 'settings') => {
+  const handleViewChange = (view: 'active' | 'completed' | 'drawings' | 'workers' | 'materials' | 'public-inventory' | 'settings' | 'attendance') => {
     // 特殊处理
     if (view === 'settings') {
       setShowSettingsPage(true); // 系统设置页面
@@ -480,6 +481,10 @@ function HomeContent() {
       case 'public-inventory':
         // 公共库存不需要特殊侧边栏，显示基础项目树
         return null;
+
+      case 'attendance':
+        // 考勤管理不需要侧边栏
+        return null;
       
       default:
         // 默认显示活动项目侧边栏
@@ -509,7 +514,17 @@ function HomeContent() {
     >
       {/* 主内容区域 */}
       <AnimatePresence mode="wait">
-        {viewType === 'materials' ? (
+        {viewType === 'attendance' ? (
+          <motion.div
+            key="attendance-management"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            <AttendanceManagement className="h-full" />
+          </motion.div>
+        ) : viewType === 'materials' ? (
           <motion.div
             key="material-inventory"
             initial={{ opacity: 0, x: 20 }}

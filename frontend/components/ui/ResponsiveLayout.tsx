@@ -12,6 +12,8 @@ interface ResponsiveContainerProps {
   desktopClassName?: string;
 }
 
+export type { ResponsiveContainerProps };
+
 export const ResponsiveContainer: React.FC<ResponsiveContainerProps> = ({
   children,
   className = '',
@@ -49,6 +51,8 @@ interface AdaptiveLayoutProps {
   className?: string;
 }
 
+export type { AdaptiveLayoutProps };
+
 export const AdaptiveLayout: React.FC<AdaptiveLayoutProps> = ({
   children,
   direction = 'row',
@@ -83,6 +87,8 @@ interface ResponsiveGridProps {
   className?: string;
 }
 
+export type { ResponsiveGridProps };
+
 export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
   children,
   columns = { mobile: 1, tablet: 2, desktop: 3 },
@@ -111,6 +117,8 @@ interface MobileDrawerProps {
   title?: string;
   position?: 'left' | 'right' | 'bottom';
 }
+
+export type { MobileDrawerProps };
 
 export const MobileDrawer: React.FC<MobileDrawerProps> = ({
   isOpen,
@@ -191,6 +199,8 @@ interface BottomSheetProps {
   title?: string;
   height?: 'half' | 'full' | 'auto';
 }
+
+export type { BottomSheetProps };
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
   isOpen,

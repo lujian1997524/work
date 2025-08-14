@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Input, Select, Form, FormField, FormActions, Loading, Badge } from '@/components/ui';
+import { Button, Input, Select, Form, FormField, FormActions, Loading, Badge, SearchableSelect } from '@/components/ui';
 import { XMarkIcon, PlusIcon, TrashIcon, ChevronDownIcon, FireIcon, FolderIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/utils/api';
 import { useWorkerMaterialStore } from '@/stores';
+import { useToast } from '@/components/ui/Toast';
 import { PROJECT_STATUS_OPTIONS, PROJECT_PRIORITY_OPTIONS } from '@/constants/projectEnums';
 import type { ThicknessSpec, ProjectFormData } from '@/types/project';
 
@@ -66,6 +67,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [deletingMaterialId, setDeletingMaterialId] = useState<number | null>(null);
   const [showSpecialMaterials, setShowSpecialMaterials] = useState(false);
   const { token } = useAuth();
+  const { projectCreated, projectUpdated, smartSuggestion } = useToast();
 
   // 获取工人列表和厚度规格
   useEffect(() => {
@@ -383,18 +385,23 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
               {/* 分配工人 - 必填 */}
               <FormField label="分配工人" required error={formErrors.assignedWorkerId}>
-                <Select
+                <SearchableSelect
                   value={formData.assignedWorkerId ? formData.assignedWorkerId.toString() : ''}
                   onChange={(value) => {
                     handleInputChange('assignedWorkerId', value && value !== '' ? parseInt(value as string) : null);
                   }}
-                  placeholder="请选择工人"
+                  placeholder={workers.length === 0 ? "正在加载工人..." : "输入工人姓名进行筛选..."}
                   options={workers.map((worker) => ({
                     value: worker.id.toString(),
-                    label: `${worker.name} - ${worker.department || '未分配'}`
+                    label: `${worker.name} (${worker.department || '未分配'})`
                   }))}
+                  clearable={true}
+                  required
                   error={formErrors.assignedWorkerId}
                 />
+                {workers.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">工人列表: {workers.length} 个</p>
+                )}
                 {/* 只在编辑模式下显示工人库存概览 */}
                 {project && formData.assignedWorkerId && !loadingWorkerMaterials && localWorkerMaterials && (
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -515,7 +522,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden"
                           >
-                            <div className="p-3 pt-0">
+                            <div className="p-3 pt-6">
                               <div className="grid grid-cols-4 gap-2">
                                 {specialThicknessSpecs.map((spec) => {
                                   const isSelected = (formData.requiredThickness || []).includes(spec.id);

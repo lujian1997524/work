@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectStore } from '@/stores';
 import { Loading, Empty, EmptyData, Button } from '@/components/ui';
+import { useToast } from '@/components/ui/Toast';
+import { useProjectToastListener } from '@/utils/projectToastHelper';
+import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
 import { ActiveProjectCard } from '@/components/projects/ProjectCard';
 import { StatusType } from '@/components/ui';
 import { Material } from '@/types/project';
@@ -33,6 +36,11 @@ interface ActiveProjectsCardViewProps {
   onJumpToMaterials?: (projectId: number, workerId?: number) => void; // 新增：跳转到板材管理
   onRefresh?: () => void;
   className?: string;
+  // 批量操作相关
+  enableBatchOperations?: boolean;
+  onBatchStatusUpdate?: (projectIds: number[], newStatus: string) => Promise<void>;
+  onBatchAssignWorker?: (projectIds: number[], workerId: number) => Promise<void>;
+  onBatchDelete?: (projectIds: number[]) => Promise<void>;
 }
 
 export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
@@ -43,11 +51,27 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   onProjectMoveToPast,
   onJumpToMaterials,
   onRefresh,
-  className = ''
+  className = '',
+  // 批量操作相关
+  enableBatchOperations = false,
+  onBatchStatusUpdate,
+  onBatchAssignWorker,
+  onBatchDelete
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['pending', 'in_progress']));
   const [movingToPastIds, setMovingToPastIds] = useState<Set<number>>(new Set());
+  
+  // 批量操作相关状态
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+  
   const { user } = useAuth();
+  const toast = useToast();
+  const { createTracker } = useBatchOperationTracker();
+  
+  // 监听项目Toast事件
+  useProjectToastListener(toast);
   
   const { 
     projects, 
@@ -101,22 +125,154 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   const handleMoveToPast = async (projectId: number) => {
     if (movingToPastIds.has(projectId)) return;
 
+    // 查找项目名称用于Toast显示
+    const project = projects.find(p => p.id === projectId);
+    const projectName = project?.name || `项目${projectId}`;
+
     setMovingToPastIds(prev => new Set(prev).add(projectId));
     try {
       const success = await moveToPastProject(projectId);
       if (success) {
+        // 显示项目归档成功Toast
+        toast.projectArchived(projectName);
+        
         onProjectMoveToPast?.(projectId);
         // 刷新项目列表
         fetchProjects();
+      } else {
+        // 显示失败Toast
+        toast.addToast({
+          type: 'error',
+          message: `项目"${projectName}"移至过往库失败，请重试`
+        });
       }
     } catch (error) {
-      // 移至过往项目失败，忽略错误日志
+      // 移至过往项目失败
+      toast.addToast({
+        type: 'error',
+        message: `项目"${projectName}"移至过往库失败：${error instanceof Error ? error.message : '未知错误'}`
+      });
     } finally {
       setMovingToPastIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
       });
+    }
+  };
+
+  // 批量操作相关函数
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedProjectIds(new Set());
+  };
+
+  const handleSelectProject = (projectId: number) => {
+    const newSelected = new Set(selectedProjectIds);
+    if (newSelected.has(projectId)) {
+      newSelected.delete(projectId);
+    } else {
+      newSelected.add(projectId);
+    }
+    setSelectedProjectIds(newSelected);
+  };
+
+  const selectAllProjects = () => {
+    const allProjectIds = new Set(projects.map(p => p.id));
+    setSelectedProjectIds(allProjectIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedProjectIds(new Set());
+  };
+
+  // 批量状态更新
+  const handleBatchStatusUpdate = async (newStatus: string) => {
+    if (selectedProjectIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的项目' });
+      return;
+    }
+
+    if (!onBatchStatusUpdate) {
+      toast.addToast({ type: 'warning', message: '批量状态更新功能不可用' });
+      return;
+    }
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量更新项目状态', selectedProjectIds.size, 'project-batch');
+    
+    try {
+      await onBatchStatusUpdate(Array.from(selectedProjectIds), newStatus);
+      tracker.complete();
+      batchOperationToastHelper.projectBatchStatusChange(selectedProjectIds.size, selectedProjectIds.size, newStatus);
+      
+      fetchProjects();
+      setBatchMode(false);
+      setSelectedProjectIds(new Set());
+    } catch (error) {
+      tracker.fail(`批量状态更新失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // 批量分配工人
+  const handleBatchAssignWorker = async (workerId: number, workerName: string) => {
+    if (selectedProjectIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的项目' });
+      return;
+    }
+
+    if (!onBatchAssignWorker) {
+      toast.addToast({ type: 'warning', message: '批量分配工人功能不可用' });
+      return;
+    }
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量分配工人', selectedProjectIds.size, 'project-batch');
+    
+    try {
+      await onBatchAssignWorker(Array.from(selectedProjectIds), workerId);
+      tracker.complete();
+      batchOperationToastHelper.projectBatchAssign(selectedProjectIds.size, selectedProjectIds.size, workerName);
+      
+      fetchProjects();
+      setBatchMode(false);
+      setSelectedProjectIds(new Set());
+    } catch (error) {
+      tracker.fail(`批量分配工人失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // 批量删除项目
+  const handleBatchDelete = async () => {
+    if (selectedProjectIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的项目' });
+      return;
+    }
+
+    if (!onBatchDelete) {
+      toast.addToast({ type: 'warning', message: '批量删除功能不可用' });
+      return;
+    }
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量删除项目', selectedProjectIds.size, 'project-batch');
+    
+    try {
+      await onBatchDelete(Array.from(selectedProjectIds));
+      tracker.complete();
+      batchOperationToastHelper.projectBatchDelete(selectedProjectIds.size, selectedProjectIds.size);
+      
+      fetchProjects();
+      setBatchMode(false);
+      setSelectedProjectIds(new Set());
+    } catch (error) {
+      tracker.fail(`批量删除失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
     }
   };
 

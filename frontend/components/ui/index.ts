@@ -80,6 +80,8 @@ export type { PopoverProps } from './Popover'
 export { DatePicker } from './DatePicker'
 export type { DatePickerProps } from './DatePicker'
 
+export { MonthSelector } from './MonthSelector'
+
 export { SearchBar } from './SearchBar'
 export type { SearchBarProps, SearchSuggestion } from './SearchBar'
 
@@ -117,6 +119,9 @@ export type { DialogConfig, DialogType, DialogVariant, DialogButton } from './Di
 export { Table, TableHeader, TableBody, TableRow, TableCell, TableContainer } from './Table'
 export type { TableProps, TableHeaderProps, TableBodyProps, TableRowProps, TableCellProps, TableContainerProps } from './Table'
 
+export { ModernTable } from './ModernTable'
+export type { ModernTableProps } from './ModernTable'
+
 export { SortableTableRow } from './SortableTableRow'
 export type { SortableTableRowProps } from './SortableTableRow'
 
@@ -125,6 +130,9 @@ export type { FormProps, FormGroupProps, FormFieldProps, FormActionsProps, FormC
 
 export { Select } from './Select'
 export type { SelectProps, SelectOption } from './Select'
+
+export { SearchableSelect } from './SearchableSelect'
+export type { SearchableSelectProps } from './SearchableSelect'
 
 export { List, ListItem, ListGroup, ListAction, ListContainer } from './List'
 export type { ListProps, ListItemProps, ListGroupProps, ListActionProps, ListContainerProps } from './List'
@@ -137,3 +145,7 @@ export { MaterialManagementModal } from './MaterialManagementModal'
 
 export { MaterialStatusManager } from './MaterialStatusManager'
 export type { MaterialStatusType, MaterialInfo } from './MaterialStatusManager'
+
+// 响应式布局组件导出
+export { ResponsiveContainer, AdaptiveLayout, ResponsiveGrid, MobileDrawer, BottomSheet } from './ResponsiveLayout'
+export type { ResponsiveContainerProps, AdaptiveLayoutProps, ResponsiveGridProps, MobileDrawerProps, BottomSheetProps } from './ResponsiveLayout'

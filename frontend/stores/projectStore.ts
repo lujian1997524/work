@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { sseManager } from '@/utils/sseManager';
 import { apiRequest } from '@/utils/api';
+import { projectToastHelper } from '@/utils/projectToastHelper';
 import type { Project, Material } from '@/types/project';
 
 // 类型别名，兼容现有代码
@@ -278,12 +279,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         detail: { projectId: newProject.id, action: 'project-created' } 
       }));
       
+      // 触发Toast提示
+      const workerName = newProject.assignedWorker?.name;
+      projectToastHelper.projectCreated(newProject.name, workerName);
+      
       return newProject;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '创建项目失败';
       set({ 
-        error: error instanceof Error ? error.message : '创建项目失败',
+        error: errorMessage,
         loading: false 
       });
+      
+      // 触发错误Toast
+      projectToastHelper.error(errorMessage);
+      
       return null;
     }
   },
@@ -332,14 +342,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         window.dispatchEvent(new CustomEvent('project-updated', { 
           detail: { id, updates: updatedProject } 
         }));
+        
+        // 触发Toast提示 - 获取项目名称
+        const projectName = updatedProject.name || get().projects.find(p => p.id === id)?.name || `项目${id}`;
+        projectToastHelper.projectUpdated(projectName);
       }
       
       return updatedProject;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '更新项目失败';
       set({ 
-        error: error instanceof Error ? error.message : '更新项目失败',
+        error: errorMessage,
         loading: false 
       });
+      
+      // 触发错误Toast
+      if (!silent) {
+        projectToastHelper.error(errorMessage);
+      }
+      
       return null;
     }
   },
@@ -347,6 +368,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // 删除项目
   deleteProject: async (id) => {
     set({ loading: true, error: null });
+    
+    // 获取项目信息用于Toast
+    const project = get().projects.find(p => p.id === id);
+    const projectName = project?.name || `项目${id}`;
+    const drawingsCount = project?.drawings?.length || 0;
     
     try {
       const token = getAuthToken();
@@ -377,12 +403,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         detail: { id } 
       }));
       
+      // 触发Toast提示
+      projectToastHelper.projectDeleted(projectName, drawingsCount.toString());
+      
       return true;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '删除项目失败';
       set({ 
-        error: error instanceof Error ? error.message : '删除项目失败',
+        error: errorMessage,
         loading: false 
       });
+      
+      // 触发错误Toast
+      projectToastHelper.error(errorMessage);
+      
       return false;
     }
   },

@@ -140,36 +140,37 @@ class NotificationManager {
 
   /**
    * 显示项目状态变更通知
-   * 根据项目状态转换播放对应音效和显示通知
+   * 根据项目状态转换播放对应音效和显示Toast通知
    */
   public async showProjectStatusNotification(
     projectName: string, 
     oldStatus: string, 
     newStatus: string,
     workerName?: string
-  ): Promise<Notification | null> {
+  ): Promise<void> {
     const statusLabels: Record<string, string> = {
       'pending': '待处理',
       'in_progress': '进行中',
       'completed': '已完成'
     };
 
-    // 根据状态转换生成更准确的通知内容
-    let title = '项目状态更新';
-    let body = '';
+    // 根据状态转换生成Toast通知内容和类型
+    let message = '';
+    let toastType: 'success' | 'info' | 'warning' = 'info';
 
     if (oldStatus === 'pending' && newStatus === 'in_progress') {
-      title = '项目开始进行';
-      body = `项目 "${projectName}" 已开始进行${workerName ? ` (负责人: ${workerName})` : ''}`;
+      message = `项目"${projectName}"已开始进行${workerName ? ` (负责人: ${workerName})` : ''}`;
+      toastType = 'info';
     } else if (oldStatus === 'in_progress' && newStatus === 'completed') {
-      title = '项目已完成';
-      body = `项目 "${projectName}" 已全部完成！${workerName ? ` (负责人: ${workerName})` : ''}`;
+      message = `项目"${projectName}"已全部完成！${workerName ? ` (负责人: ${workerName})` : ''}`;
+      toastType = 'success';
     } else if (oldStatus === 'completed' && newStatus === 'in_progress') {
-      title = '项目重新开始';
-      body = `已完成项目 "${projectName}" 重新进入进行状态${workerName ? ` (负责人: ${workerName})` : ''}`;
+      message = `已完成项目"${projectName}"重新进入进行状态${workerName ? ` (负责人: ${workerName})` : ''}`;
+      toastType = 'warning';
     } else {
       // 默认格式
-      body = `${projectName} 状态从 ${statusLabels[oldStatus] || oldStatus} 改为 ${statusLabels[newStatus] || newStatus}${workerName ? ` (${workerName})` : ''}`;
+      message = `${projectName}状态从${statusLabels[oldStatus] || oldStatus}改为${statusLabels[newStatus] || newStatus}${workerName ? ` (${workerName})` : ''}`;
+      toastType = 'info';
     }
 
     // 播放项目状态专用音效
@@ -179,20 +180,17 @@ class NotificationManager {
       audioManager.playNotificationSound(soundType);
     }
 
-    return this.showNotification({
-      title,
-      body,
-      tag: `project-${projectName}-status`,
-      silent: true, // 设置为静音，因为我们已经手动播放了音效
-      data: {
-        type: 'project-status',
-        projectName,
-        oldStatus,
-        newStatus,
-        workerName,
-        transition: `${oldStatus}-to-${newStatus}` // 添加转换信息用于调试
-      }
-    });
+    // 使用Toast通知替代桌面通知
+    const { projectToastHelper } = await import('./projectToastHelper');
+    
+    // 根据状态转换调用相应的Toast方法
+    if (oldStatus === 'pending' && newStatus === 'in_progress') {
+      projectToastHelper.projectStatusChanged(projectName, oldStatus, newStatus, `开始加工，分配给 ${workerName}`);
+    } else if (oldStatus === 'in_progress' && newStatus === 'completed') {
+      projectToastHelper.projectStatusChanged(projectName, oldStatus, newStatus, `项目完成，完成人：${workerName}`);
+    } else {
+      projectToastHelper.projectStatusChanged(projectName, oldStatus, newStatus, workerName || '系统');
+    }
   }
 
   /**

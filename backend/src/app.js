@@ -26,6 +26,9 @@ const materialRequirementsRoutes = require('./routes/material-requirements');
 const dxfRoutes = require('./routes/dxf');
 const searchRoutes = require('./routes/search');
 const sseRoutes = require('./routes/sse');
+// 考勤系统路由
+const employeesRoutes = require('./routes/employees');
+const attendanceRoutes = require('./routes/attendance');
 
 const app = express();
 
@@ -115,7 +118,10 @@ app.get('/api', (req, res) => {
       drawings: '/api/drawings',
       dxf: '/api/dxf',
       search: '/api/search',
-      sse: '/api/sse'
+      sse: '/api/sse',
+      // 考勤系统端点
+      employees: '/api/employees',
+      attendance: '/api/attendance'
     }
   });
 });
@@ -135,6 +141,9 @@ app.use('/api/thickness-specs', thicknessSpecsRoutes);
 app.use('/api/dxf', dxfRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/sse', sseRoutes);
+// 考勤系统路由
+app.use('/api/employees', employeesRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

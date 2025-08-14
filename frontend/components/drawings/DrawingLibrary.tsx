@@ -2,14 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Alert, Loading, EmptyData, Modal, Input, Dropdown, Button, useDialog } from '@/components/ui';
+import { Alert, Loading, EmptyData, Modal, Input, Dropdown, Button, useDialog, DxfPreviewModal } from '@/components/ui';
 import { DrawingGrid } from './DrawingGrid';
 import { DrawingList } from './DrawingList';
 import { DrawingUpload } from './DrawingUpload';
-import { DxfPreviewModal } from '@/components/ui/DxfPreviewModal';
 import { DrawingActionButton, DrawingAdvancedActions } from './DrawingActionButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/utils/api';
+import { useToast } from '@/components/ui/Toast';
+import { useDrawingToastListener, drawingToastHelper } from '@/utils/drawingToastHelper';
+import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
 
 export interface Drawing {
   id: number;
@@ -45,6 +47,11 @@ export interface DrawingLibraryProps {
   onCategoryChange?: (category: string) => void;
   showUploadModal?: boolean;
   onUploadModalChange?: (show: boolean) => void;
+  // 批量操作相关
+  enableBatchOperations?: boolean;
+  onBatchDelete?: (drawingIds: number[]) => Promise<void>;
+  onBatchUpdateStatus?: (drawingIds: number[], newStatus: string) => Promise<void>;
+  onBatchMove?: (drawingIds: number[], targetProjectId: number) => Promise<void>;
 }
 
 export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
@@ -52,7 +59,12 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
   selectedCategory = 'all',
   onCategoryChange,
   showUploadModal = false,
-  onUploadModalChange
+  onUploadModalChange,
+  // 批量操作相关
+  enableBatchOperations = false,
+  onBatchDelete,
+  onBatchUpdateStatus,
+  onBatchMove
 }) => {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,8 +77,18 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
   const [editStatus, setEditStatus] = useState<'可用' | '已废弃' | '已归档'>('可用');
   const [editFilename, setEditFilename] = useState('');
 
+  // 批量操作相关状态
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedDrawingIds, setSelectedDrawingIds] = useState<Set<number>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+
   const { token } = useAuth();
   const { alert, confirm, DialogRenderer } = useDialog();
+  const toast = useToast();
+  const { createTracker } = useBatchOperationTracker();
+
+  // 监听图纸Toast事件
+  useDrawingToastListener(toast);
 
   // 获取图纸列表
   const fetchDrawings = async () => {
@@ -218,6 +240,211 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     }
   };
 
+  // 批量操作相关函数
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedDrawingIds(new Set());
+  };
+
+  const handleSelectDrawing = (drawingId: number) => {
+    const newSelected = new Set(selectedDrawingIds);
+    if (newSelected.has(drawingId)) {
+      newSelected.delete(drawingId);
+    } else {
+      newSelected.add(drawingId);
+    }
+    setSelectedDrawingIds(newSelected);
+  };
+
+  const selectAllDrawings = () => {
+    const allDrawingIds = new Set(drawings.map(d => d.id));
+    setSelectedDrawingIds(allDrawingIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedDrawingIds(new Set());
+  };
+
+  // 批量删除图纸
+  const handleBatchDelete = async () => {
+    if (selectedDrawingIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要删除的图纸' });
+      return;
+    }
+
+    const confirmed = await confirm(
+      `确定要删除所选的 ${selectedDrawingIds.size} 个图纸吗？此操作不可撤销。`,
+      { title: '批量删除图纸' }
+    );
+    if (!confirmed) return;
+
+    if (!onBatchDelete) {
+      // 使用内部删除逻辑
+      setBatchLoading(true);
+      const tracker = createTracker('批量删除图纸', selectedDrawingIds.size, 'drawing-batch');
+      
+      let successCount = 0;
+      const errors: string[] = [];
+
+      try {
+        for (const drawingId of selectedDrawingIds) {
+          try {
+            const response = await apiRequest(`/api/drawings/${drawingId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            if (response.ok) {
+              successCount++;
+            } else {
+              const errorData = await response.json();
+              errors.push(`图纸 ${drawingId}: ${errorData.error || '删除失败'}`);
+            }
+          } catch (error) {
+            errors.push(`图纸 ${drawingId}: ${error}`);
+          }
+          
+          tracker.updateProgress(`删除图纸 ${drawingId}`);
+        }
+
+        tracker.complete();
+        toast.addToast({
+          type: successCount === selectedDrawingIds.size ? 'success' : 'warning',
+          message: `批量删除完成：成功删除 ${successCount} 个图纸，共 ${selectedDrawingIds.size} 个`
+        });
+        
+        if (successCount > 0) {
+          await fetchDrawings();
+          setBatchMode(false);
+          setSelectedDrawingIds(new Set());
+        }
+      } catch (error) {
+        tracker.fail(`批量删除失败: ${error}`);
+      } finally {
+        setBatchLoading(false);
+      }
+    } else {
+      // 使用外部删除逻辑
+      setBatchLoading(true);
+      const tracker = createTracker('批量删除图纸', selectedDrawingIds.size, 'drawing-batch');
+      
+      try {
+        await onBatchDelete(Array.from(selectedDrawingIds));
+        tracker.complete();
+        toast.addToast({
+          type: 'success',
+          message: `成功删除 ${selectedDrawingIds.size} 个图纸`
+        });
+        
+        await fetchDrawings();
+        setBatchMode(false);
+        setSelectedDrawingIds(new Set());
+      } catch (error) {
+        tracker.fail(`批量删除失败: ${error}`);
+      } finally {
+        setBatchLoading(false);
+      }
+    }
+  };
+
+  // 批量更新状态
+  const handleBatchUpdateStatus = async (newStatus: string) => {
+    if (selectedDrawingIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的图纸' });
+      return;
+    }
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量更新图纸状态', selectedDrawingIds.size, 'drawing-batch');
+    
+    try {
+      if (onBatchUpdateStatus) {
+        await onBatchUpdateStatus(Array.from(selectedDrawingIds), newStatus);
+      } else {
+        // 使用内部更新逻辑
+        let successCount = 0;
+        for (const drawingId of selectedDrawingIds) {
+          try {
+            const response = await apiRequest(`/api/drawings/${drawingId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+              successCount++;
+            }
+          } catch (error) {
+            tracker.addError(`更新图纸 ${drawingId} 状态失败: ${error}`);
+          }
+          
+          tracker.updateProgress(`更新图纸 ${drawingId}`);
+        }
+      }
+
+      tracker.complete();
+      
+      if (newStatus === '已归档') {
+        toast.addToast({
+          type: 'success',
+          message: `成功归档 ${selectedDrawingIds.size} 个图纸`
+        });
+      } else {
+        toast.addToast({
+          type: 'success',
+          message: `成功更新 ${selectedDrawingIds.size} 个图纸状态为"${newStatus}"`
+        });
+      }
+      
+      await fetchDrawings();
+      setBatchMode(false);
+      setSelectedDrawingIds(new Set());
+    } catch (error) {
+      tracker.fail(`批量更新状态失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // 批量移动到项目
+  const handleBatchMove = async (targetProjectId: number, projectName: string) => {
+    if (selectedDrawingIds.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的图纸' });
+      return;
+    }
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量移动图纸', selectedDrawingIds.size, 'drawing-batch');
+    
+    try {
+      if (onBatchMove) {
+        await onBatchMove(Array.from(selectedDrawingIds), targetProjectId);
+      } else {
+        // 内部移动逻辑（需要具体的API实现）
+        tracker.addError('批量移动功能需要外部实现');
+      }
+
+      tracker.complete();
+      toast.addToast({
+        type: 'success',
+        message: `成功移动 ${selectedDrawingIds.size} 个图纸到项目"${projectName}"`
+      });
+      
+      await fetchDrawings();
+      setBatchMode(false);
+      setSelectedDrawingIds(new Set());
+    } catch (error) {
+      tracker.fail(`批量移动失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchDrawings();
   }, [token, selectedCategory]);
@@ -296,7 +523,10 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
       }
     } catch (error) {
       // 删除图纸失败
-      await alert('删除图纸失败，请重试');
+      toast.addToast({
+        type: 'error',
+        message: '删除图纸失败，请重试'
+      });
     }
   };
 

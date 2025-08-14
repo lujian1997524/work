@@ -36,10 +36,43 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
   const { token } = useAuth();
+  
+  // DXF内容缓存Key
+  const getCacheKey = (drawingId: number) => `dxf-content-${drawingId}`;
+  
+  // 获取缓存的DXF内容
+  const getCachedContent = (drawingId: number): string | null => {
+    try {
+      const cached = sessionStorage.getItem(getCacheKey(drawingId));
+      return cached;
+    } catch {
+      return null;
+    }
+  };
+  
+  // 缓存DXF内容
+  const setCachedContent = (drawingId: number, content: string) => {
+    try {
+      sessionStorage.setItem(getCacheKey(drawingId), content);
+    } catch {
+      // sessionStorage满了或不可用，忽略缓存
+    }
+  };
 
   // 等待DOM挂载
   useEffect(() => {
     setMounted(true);
+    
+    // 全局优化：为可能的滚动事件添加被动监听器
+    const addPassiveListeners = () => {
+      const events = ['wheel', 'touchstart', 'touchmove', 'touchend'];
+      events.forEach(event => {
+        document.addEventListener(event, () => {}, { passive: true });
+      });
+    };
+    
+    addPassiveListeners();
+    
     return () => setMounted(false);
   }, []);
 
@@ -73,16 +106,13 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       return;
     }
 
-    // 延迟加载，确保DOM完全准备就绪
-    const timer = setTimeout(() => {
-      if (!initRef.current) {
-        initRef.current = true;
-        loadDxfViewer();
-      }
-    }, 100);
+    // 直接加载，移除不必要的延迟
+    if (!initRef.current) {
+      initRef.current = true;
+      loadDxfViewer();
+    }
 
     return () => {
-      clearTimeout(timer);
       cleanupViewer();
     };
   }, [isOpen, drawing, mounted, token]);
@@ -92,14 +122,30 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       setLoading(true);
       setError(null);
 
-      // 检查容器是否存在
+      // 检查容器是否存在，简化等待逻辑
       if (!containerRef.current) {
-        // 再次尝试等待
-        await new Promise(resolve => setTimeout(resolve, 200));
-        if (!containerRef.current) {
-          throw new Error('预览容器初始化失败');
-        }
+        throw new Error('预览容器初始化失败');
       }
+
+      // 使用 requestIdleCallback 在空闲时执行重型操作
+      const performHeavyWork = () => {
+        return new Promise<void>((resolve) => {
+          const callback = () => {
+            // 分批处理，避免阻塞UI
+            requestAnimationFrame(() => {
+              resolve();
+            });
+          };
+          
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(callback, { timeout: 100 });
+          } else {
+            setTimeout(callback, 0);
+          }
+        });
+      };
+
+      await performHeavyWork();
 
       // 动态导入dxf-viewer
       const { DxfViewer } = await import('dxf-viewer');
@@ -114,24 +160,50 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
         // 移除不支持的canvasOptions
       });
 
-      setViewerInstance(viewer);
-
-      // 获取DXF内容
-      const response = await apiRequest(`/api/drawings/${drawing?.id}/content`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('认证失败，请重新登录');
-        }
-        throw new Error(`获取图纸内容失败: ${response.status}`);
+      // 为 dxf-viewer 添加被动事件监听器支持
+      const originalAddEventListener = containerRef.current.addEventListener;
+      if (originalAddEventListener) {
+        containerRef.current.addEventListener = function(type: string, listener: any, options?: any) {
+          // 将滚动相关事件设为被动监听
+          if (typeof type === 'string' && (type.includes('scroll') || type.includes('wheel') || type.includes('touch'))) {
+            const passiveOptions = typeof options === 'object' 
+              ? { ...options, passive: true }
+              : { passive: true };
+            return originalAddEventListener.call(this, type, listener, passiveOptions);
+          }
+          return originalAddEventListener.call(this, type, listener, options);
+        };
       }
 
-      const dxfContent = await response.text();
+      setViewerInstance(viewer);
 
+      // 检查缓存的DXF内容
+      let dxfContent = getCachedContent(drawing?.id || 0);
+      
+      if (!dxfContent) {
+        // 获取DXF内容
+        const response = await apiRequest(`/api/drawings/${drawing?.id}/content`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('认证失败，请重新登录');
+          }
+          throw new Error(`获取图纸内容失败: ${response.status}`);
+        }
+
+        dxfContent = await response.text();
+        
+        // 缓存内容
+        setCachedContent(drawing?.id || 0, dxfContent);
+      }
+
+      // 在下一个帧中加载到查看器，避免阻塞
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      
       // 加载到查看器
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfContent)}`,
@@ -140,7 +212,7 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
           '/fonts/NotoSansSC-Thin.ttf'
         ],
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
-          // 进度回调
+          // 进度回调 - 可以在这里添加进度显示
         },
         workerFactory: undefined
       } as any);
@@ -148,9 +220,31 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       setLoading(false);
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '加载DXF失败';
+      let errorMessage = '加载DXF失败';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('认证失败')) {
+          errorMessage = '认证失败，请重新登录';
+        } else if (err.message.includes('获取图纸内容失败')) {
+          errorMessage = '网络连接问题，无法获取图纸内容';
+        } else if (err.message.includes('预览容器初始化失败')) {
+          errorMessage = '预览组件初始化失败，请刷新页面重试';
+        } else if (err.message.includes('Load')) {
+          errorMessage = 'DXF文件格式可能有问题，无法正常显示';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       setLoading(false);
+      
+      // 清理可能有问题的缓存
+      if (drawing?.id) {
+        try {
+          sessionStorage.removeItem(getCacheKey(drawing.id));
+        } catch {}
+      }
     }
   };
 
@@ -242,6 +336,12 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
                     <button
                       onClick={() => {
                         setError(null);
+                        // 清理可能有问题的缓存
+                        if (drawing?.id) {
+                          try {
+                            sessionStorage.removeItem(getCacheKey(drawing.id));
+                          } catch {}
+                        }
                         if (!initRef.current) {
                           initRef.current = true;
                           loadDxfViewer();

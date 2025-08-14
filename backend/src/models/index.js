@@ -11,12 +11,23 @@ const WorkerMaterial = require('./WorkerMaterial');
 const MaterialDimension = require('./MaterialDimension');
 const MaterialRequirement = require('./MaterialRequirement');
 const MaterialAllocation = require('./MaterialAllocation');
+// 考勤系统模型
+const Employee = require('./Employee');
+const AttendanceException = require('./AttendanceException');
+const AttendanceSettings = require('./AttendanceSettings');
+const MonthlyAttendanceSummary = require('./MonthlyAttendanceSummary');
 
 // 导入sequelize实例
 const { sequelize } = require('../utils/database');
 
 // 初始化MaterialDimension模型 (其他模型已经定义好了)
 MaterialDimension.init(sequelize);
+
+// 初始化考勤系统模型
+const EmployeeModel = Employee.init(sequelize);
+const AttendanceExceptionModel = AttendanceException.init(sequelize);
+const AttendanceSettingsModel = AttendanceSettings.init(sequelize);
+const MonthlyAttendanceSummaryModel = MonthlyAttendanceSummary.init(sequelize);
 
 // 定义模型关联关系
 
@@ -261,6 +272,46 @@ WorkerMaterial.hasMany(MaterialAllocation, {
   as: 'allocations'
 });
 
+// 考勤系统关联关系
+// Employee 关联
+EmployeeModel.hasMany(AttendanceExceptionModel, {
+  foreignKey: 'employeeId',
+  as: 'attendanceExceptions'
+});
+
+EmployeeModel.hasMany(AttendanceExceptionModel, {
+  foreignKey: 'employeeId',
+  as: 'todayExceptions'
+});
+
+EmployeeModel.hasMany(MonthlyAttendanceSummaryModel, {
+  foreignKey: 'employeeId',
+  as: 'monthlySummaries'
+});
+
+// AttendanceException 关联
+AttendanceExceptionModel.belongsTo(EmployeeModel, {
+  foreignKey: 'employeeId',
+  as: 'employee'
+});
+
+AttendanceExceptionModel.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator'
+});
+
+// MonthlyAttendanceSummary 关联
+MonthlyAttendanceSummaryModel.belongsTo(EmployeeModel, {
+  foreignKey: 'employeeId',
+  as: 'employee'
+});
+
+// User 关联考勤
+User.hasMany(AttendanceExceptionModel, {
+  foreignKey: 'createdBy',
+  as: 'createdAttendanceExceptions'
+});
+
 // 导出所有模型
 module.exports = {
   User,
@@ -275,5 +326,10 @@ module.exports = {
   MaterialDimension,
   MaterialRequirement,
   MaterialAllocation,
+  // 考勤系统模型 - 导出初始化后的模型
+  Employee: EmployeeModel,
+  AttendanceException: AttendanceExceptionModel,
+  AttendanceSettings: AttendanceSettingsModel,
+  MonthlyAttendanceSummary: MonthlyAttendanceSummaryModel,
   sequelize
 };

@@ -66,11 +66,8 @@ class SSEManager {
       return sseUrl;
     }
     
-    // 兜底使用主机+端口配置
-    const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost';
-    const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
-    
-    const sseUrl = `http://${backendHost}:${backendPort}/api/sse/connect?token=${encodeURIComponent(token)}`;
+    // 兜底使用生产服务器配置
+    const sseUrl = `https://api.gei5.com/api/sse/connect?token=${encodeURIComponent(token)}`;
     return sseUrl;
   }
 

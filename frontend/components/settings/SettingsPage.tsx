@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Button, Input, Card, Modal } from '@/components/ui';
+import { Button, Input, Card, Modal, useDialog } from '@/components/ui';
 import { configManager, type AppConfig } from '@/utils/configManager';
 import { audioManager, type SoundType } from '@/utils/audioManager';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import {
   CogIcon,
   ExclamationTriangleIcon,
@@ -26,6 +27,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { alert, confirm, DialogRenderer } = useDialog();
+  const toast = useToast();
   
   const [config, setConfig] = useState<AppConfig>(configManager.getConfig());
   const [tempConfig, setTempConfig] = useState<AppConfig>(config);
@@ -70,7 +73,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   // 保存配置
   const handleSave = async () => {
     if (!isAdmin) {
-      alert('只有管理员可以修改系统配置');
+      await alert('只有管理员可以修改系统配置');
       return;
     }
 
@@ -105,11 +108,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   // 重置为默认配置
   const handleResetToDefaults = async () => {
     if (!isAdmin) {
-      alert('只有管理员可以重置配置');
+      await alert('只有管理员可以重置配置');
       return;
     }
 
-    if (!confirm('确定要重置为默认配置吗？此操作不可撤销。')) {
+    const confirmed = await confirm('确定要重置为默认配置吗？此操作不可撤销。');
+    if (!confirmed) {
       return;
     }
 
@@ -372,7 +376,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 onClick={async () => {
                   if (!isAdmin) return;
                   if (typeof window === 'undefined' || !('Notification' in window)) {
-                    alert('当前浏览器不支持桌面通知');
+                    await alert('当前浏览器不支持桌面通知');
                     return;
                   }
                   
@@ -381,7 +385,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   if (newEnabled && Notification.permission !== 'granted') {
                     const permission = await Notification.requestPermission();
                     if (permission !== 'granted') {
-                      alert('通知权限被拒绝，无法启用桌面通知');
+                      await alert('通知权限被拒绝，无法启用桌面通知');
                       return;
                     }
                   }
@@ -496,7 +500,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 size="sm"
                 onClick={async () => {
                   if (typeof window === 'undefined' || !('Notification' in window)) {
-                    alert('当前浏览器不支持桌面通知');
+                    await alert('当前浏览器不支持桌面通知');
                     return;
                   }
 
@@ -535,7 +539,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       notification.close();
                     };
                   } else {
-                    alert('通知权限被拒绝。请在浏览器设置中启用通知权限，然后刷新页面重试。');
+                    await alert('通知权限被拒绝。请在浏览器设置中启用通知权限，然后刷新页面重试。');
                   }
                 }}
                 className="w-full"
@@ -608,6 +612,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </p>
         </div>
       )}
+      
+      {/* Dialog渲染器 */}
+      <DialogRenderer />
     </Modal>
   );
 };

@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { ThicknessSpec } = require('../models');
+const { ThicknessSpec, Material, WorkerMaterial } = require('../models');
 const { authenticate } = require('../middleware/auth');
+const { Op } = require('sequelize');
 
 // 获取所有厚度规格
 router.get('/', authenticate, async (req, res) => {
@@ -151,52 +152,6 @@ router.put('/:id', authenticate, async (req, res) => {
     console.error('更新厚度规格失败:', error);
     res.status(500).json({
       error: '更新厚度规格失败',
-      details: error.message
-    });
-  }
-});
-
-// 删除厚度规格（仅管理员）
-router.delete('/:id', authenticate, async (req, res) => {
-  try {
-    // 检查权限
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        error: '权限不足，只有管理员可以删除厚度规格'
-      });
-    }
-
-    const { id } = req.params;
-
-    const thicknessSpec = await ThicknessSpec.findByPk(id);
-    if (!thicknessSpec) {
-      return res.status(404).json({
-        error: '厚度规格不存在'
-      });
-    }
-
-    // 检查是否有材料使用此厚度规格
-    const { Material } = require('../models');
-    const materialsUsingSpec = await Material.count({
-      where: { thicknessSpecId: id }
-    });
-
-    if (materialsUsingSpec > 0) {
-      return res.status(400).json({
-        error: `无法删除该厚度规格，有 ${materialsUsingSpec} 个板材记录正在使用此规格`
-      });
-    }
-
-    await thicknessSpec.destroy();
-
-    res.json({
-      success: true,
-      message: '厚度规格删除成功'
-    });
-  } catch (error) {
-    console.error('删除厚度规格失败:', error);
-    res.status(500).json({
-      error: '删除厚度规格失败',
       details: error.message
     });
   }

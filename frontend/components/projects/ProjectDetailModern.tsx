@@ -23,7 +23,7 @@ import {
   Timeline,
   Select
 } from '@/components/ui';
-import type { TimelineItem } from '@/components/ui/Timeline';
+import type { TimelineItem, StatusType } from '@/components/ui';
 import { 
   ArrowLeftIcon, 
   PencilIcon, 
@@ -56,7 +56,6 @@ import { DrawingUpload } from '@/components/drawings/DrawingUpload';
 import { MaterialRequirementManager } from '@/components/materials/MaterialRequirementManager';
 import { ProjectBorrowingDetails } from '@/components/materials/ProjectBorrowingDetails';
 import type { Project, Material, Drawing, ThicknessSpec, OperationHistory } from '@/types/project';
-import type { StatusType } from '@/components/ui';
 
 interface ProjectDetailModernProps {
   projectId: number;

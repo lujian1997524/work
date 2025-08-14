@@ -4,8 +4,10 @@ import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { apiRequest } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { materialToastHelper } from '../../utils/materialToastHelper';
 
 interface AddMaterialModalProps {
   isOpen: boolean;
@@ -303,6 +305,20 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
       }
 
       // 成功
+      // 获取工人名称用于Toast
+      const selectedWorker = workers.find(w => w.id === parseInt(formData.workerId));
+      const workerName = selectedWorker?.name || '未知工人';
+      const materialTypeText = `${formData.thickness}mm${formData.materialType}`;
+      
+      // 触发Toast提示
+      materialToastHelper.stockAdded(workerName, materialTypeText, totalQuantity);
+      
+      // 如果有尺寸信息，触发额外Toast
+      if (dimensions.length > 0) {
+        const dimensionText = dimensions.map(d => `${d.width}×${d.height}mm`).join(', ');
+        materialToastHelper.dimensionAdded(materialTypeText, dimensionText, totalQuantity);
+      }
+      
       resetForm();
       onSuccess();
       onClose();
@@ -311,7 +327,8 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
       window.dispatchEvent(new CustomEvent('materials-updated'));
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : '添加板材失败，请重试');
+      const errorMessage = error instanceof Error ? error.message : '添加板材失败，请重试';
+      materialToastHelper.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -342,14 +359,15 @@ export const AddMaterialModal: React.FC<AddMaterialModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">工人 *</label>
-                <Select
+                <SearchableSelect
                   value={formData.workerId}
                   onChange={(value) => setFormData(prev => ({ ...prev, workerId: value as string }))}
-                  placeholder={workers.length === 0 ? "正在加载工人..." : "选择工人"}
+                  placeholder={workers.length === 0 ? "正在加载工人..." : "输入工人姓名进行筛选..."}
                   options={workers.map(worker => ({
                     value: worker.id,
                     label: `${worker.name} (${worker.department})`
                   }))}
+                  clearable={true}
                   required
                 />
                 {workers.length === 0 && (

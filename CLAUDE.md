@@ -24,14 +24,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 如果需要验证，询问用户是否要运行
 - 绝不主动执行
 
-### 端口检查约束
-每次需要启动服务前，**必须**先检查端口占用情况：
+### 服务器架构配置
+**重要说明**：本项目采用分离式架构
+- **前端服务**: 本地开发服务器 http://localhost:4000
+- **后端服务**: 远程云服务器 https://api.gei5.com
+- **数据库**: 远程MySQL服务器，不需要本地Docker
+
+**端口检查约束**：
 ```bash
-lsof -ti:4000    # 检查前端端口
-lsof -ti:35001   # 检查后端端口
-lsof -ti:3330    # 检查数据库端口
+lsof -ti:4000    # 检查前端端口（仅需检查此端口）
 ```
-如果端口被占用，说明服务已运行，直接继续工作。
+**重要**：不要尝试启动本地后端服务或数据库，所有API请求直接连接远程服务器 https://api.gei5.com
+
+**后端文件修改流程**：
+- Claude只能修改本地backend文件
+- 用户负责将修改后的文件上传到远程服务器
+- 绝不在本地运行后端服务进行测试
 
 ## 快速开始
 
@@ -48,27 +56,25 @@ cd frontend && npm install
 cd backend && npm run init:db && npm run create:sample
 ```
 
-### 日常开发工作流
+### 日常开发工作流（远程后端架构）
 ```bash
-# 1. 检查服务状态
+# 1. 检查前端服务状态
 lsof -ti:4000 && echo "前端已启动" || echo "前端未启动"
-lsof -ti:35001 && echo "后端已启动" || echo "后端未启动"
 
-# 2. 启动开发服务器（仅在未启动时）
-cd frontend && npm run dev    # 前端: http://localhost:4000
-cd backend && npm run dev     # 后端: http://localhost:35001
+# 2. 仅启动前端开发服务器（仅在未启动时）
+cd frontend && npm run dev     # 前端: http://localhost:4000
 
-# 3. 健康检查
-curl http://localhost:35001/health  # 后端 API
-curl http://localhost:4000          # 前端服务
+# 3. 健康检查（远程服务器）
+curl http://localhost:4000     # 前端服务（本地）
+# 后端API通过前端代理访问，无需直接访问
 ```
 
-### 关键开发端点
+### 关键开发端点（远程后端架构）
 - **主应用**: http://localhost:4000
 - **组件系统**: http://localhost:4000/design-system
 - **API测试**: http://localhost:4000/debug-api
-- **数据库管理**: http://localhost:8880 (phpMyAdmin)
-- **后端健康检查**: http://localhost:35001/health
+- **后端API**: https://api.gei5.com（远程服务器）
+- **考勤管理**: http://localhost:4000（导航至考勤模块）
 
 ## 严格遵守
 - 所有回复必须使用中文
@@ -92,11 +98,11 @@ curl http://localhost:4000          # 前端服务
 - **实时通信**: Server-Sent Events (SSE) + 音频通知
 - **桌面应用**: Tauri多平台打包 (Rust + Web技术)
 
-### 端口和服务
+### 端口和服务（远程后端架构）
 - 前端开发服务器: http://localhost:4000
-- 后端API服务: http://localhost:35001  
-- MySQL数据库: localhost:3330
-- phpMyAdmin: http://localhost:8880
+- 后端API服务: https://api.gei5.com（远程云服务器）
+- MySQL数据库: 远程云数据库（通过API访问）
+- phpMyAdmin: 不适用（远程数据库管理）
 
 ### 默认用户
 - **高春强** (admin) - 管理员权限
@@ -330,18 +336,48 @@ const data = response.projects || response;
 - 遵循 iOS 18 & macOS 15 设计规范
 - 中文注释和变量命名
 
-### 状态更新标准流程
+### 智能Toast系统使用模式
+Toast系统支持专业化提示和AI驱动的智能建议：
+
 ```javascript
-// 1. 更新Store数据
-const store = useProjectStore.getState();
-await store.updateProject(projectData);
+// 项目相关Toast
+import { projectToastHelper } from '@/utils/projectToastHelper';
+projectToastHelper.projectCreated(projectName, workerName);
+projectToastHelper.projectUpdated(projectName);
 
-// 2. 触发全局事件
-window.dispatchEvent(new CustomEvent('materials-updated'));
+// 材料操作Toast  
+import { materialToastHelper } from '@/utils/materialToastHelper';
+materialToastHelper.statusChanged(materialType, oldStatus, newStatus);
+materialToastHelper.batchOperationComplete(message);
 
-// 3. 音频反馈（如适用）
-const audioManager = useAudioManager();
-audioManager.play('success');
+// 智能建议引擎
+import { useSmartSuggestions } from '@/utils/smartSuggestionEngine';
+const { start, updateMetrics } = useSmartSuggestions({ autoStart: true });
+updateMetrics({ totalProjects: 50, carbonMaterialRatio: 92 });
+```
+
+### 考勤系统开发约定
+```javascript
+// 考勤状态管理
+import { useAttendanceStore } from '@/stores/attendanceStore';
+const { employees, addException, calculateMonthlySummary } = useAttendanceStore();
+
+// 考勤数据导出
+import { exportMonthlyAttendanceReport } from '@/utils/attendanceExporter';
+await exportMonthlyAttendanceReport(2025, 1); // 导出2025年1月报表
+```
+
+### 数据库操作约定
+```bash
+# 考勤系统数据库初始化
+mysql -h localhost -P 3330 -u laser_user -p < database/migrations/attendance_system.sql
+
+# 计算月度考勤汇总（存储过程）
+CALL sp_calculate_monthly_attendance(2025, 1);
+
+# 查看考勤状态视图
+SELECT * FROM v_employee_attendance_status;
+SELECT * FROM v_monthly_attendance_stats;
 ```
 
 
@@ -354,6 +390,14 @@ audioManager.play('success');
 - **thickness_specs** (id, thickness, unit, material_type, is_active) - 厚度规格配置
 - **materials** (id, project_id, thickness_spec_id, status, completed_by) - 板材状态
 - **drawings** (id, project_id, filename, file_path, version, uploaded_by) - 图纸文件
+
+### 考勤系统数据表 (新增)
+- **employees** (id, employee_id, name, department, position, daily_work_hours, status) - 员工基础信息
+- **attendance_exceptions** (id, employee_id, date, exception_type, leave_type, leave_hours, overtime_hours) - 考勤异常记录
+- **attendance_settings** (id, setting_key, setting_value, description) - 考勤系统设置
+- **monthly_attendance_summary** (id, employee_id, year, month, work_days, total_work_hours, attendance_rate) - 月度考勤汇总
+- **attendance_approvals** (id, attendance_exception_id, approver_id, status, approval_reason) - 考勤审批流程
+- **annual_leave_balance** (id, employee_id, year, total_hours, used_hours, remaining_hours) - 年假余额管理
 
 ### 数据库凭据
 - 数据库: laser_cutting_db
@@ -404,11 +448,41 @@ audioManager.play('success');
 4. 避免WebSocket，使用Zustand+事件
 ```
 
+## 系统新增功能模块
+
+### 考勤管理系统 (新增)
+- **功能描述**: 员工考勤管理、请假审批、加班统计、月度报表
+- **数据库表**: employees, attendance_exceptions, attendance_settings, monthly_attendance_summary, attendance_approvals, annual_leave_balance
+- **前端组件**: `frontend/components/attendance/` - 完整的考勤管理界面
+- **状态管理**: `frontend/stores/attendanceStore.ts` - 考勤数据状态管理
+- **类型定义**: `frontend/types/attendance.ts` - 考勤相关类型
+- **工具函数**: `frontend/utils/attendanceExporter.ts` - 考勤数据导出功能
+- **数据库脚本**: `database/migrations/attendance_system.sql` - 考勤系统完整数据库结构
+
+### Toast智能提示系统 (新增)
+- **智能提示引擎**: `frontend/utils/smartSuggestionEngine.ts` - AI驱动的业务洞察和建议
+- **专业化Toast助手**:
+  - `frontend/utils/projectToastHelper.ts` - 项目相关提示
+  - `frontend/utils/materialToastHelper.ts` - 材料操作提示
+  - `frontend/utils/workerToastHelper.ts` - 工人管理提示
+  - `frontend/utils/drawingToastHelper.ts` - 图纸管理提示
+  - `frontend/utils/batchOperationToastHelper.ts` - 批量操作提示
+- **Toast优化**:
+  - `frontend/utils/toastAnimationOptimizer.ts` - 动画性能优化
+  - `frontend/utils/toastAccessibility.ts` - 无障碍访问支持
+  - `frontend/utils/sseToastMapper.ts` - SSE事件到Toast映射
+
+### 增强组件库 (新增)
+- **高级选择器**: `frontend/components/ui/SearchableSelect.tsx` - 支持搜索的下拉选择组件
+- **Toast系统**: `frontend/components/ui/Toast.tsx` - 增强的智能提示组件
+- **响应式布局**: `frontend/components/ui/ResponsiveLayout.tsx` - 自适应布局容器
+
 ## 关键文件位置
 
 ### 核心状态管理
 - `frontend/stores/projectStore.ts` - 项目数据管理
 - `frontend/stores/materialStore.ts` - 材料状态管理  
+- `frontend/stores/attendanceStore.ts` - 考勤系统状态管理 (新增)
 - `frontend/stores/globalSyncStore.ts` - 全局同步
 - `frontend/stores/notificationStore.ts` - 通知系统
 
@@ -425,12 +499,19 @@ audioManager.play('success');
 - `frontend/components/materials/MaterialInventoryManagerNew.tsx` - 主数据表格
 - `frontend/components/ui/ModernTable.tsx` - 通用表格组件
 - `frontend/components/ui/DxfPreviewModal.tsx` - DXF文件预览组件
+- `frontend/components/attendance/` - 考勤管理组件库 (新增)
+
+### 智能系统文件
+- `frontend/utils/smartSuggestionEngine.ts` - AI智能提示引擎 (新增)
+- `frontend/utils/*ToastHelper.ts` - 专业化Toast助手集合 (新增)
+- `frontend/utils/toastAnimationOptimizer.ts` - Toast性能优化 (新增)
 
 ### 配置文件
 - `frontend/.env.local` - 前端环境配置
 - `backend/src/config/envConfig.js` - 后端环境配置
 - `docker-compose.yml` - 数据库容器配置
-- `database/init/01-create-tables.sql` - 数据库结构
+- `database/init/01-create-tables.sql` - 基础数据库结构
+- `database/migrations/attendance_system.sql` - 考勤系统数据库结构 (新增)
 - `frontend/next.config.js` - Next.js开发配置(标准模式，非export)
 - `frontend/tailwind.config.js` - iOS 18/macOS 15 设计系统配置
 - `deploy-to-server.sh` - 云服务器部署脚本
@@ -438,6 +519,7 @@ audioManager.play('success');
 ### 数据模型文件
 - `backend/src/models/index.js` - Sequelize模型汇总和关联定义
 - `backend/src/models/[Entity].js` - 各实体的Sequelize模型定义
+- `frontend/types/attendance.ts` - 考勤系统类型定义 (新增)
 
 ### 认证和中间件
 - `backend/src/middleware/auth.js` - JWT认证中间件

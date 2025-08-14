@@ -10,12 +10,13 @@ import {
   DocumentTextIcon,
   CubeIcon,
   CogIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 
 interface ActivityBarProps {
-  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings';
-  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings') => void;
+  activeView: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance';
+  onViewChange: (view: 'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance') => void;
   onSearchClick?: () => void;
   onSystemSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -36,7 +37,8 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
     { key: 'active', icon: FolderIcon, label: '活跃项目' },
     { key: 'completed', icon: ClockIcon, label: '过往项目' },
     { key: 'drawings', icon: DocumentTextIcon, label: '图纸库' },
-    { key: 'materials', icon: CubeIcon, label: '板材库存' }
+    { key: 'materials', icon: CubeIcon, label: '板材库存' },
+    { key: 'attendance', icon: CalendarDaysIcon, label: '考勤管理' }
   ];
 
   const adminActivities = [

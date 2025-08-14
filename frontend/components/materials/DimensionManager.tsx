@@ -2,10 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlusIcon, XMarkIcon, PencilIcon, TrashIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { useDialog } from '../ui';
+import { useDialog, useToast } from '../ui';
 import { Input } from '../ui/Input';
 import { apiRequest } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { materialToastHelper } from '../../utils/materialToastHelper';
 import { TransferModal } from './TransferModal';
 
 interface MaterialDimension {
@@ -79,7 +80,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
   // 添加新尺寸
   const addDimension = async () => {
     if (!newDimension.width || !newDimension.height || !newDimension.quantity) {
-      await alert('请填写完整的尺寸信息');
+      materialToastHelper.error('请填写完整的尺寸信息');
       return;
     }
 
@@ -101,13 +102,19 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         setNewDimension({ width: '', height: '', quantity: '', notes: '' });
         setShowAddForm(false);
         onUpdate(); // 通知父组件更新
+        
+        // 显示成功Toast
+        const materialTypeText = workerMaterial 
+          ? `${workerMaterial.thickness}mm${workerMaterial.materialType}` 
+          : '材料';
+        const dimensionText = `${newDimension.width}×${newDimension.height}mm`;
+        materialToastHelper.dimensionAdded(materialTypeText, dimensionText, parseInt(newDimension.quantity));
       } else {
         const error = await response.json();
-        await alert(`添加失败: ${error.error || '未知错误'}`);
+        materialToastHelper.error(`添加失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      // 添加尺寸失败
-      await alert('添加失败，请检查网络连接');
+      materialToastHelper.error('添加失败，请检查网络连接');
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
   // 更新尺寸
   const updateDimension = async (dimensionId: number, formData: DimensionFormData) => {
     if (!formData.width || !formData.height || !formData.quantity) {
-      await alert('请填写完整的尺寸信息');
+      materialToastHelper.error('请填写完整的尺寸信息');
       return;
     }
 
@@ -139,13 +146,19 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
         );
         setEditingDimension(null);
         onUpdate(); // 通知父组件更新
+        
+        // 显示成功Toast - 使用通用成功提示
+        const materialTypeText = workerMaterial 
+          ? `${workerMaterial.thickness}mm${workerMaterial.materialType}` 
+          : '材料';
+        const dimensionText = `${formData.width}×${formData.height}mm`;
+        materialToastHelper.dimensionAdded(materialTypeText, dimensionText, parseInt(formData.quantity));
       } else {
         const error = await response.json();
-        await alert(`更新失败: ${error.error || '未知错误'}`);
+        materialToastHelper.error(`更新失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      // 更新尺寸失败
-      await alert('更新失败，请检查网络连接');
+      materialToastHelper.error('更新失败，请检查网络连接');
     } finally {
       setLoading(false);
     }
@@ -156,6 +169,12 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
     const confirmed = await confirm('确定要删除这个尺寸记录吗？');
     if (!confirmed) return;
 
+    // 获取要删除的尺寸信息用于Toast显示
+    const targetDimension = dimensions.find(d => d.id === dimensionId);
+    const dimensionText = targetDimension 
+      ? `${targetDimension.width}×${targetDimension.height}mm` 
+      : '尺寸记录';
+
     setLoading(true);
     try {
       const response = await apiRequest(`/api/dimensions/${dimensionId}`, {
@@ -165,13 +184,18 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
       if (response.ok) {
         setDimensions(prev => prev.filter(dim => dim.id !== dimensionId));
         onUpdate(); // 通知父组件更新
+        
+        // 显示删除成功Toast
+        const materialTypeText = workerMaterial 
+          ? `${workerMaterial.thickness}mm${workerMaterial.materialType}` 
+          : '材料';
+        materialToastHelper.materialRecycled(`${materialTypeText} ${dimensionText}`);
       } else {
         const error = await response.json();
-        await alert(`删除失败: ${error.error || '未知错误'}`);
+        materialToastHelper.error(`删除失败: ${error.error || '未知错误'}`);
       }
     } catch (error) {
-      // 删除尺寸失败
-      await alert('删除失败，请检查网络连接');
+      materialToastHelper.error('删除失败，请检查网络连接');
     } finally {
       setLoading(false);
     }

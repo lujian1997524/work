@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Button, Badge, Input, Loading, Modal } from '@/components/ui';
+import { Button, Badge, Input, Loading, Modal, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/utils/api';
 import { TabNavigation } from './TabNavigation';
 import { DepartmentSelector } from './DepartmentSelector';
+import { workerToastHelper, useWorkerToastListener } from '@/utils/workerToastHelper';
 import {
   CubeIcon,
   MagnifyingGlassIcon,
@@ -60,6 +61,22 @@ interface WorkerSummary {
   totalQuantity: number;
 }
 
+// 格式化厚度显示
+const formatThickness = (materialType: string, thickness: string) => {
+  // 移除多余的小数点零
+  const cleanThickness = parseFloat(thickness).toString();
+  
+  // 材料类型简化映射
+  const materialTypeMap: { [key: string]: string } = {
+    '碳板': 'T',
+    '锰板': 'M', 
+    '不锈钢': 'B'
+  };
+  
+  const prefix = materialTypeMap[materialType] || materialType.charAt(0);
+  return `${prefix}${cleanThickness}`;
+};
+
 export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   activeTab = 'inventory',
   onTabChange,
@@ -74,6 +91,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   const [materialSummary, setMaterialSummary] = useState<MaterialSummary[]>([]);
   const [workerSummary, setWorkerSummary] = useState<WorkerSummary[]>([]);
   const [allWorkers, setAllWorkers] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null); // 保存原始数据
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMaterialType, setSelectedMaterialType] = useState<string>('all');
@@ -81,8 +99,13 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
   const [selectedThickness, setSelectedThickness] = useState<string>('all');
   const [showCarbonDetails, setShowCarbonDetails] = useState(true);
   const [showSpecialMaterials, setShowSpecialMaterials] = useState(false);
+  const [expandedSpecialMaterials, setExpandedSpecialMaterials] = useState<Set<string>>(new Set());
 
   const { token } = useAuth();
+  const toast = useToast();
+  
+  // 监听工人Toast事件
+  useWorkerToastListener(toast);
 
   // 获取材料汇总数据
   const fetchMaterialSummary = async () => {
@@ -97,7 +120,8 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const responseData = await response.json();
+        setData(responseData); // 保存原始数据
         
         // 处理材料类型汇总
         const materialTypeMap = new Map<string, {
@@ -107,10 +131,32 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
           thicknessMap: Map<string, { quantity: number; workerCount: number }>;
         }>();
 
+        // 首先从厚度规格中初始化所有材料类型和厚度
+        responseData.thicknessSpecs?.forEach((spec: any) => {
+          if (spec.materialType) {
+            if (!materialTypeMap.has(spec.materialType)) {
+              materialTypeMap.set(spec.materialType, {
+                totalQuantity: 0,
+                workerCount: 0,
+                lowStockCount: 0,
+                thicknessMap: new Map()
+              });
+            }
+            
+            const typeData = materialTypeMap.get(spec.materialType)!;
+            const thickness = spec.thickness;
+            
+            // 初始化所有厚度规格，即使库存为0
+            if (!typeData.thicknessMap.has(thickness)) {
+              typeData.thicknessMap.set(thickness, { quantity: 0, workerCount: 0 });
+            }
+          }
+        });
+
         // 处理工人汇总
         const workerSummaries: WorkerSummary[] = [];
 
-        data.workers?.forEach((worker: any) => {
+        responseData.workers?.forEach((worker: any) => {
           let workerTotalQuantity = 0;
           let workerMaterialCount = 0;
 
@@ -119,21 +165,22 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
             const thickness = thicknessStr.replace('mm', '');
             const quantity = materialData.quantity || 0;
             
+            // 确保材料类型存在于map中
+            if (!materialTypeMap.has(materialType)) {
+              materialTypeMap.set(materialType, {
+                totalQuantity: 0,
+                workerCount: 0,
+                lowStockCount: 0,
+                thicknessMap: new Map()
+              });
+            }
+            
+            const typeData = materialTypeMap.get(materialType)!;
+            
             if (quantity > 0) {
               workerTotalQuantity += quantity;
               workerMaterialCount++;
 
-              // 更新材料类型汇总
-              if (!materialTypeMap.has(materialType)) {
-                materialTypeMap.set(materialType, {
-                  totalQuantity: 0,
-                  workerCount: 0,
-                  lowStockCount: 0,
-                  thicknessMap: new Map()
-                });
-              }
-              
-              const typeData = materialTypeMap.get(materialType)!;
               typeData.totalQuantity += quantity;
               typeData.workerCount++;
               
@@ -162,21 +209,20 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
           });
         });
 
-        // 转换材料类型汇总 - 只显示有库存的材料类型
+        // 转换材料类型汇总 - 显示所有材料类型，包括库存为0的
         const materialSummaries: MaterialSummary[] = Array.from(materialTypeMap.entries())
-          .filter(([materialType, data]) => data.totalQuantity > 0) // 只显示有库存的材料类型
           .map(([materialType, data]) => {
             const getMaterialCode = (type: string) => {
               const typeMap: { [key: string]: string } = {
                 '碳板': 'T',
-                '不锈钢': 'B',
                 '锰板': 'M',
+                '不锈钢': 'B',
                 '钢板': 'S'
               };
               return typeMap[type] || type.charAt(0).toUpperCase();
             };
 
-            // 转换厚度统计
+            // 转换厚度统计 - 显示所有厚度规格，包括库存为0的
             const thicknessStats: ThicknessStats[] = Array.from(data.thicknessMap.entries())
               .map(([thickness, thicknessData]) => ({
                 thickness,
@@ -245,6 +291,19 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
     setSelectedMaterialType(newSelection);
     onMaterialTypeFilter?.(newSelection);
     onMobileItemClick?.(); // 移动端自动收起侧边栏
+  };
+
+  // 处理特殊材料展开
+  const handleSpecialMaterialToggle = (materialType: string) => {
+    setExpandedSpecialMaterials(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(materialType)) {
+        newSet.delete(materialType);
+      } else {
+        newSet.add(materialType);
+      }
+      return newSet;
+    });
   };
 
   // 处理厚度筛选
@@ -409,7 +468,7 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                           <h4 className="font-semibold text-blue-900">
-                            {material.code} - {material.materialType}
+                            {material.materialType}
                           </h4>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -437,27 +496,32 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
                           {material.thicknessStats.map((thickness) => {
                             const thicknessKey = `${material.materialType}_${thickness.thickness}`;
                             const isSelected = selectedThickness === thicknessKey;
+                            
                             return (
-                              <button
+                              <div
                                 key={thickness.thickness}
-                                onClick={() => handleThicknessClick(material.materialType, thickness.thickness)}
-                                className={`w-full flex items-center justify-between p-3 rounded border text-left ${
+                                className={`w-full flex items-center justify-between p-3 rounded border ${
                                   isSelected
                                     ? 'bg-white border-blue-400 ring-2 ring-blue-200'
                                     : 'bg-white border-gray-200 hover:border-gray-300'
                                 }`}
                               >
-                                <div className="flex items-center space-x-2">
-                                  <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                                  <span className="font-medium">{thickness.thickness}mm</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-sm text-gray-600">{thickness.workerCount} 工人</span>
-                                  <Badge variant={isSelected ? "primary" : "secondary"} size="sm">
-                                    {thickness.totalQuantity}张
-                                  </Badge>
-                                </div>
-                              </button>
+                                <button
+                                  onClick={() => handleThicknessClick(material.materialType, thickness.thickness)}
+                                  className="flex-1 flex items-center justify-between text-left"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                                    <span className="font-medium">{formatThickness(material.materialType, thickness.thickness)}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-600">{thickness.workerCount} 工人</span>
+                                    <Badge variant={isSelected ? "primary" : "secondary"} size="sm">
+                                      {thickness.totalQuantity}张
+                                    </Badge>
+                                  </div>
+                                </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -488,32 +552,90 @@ export const MaterialsSidebar: React.FC<MaterialsSidebarProps> = ({
                       <div className="p-4 pt-0 space-y-2">
                         {materialSummary
                           .filter(material => material.priority === 'secondary')
-                          .map((material) => (
-                            <div
-                              key={material.materialType}
-                              onClick={() => handleMaterialTypeClick(material.materialType)}
-                              className={`p-3 rounded border cursor-pointer ${
-                                selectedMaterialType === material.materialType
-                                  ? 'bg-gray-50 border-gray-400'
-                                  : 'bg-white border-gray-200 hover:border-gray-300'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-2 h-2 bg-orange-400 rounded-full" />
-                                  <span className="font-medium">{material.code}</span>
+                          .map((material) => {
+                            const isExpanded = expandedSpecialMaterials.has(material.materialType);
+                            return (
+                              <div key={material.materialType} className="bg-white rounded border border-gray-200">
+                                {/* 材料类型头部 */}
+                                <div className="p-3">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                                      <h4 className="font-semibold text-orange-900">
+                                        {material.materialType}
+                                      </h4>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Badge variant="secondary">{material.totalQuantity}张</Badge>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSpecialMaterialToggle(material.materialType);
+                                        }}
+                                        className="p-1 hover:bg-gray-100 rounded"
+                                      >
+                                        {isExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">{material.workerCount} 工人持有</span>
+                                    <button
+                                      onClick={() => handleMaterialTypeClick(material.materialType)}
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        selectedMaterialType === material.materialType
+                                          ? 'bg-orange-100 text-orange-700'
+                                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                      }`}
+                                    >
+                                      查看详情
+                                    </button>
+                                  </div>
+                                  
+                                  {material.lowStockCount > 0 && (
+                                    <div className="flex items-center space-x-1 text-xs text-yellow-600 mt-2">
+                                      <ExclamationTriangleIcon className="w-3 h-3" />
+                                      <span>{material.lowStockCount} 项低库存警告</span>
+                                    </div>
+                                  )}
                                 </div>
-                                <Badge variant="secondary">{material.totalQuantity}张</Badge>
+                                
+                                {/* 厚度规格详情 */}
+                                {isExpanded && (
+                                  <div className="px-3 pb-3 space-y-2">
+                                    {material.thicknessStats.map((thickness) => {
+                                      const thicknessKey = `${material.materialType}_${thickness.thickness}`;
+                                      const isSelected = selectedThickness === thicknessKey;
+                                      
+                                      return (
+                                        <div
+                                          key={thickness.thickness}
+                                          onClick={() => handleThicknessClick(material.materialType, thickness.thickness)}
+                                          className={`w-full flex items-center justify-between p-3 rounded border cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-white border-orange-400 ring-2 ring-orange-200'
+                                              : 'bg-white border-gray-200 hover:border-gray-300'
+                                          }`}
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-orange-500' : 'bg-gray-300'}`} />
+                                            <span className="font-medium">{formatThickness(material.materialType, thickness.thickness)}</span>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-sm text-gray-600">{thickness.workerCount} 工人</span>
+                                            <Badge variant={isSelected ? "primary" : "secondary"} size="sm">
+                                              {thickness.totalQuantity}张
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                              <p className="text-sm text-gray-600 mb-1">{material.materialType}</p>
-                              {material.lowStockCount > 0 && (
-                                <div className="flex items-center space-x-1 text-xs text-yellow-600">
-                                  <ExclamationTriangleIcon className="w-3 h-3" />
-                                  <span>{material.lowStockCount} 项低库存</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     )}
                   </div>
@@ -719,6 +841,12 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
 
       if (response.ok) {
         const data = await response.json();
+        const workerName = submitData.name;
+        const departmentName = newWorkerData.department || '未指定部门';
+        
+        // 显示添加成功Toast
+        workerToastHelper.workerAdded(workerName, departmentName);
+        
         setNewWorkerData({ 
           name: '', 
           phone: '', 
@@ -730,10 +858,10 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         onRefresh();
       } else {
         const errorData = await response.json();
-        alert(`创建工人失败: ${errorData.message || '未知错误'}`);
+        workerToastHelper.error(`创建工人失败: ${errorData.message || '未知错误'}`);
       }
     } catch (error) {
-      alert(`创建工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      workerToastHelper.error(`创建工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
@@ -761,6 +889,12 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
       });
 
       if (response.ok) {
+        const workerName = editWorkerData.name || editingWorker.name;
+        const departmentName = editWorkerData.department || '部门信息';
+        
+        // 显示更新成功Toast
+        workerToastHelper.workerUpdated(workerName, departmentName);
+        
         setEditWorkerData({ 
           name: '', 
           phone: '', 
@@ -773,10 +907,10 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
         onRefresh();
       } else {
         const errorData = await response.json();
-        alert(`更新工人失败: ${errorData.message || '未知错误'}`);
+        workerToastHelper.error(`更新工人失败: ${errorData.message || '未知错误'}`);
       }
     } catch (error) {
-      alert(`更新工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      workerToastHelper.error(`更新工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
@@ -797,14 +931,15 @@ const WorkerManagementSidebar: React.FC<WorkerManagementSidebarProps> = ({
       });
 
       if (response.ok) {
+        // 显示删除成功Toast
+        workerToastHelper.workerDeleted(workerName);
         onRefresh();
-        alert('工人删除成功');
       } else {
         const errorData = await response.json();
-        alert(`删除工人失败: ${errorData.message || '未知错误'}`);
+        workerToastHelper.error(`删除工人失败: ${errorData.message || '未知错误'}`);
       }
     } catch (error) {
-      alert(`删除工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      workerToastHelper.error(`删除工人失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 

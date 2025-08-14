@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Modal, Button, Input, Dropdown, FileDropzone, Alert, ProgressBar } from '@/components/ui';
+import { Modal, Button, Input, Dropdown, FileDropzone, Alert, ProgressBar, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/utils/api';
+import { drawingToastHelper, useDrawingToastListener } from '@/utils/drawingToastHelper';
 
 export interface DrawingUploadProps {
   isOpen: boolean;
@@ -34,6 +35,10 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const { token } = useAuth();
+  const toast = useToast();
+  
+  // 监听图纸Toast事件
+  useDrawingToastListener(toast);
 
   // 处理文件选择
   const handleFileSelected = (selectedFile: File) => {
@@ -110,21 +115,30 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
             : f
         ));
         
+        // 显示上传成功Toast
+        drawingToastHelper.drawingUploaded(uploadFile.file.name);
+        
         return true;
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || errorData.message || '上传失败');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '上传失败';
+      
       setFiles(prev => prev.map(f => 
         f.id === uploadFile.id 
           ? { 
               ...f, 
               status: 'error' as const, 
-              error: error instanceof Error ? error.message : '上传失败' 
+              error: errorMessage 
             } 
           : f
       ));
+      
+      // 显示上传失败Toast
+      drawingToastHelper.drawingUploadFailed(uploadFile.file.name, errorMessage);
+      
       return false;
     }
   };
@@ -147,12 +161,18 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
       
       const results = await Promise.all(uploadPromises);
       const successCount = results.filter(Boolean).length;
+      const totalCount = files.filter(f => f.status === 'pending').length;
+      
+      // 显示批量上传完成Toast
+      if (totalCount > 1) {
+        drawingToastHelper.batchUploadComplete(successCount, totalCount);
+      }
       
       if (successCount > 0) {
         onSuccess(); // 调用成功回调刷新数据
         
         // 如果全部成功，立即关闭对话框并重置表单
-        if (successCount === files.filter(f => f.status === 'pending').length) {
+        if (successCount === totalCount) {
           onClose();
           resetForm();
         }

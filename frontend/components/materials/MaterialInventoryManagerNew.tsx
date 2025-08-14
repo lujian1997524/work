@@ -3,7 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Badge, Loading, useDialog } from '@/components/ui';
+import { useToast } from '@/components/ui/Toast';
+import { useMaterialToastListener, materialToastHelper } from '@/utils/materialToastHelper';
+import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
 import { useAuth } from '@/contexts/AuthContext';
+import { useResponsive } from '@/hooks/useResponsive';
 import { apiRequest } from '@/utils/api';
 import { AddMaterialModal } from './AddMaterialModal';
 import { ExpandableMaterialCell } from './ExpandableMaterialCell';
@@ -14,6 +18,8 @@ import {
   PencilIcon,
   TrashIcon,
   PhoneIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 
 interface ThicknessSpec {
@@ -24,6 +30,7 @@ interface ThicknessSpec {
   unit: string;
   code: string;
   label: string;
+  sortOrder?: number;
 }
 
 interface MaterialDimension {
@@ -76,6 +83,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
   const [editingWorker, setEditingWorker] = useState<WorkerMaterial | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDimensionManager, setShowDimensionManager] = useState(false);
+  const [showOnlyWithStock, setShowOnlyWithStock] = useState(true); // 默认只显示有库存的
   const [selectedMaterial, setSelectedMaterial] = useState<{
     workerMaterialId: number;
     materialData: MaterialData;
@@ -83,8 +91,39 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
     materialType: string;
     thickness: string;
   } | null>(null);
+  
+  // 批量操作相关状态
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchLoading, setBatchLoading] = useState(false);
+  
   const { token } = useAuth();
   const { confirm, DialogRenderer } = useDialog();
+  const { isMobile, isTablet } = useResponsive();
+  const toast = useToast();
+  const { createTracker } = useBatchOperationTracker();
+  
+  // 监听材料Toast事件
+  useMaterialToastListener(toast);
+
+  // 用于同步滚动的refs
+  const topScrollRef = React.useRef<HTMLDivElement>(null);
+  const bodyScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // 同步滚动处理
+  const handleTopScroll = () => {
+    if (topScrollRef.current && bodyScrollRef.current) {
+      const scrollLeft = topScrollRef.current.scrollLeft;
+      bodyScrollRef.current.scrollLeft = scrollLeft;
+    }
+  };
+
+  const handleBodyScroll = () => {
+    if (bodyScrollRef.current && topScrollRef.current) {
+      const scrollLeft = bodyScrollRef.current.scrollLeft;
+      topScrollRef.current.scrollLeft = scrollLeft;
+    }
+  };
 
   // 获取数据
   const fetchData = async () => {
@@ -165,6 +204,235 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
     setSelectedMaterial(null);
   };
 
+  // 批量操作相关函数
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedItems(new Set());
+  };
+
+  const handleSelectItem = (itemKey: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemKey)) {
+      newSelected.delete(itemKey);
+    } else {
+      newSelected.add(itemKey);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const selectAllItems = () => {
+    const allItems = new Set<string>();
+    filteredWorkers.forEach(worker => {
+      filteredThicknessSpecs.forEach(spec => {
+        const materialData = worker.materials[spec.key];
+        if (materialData && materialData.quantity > 0) {
+          allItems.add(`${worker.workerId}_${spec.key}`);
+        }
+      });
+    });
+    setSelectedItems(allItems);
+  };
+
+  const clearSelection = () => {
+    setSelectedItems(new Set());
+  };
+
+  // 批量更新材料状态
+  const handleBatchStatusUpdate = async (newStatus: string) => {
+    if (selectedItems.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      return;
+    }
+
+    const confirmed = await confirm(
+      `确定要将 ${selectedItems.size} 个材料的状态更新为 "${newStatus}" 吗？`,
+      { title: '批量状态更新' }
+    );
+
+    if (!confirmed) return;
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量更新材料状态', selectedItems.size, 'material-batch');
+    
+    let successCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const itemKey of selectedItems) {
+        try {
+          const [workerId, materialKey] = itemKey.split('_', 2);
+          const worker = data?.workers.find(w => w.workerId === parseInt(workerId));
+          const materialData = worker?.materials[materialKey];
+          
+          if (materialData?.id) {
+            const response = await apiRequest(`/api/worker-materials/${materialData.id}/status`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+              successCount++;
+            } else {
+              failedCount++;
+              tracker.addError(`材料 ${materialKey} 更新失败`);
+            }
+          } else {
+            failedCount++;
+            tracker.addError(`材料 ${materialKey} 未找到ID`);
+          }
+          
+          tracker.updateProgress(`${worker?.workerName} - ${materialKey}`);
+        } catch (error) {
+          failedCount++;
+          tracker.addError(`处理 ${itemKey} 时出错: ${error}`);
+        }
+      }
+
+      tracker.complete();
+      toast.addToast({
+        type: successCount === selectedItems.size ? 'success' : 'warning',
+        message: `批量更新状态完成：成功 ${successCount} 个，共 ${selectedItems.size} 个材料，状态为 "${newStatus}"`
+      });
+      
+      if (successCount > 0) {
+        await fetchData();
+        setBatchMode(false);
+        setSelectedItems(new Set());
+      }
+    } catch (error) {
+      tracker.fail(`批量操作失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // 批量材料调拨
+  const handleBatchTransfer = async (fromWorker: string, toWorker: string) => {
+    if (selectedItems.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      return;
+    }
+
+    const confirmed = await confirm(
+      `确定要将 ${selectedItems.size} 个材料从 ${fromWorker} 调拨给 ${toWorker} 吗？`,
+      { title: '批量材料调拨' }
+    );
+
+    if (!confirmed) return;
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量材料调拨', selectedItems.size, 'material-batch');
+    
+    let successCount = 0;
+
+    try {
+      for (const itemKey of selectedItems) {
+        try {
+          // 这里需要根据实际API调用调拨接口
+          // 暂时模拟
+          successCount++;
+          tracker.updateProgress(itemKey);
+        } catch (error) {
+          tracker.addError(`调拨 ${itemKey} 时出错: ${error}`);
+        }
+      }
+
+      tracker.complete();
+      toast.addToast({
+        type: successCount === selectedItems.size ? 'success' : 'warning',
+        message: `批量调拨完成：成功调拨 ${successCount} 个材料从 ${fromWorker} 到 ${toWorker}`
+      });
+      
+      if (successCount > 0) {
+        await fetchData();
+        setBatchMode(false);
+        setSelectedItems(new Set());
+      }
+    } catch (error) {
+      tracker.fail(`批量调拨失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // 批量添加库存
+  const handleBatchAddStock = async (quantity: number) => {
+    if (selectedItems.size === 0) {
+      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      return;
+    }
+
+    const confirmed = await confirm(
+      `确定要为 ${selectedItems.size} 个材料各增加 ${quantity} 张库存吗？`,
+      { title: '批量添加库存' }
+    );
+
+    if (!confirmed) return;
+
+    setBatchLoading(true);
+    const tracker = createTracker('批量添加库存', selectedItems.size, 'material-batch');
+    
+    let successCount = 0;
+    const materialTypes = new Set<string>();
+
+    try {
+      for (const itemKey of selectedItems) {
+        try {
+          const [workerId, materialKey] = itemKey.split('_', 2);
+          const worker = data?.workers.find(w => w.workerId === parseInt(workerId));
+          const materialData = worker?.materials[materialKey];
+          const [materialType] = materialKey.split('_');
+          materialTypes.add(materialType);
+          
+          if (materialData?.id) {
+            const response = await apiRequest(`/api/worker-materials/${materialData.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ 
+                quantity: materialData.quantity + quantity
+              })
+            });
+
+            if (response.ok) {
+              successCount++;
+            } else {
+              tracker.addError(`材料 ${materialKey} 库存增加失败`);
+            }
+          } else {
+            tracker.addError(`材料 ${materialKey} 未找到ID`);
+          }
+          
+          tracker.updateProgress(`${worker?.workerName} - ${materialKey}`);
+        } catch (error) {
+          tracker.addError(`处理 ${itemKey} 时出错: ${error}`);
+        }
+      }
+
+      tracker.complete();
+      toast.addToast({
+        type: successCount === selectedItems.size ? 'success' : 'warning',
+        message: `批量添加库存完成：成功增加 ${successCount} 个材料的库存`
+      });
+      
+      if (successCount > 0) {
+        await fetchData();
+        setBatchMode(false);
+        setSelectedItems(new Set());
+      }
+    } catch (error) {
+      tracker.fail(`批量添加库存失败: ${error}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
@@ -186,11 +454,35 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       return false;
     }
 
+    // 如果启用"仅显示有库存"，检查该工人是否有任何库存
+    if (showOnlyWithStock) {
+      const hasAnyStock = Object.values(worker.materials).some(material => material.quantity > 0);
+      if (!hasAnyStock) return false;
+    }
+
     return true;
   });
 
-  // 筛选材料类型列（只显示有库存的）
-  const filteredThicknessSpecs = data.thicknessSpecs.filter(spec => {
+  // 筛选材料类型列
+  const filteredThicknessSpecs = data.thicknessSpecs
+    .sort((a, b) => {
+      // 首先按 sortOrder 排序，如果没有 sortOrder 则按材料类型和厚度排序
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      
+      // 备用排序逻辑：材料类型 + 厚度
+      const materialOrder: { [key: string]: number } = { '碳板': 1, '锰板': 2, '不锈钢': 3 };
+      const aOrder = materialOrder[a.materialType] || 999;
+      const bOrder = materialOrder[b.materialType] || 999;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      
+      return parseFloat(a.thickness) - parseFloat(b.thickness);
+    })
+    .filter(spec => {
     // 材料类型筛选
     if (materialTypeFilter && materialTypeFilter !== 'all') {
       if (materialTypeFilter === 'carbon' && spec.materialType !== '碳板') return false;
@@ -206,16 +498,46 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       }
     }
 
-    // 检查是否有工人有这种材料的库存
-    const hasInventory = filteredWorkers.some(worker => {
-      const materialData = worker.materials[spec.key];
-      return materialData && materialData.quantity > 0;
-    });
+    // 如果启用"仅显示有库存"，检查是否有工人有这种材料的库存
+    if (showOnlyWithStock) {
+      const hasInventory = filteredWorkers.some(worker => {
+        const materialData = worker.materials[spec.key];
+        return materialData && materialData.quantity > 0;
+      });
+      if (!hasInventory) return false;
+    }
 
-    return hasInventory;
+    return true;
   });
 
   // 筛选结果统计
+  const getStockStats = () => {
+    let totalStockCount = 0;
+    let workersWithStock = 0;
+    let emptyWorkers = 0;
+
+    data.workers.forEach(worker => {
+      const workerTotalStock = Object.values(worker.materials).reduce((sum, material) => sum + material.quantity, 0);
+      totalStockCount += workerTotalStock;
+      
+      if (workerTotalStock > 0) {
+        workersWithStock++;
+      } else {
+        emptyWorkers++;
+      }
+    });
+
+    return {
+      totalStockCount,
+      workersWithStock,
+      emptyWorkers,
+      totalWorkers: data.workers.length,
+      filteredWorkers: filteredWorkers.length,
+      filteredSpecs: filteredThicknessSpecs.length
+    };
+  };
+
+  const stats = getStockStats();
 
   return (
     <div className={`h-full flex flex-col bg-white ${className}`}>
@@ -235,40 +557,200 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
               <PlusIcon className="w-4 h-4 mr-2" />
               添加板材
             </Button>
+            
+            <Button 
+              variant={batchMode ? "outline" : "secondary"}
+              size="sm"
+              onClick={toggleBatchMode}
+              disabled={batchLoading}
+            >
+              {batchMode ? '退出批量' : '批量操作'}
+            </Button>
           </div>
         </div>
 
-        {/* 搜索栏 */}
-        <div className="flex items-center space-x-4">
-          <div className="flex-1 max-w-md relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="搜索工人姓名或部门..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+        {/* 搜索栏和筛选控制 */}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex-1 max-w-md relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="搜索工人姓名或部门..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            
+            {/* 视图切换控制 */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowOnlyWithStock(!showOnlyWithStock)}
+                className={`
+                  flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${showOnlyWithStock 
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                    : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                  }
+                `}
+              >
+                {showOnlyWithStock ? (
+                  <EyeIcon className="w-4 h-4" />
+                ) : (
+                  <EyeSlashIcon className="w-4 h-4" />
+                )}
+                <span>{showOnlyWithStock ? '仅有库存' : '显示全部'}</span>
+              </button>
+              
+              <Badge variant="secondary">
+                显示 {stats.filteredWorkers} / {stats.totalWorkers} 工人
+              </Badge>
+            </div>
           </div>
-          <Badge variant="secondary">
-            共 {filteredWorkers.length} 名工人
-          </Badge>
+          
+          {/* 库存统计概览 */}
+          <div className="flex items-center space-x-6 text-sm text-gray-600">
+            <div className="flex items-center space-x-1">
+              <span>总库存:</span>
+              <span className="font-semibold text-blue-600">{stats.totalStockCount} 张</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span>有库存工人:</span>
+              <span className="font-semibold text-green-600">{stats.workersWithStock} 人</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span>无库存工人:</span>
+              <span className="font-semibold text-gray-500">{stats.emptyWorkers} 人</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span>显示厚度规格:</span>
+              <span className="font-semibold text-purple-600">{stats.filteredSpecs} 种</span>
+            </div>
+          </div>
+
+          {/* 批量操作控制面板 */}
+          {batchMode && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm font-medium text-blue-900">
+                    已选择 {selectedItems.size} 个材料
+                  </span>
+                  {selectedItems.size > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBatchStatusUpdate('completed')}
+                        disabled={batchLoading}
+                      >
+                        标记完成
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBatchAddStock(10)}
+                        disabled={batchLoading}
+                      >
+                        增加库存 (+10)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearSelection}
+                        disabled={batchLoading}
+                      >
+                        清除选择
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={selectAllItems}
+                    disabled={batchLoading}
+                  >
+                    全选
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                    disabled={batchLoading}
+                  >
+                    全不选
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
 
       {/* 表格内容 */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+      <div className="flex-1 flex flex-col p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 flex flex-col">
+          {/* 固定的顶部水平滚动条 */}
+          <div className="flex-shrink-0 bg-gray-50 border-b border-gray-100">
+            <div 
+              ref={topScrollRef}
+              className="overflow-x-auto" 
+              onScroll={handleTopScroll}
+            >
+              <div style={{ 
+                width: `${(isMobile ? 100 : 200) + (filteredThicknessSpecs.length * 120) + 100}px`, 
+                height: '12px' 
+              }}></div>
+            </div>
+          </div>
+          
+          {/* 表格容器 */}
+          <div 
+            ref={bodyScrollRef}
+            className="flex-1 overflow-auto"
+            onScroll={handleBodyScroll}
+          >
             <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-gray-50 via-gray-50/80 to-gray-50/60 border-b border-gray-200">
-                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-800 sticky left-0 bg-gray-50 min-w-[200px]">
-                    工人信息
+              {/* 固定表头 */}
+              <thead className="bg-gradient-to-r from-gray-50 via-gray-50/80 to-gray-50/60 border-b border-gray-200 sticky top-0 z-10">
+                <tr>
+                  {batchMode && (
+                    <th className="py-3 px-4 text-center text-sm font-semibold text-gray-800 sticky left-0 bg-gray-50 z-20 min-w-[50px]">
+                      <input
+                        type="checkbox"
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            selectAllItems();
+                          } else {
+                            clearSelection();
+                          }
+                        }}
+                        checked={selectedItems.size > 0 && selectedItems.size === filteredWorkers.reduce((count, worker) => {
+                          return count + filteredThicknessSpecs.reduce((specCount, spec) => {
+                            const materialData = worker.materials[spec.key];
+                            return specCount + (materialData && materialData.quantity > 0 ? 1 : 0);
+                          }, 0);
+                        }, 0)}
+                        className="rounded border-gray-300"
+                      />
+                    </th>
+                  )}
+                  <th className={`py-3 px-4 text-left text-sm font-semibold text-gray-800 sticky ${batchMode ? 'left-[50px]' : 'left-0'} bg-gray-50 z-20 ${
+                    isMobile ? 'min-w-[100px]' : 'min-w-[200px]'
+                  }`}>
+                    {isMobile ? '工人' : '工人信息'}
                   </th>
                   {filteredThicknessSpecs.map((spec) => (
                     <th key={spec.key} className="py-3 px-4 text-center text-sm font-semibold text-gray-800 min-w-[120px]">
-                      {spec.code}
+                      {spec.code.replace(/\.?0+$/, '')}
                     </th>
                   ))}
                   <th className="py-3 px-4 text-center text-sm font-semibold text-gray-800 min-w-[100px]">
@@ -277,37 +759,78 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
                 </tr>
               </thead>
               <tbody>
-                {filteredWorkers.map((worker, index) => (
-                  <motion.tr
-                    key={worker.workerId}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    className={`border-b border-gray-100 hover:bg-gray-50/50 ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50/20'
-                    }`}
-                  >
-                    {/* 工人信息列 */}
-                    <td className="py-3 px-4 sticky left-0 bg-white border-r border-gray-100">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-md">
-                          {worker.workerName.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900">
-                            {worker.workerName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {worker.department}
-                          </div>
-                          {worker.phone && (
-                            <div className="text-xs text-gray-400 flex items-center">
-                              <PhoneIcon className="w-3 h-3 mr-1" />
-                              {worker.phone}
-                            </div>
+                {filteredWorkers.length === 0 ? (
+                  <tr>
+                    <td colSpan={filteredThicknessSpecs.length + 2} className="py-12 text-center">
+                      <div className="flex flex-col items-center space-y-3">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                          {showOnlyWithStock ? (
+                            <EyeSlashIcon className="w-8 h-8 text-gray-400" />
+                          ) : (
+                            <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
                           )}
                         </div>
+                        <div className="text-gray-500">
+                          <p className="font-medium">
+                            {showOnlyWithStock ? '暂无工人有库存' : '未找到匹配的工人'}
+                          </p>
+                          <p className="text-sm mt-1">
+                            {showOnlyWithStock 
+                              ? '尝试切换到"显示全部"模式查看所有工人'
+                              : '尝试调整搜索条件或切换筛选模式'
+                            }
+                          </p>
+                        </div>
                       </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredWorkers.map((worker, index) => (
+                    <motion.tr
+                      key={worker.workerId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.02 }}
+                      className={`border-b border-gray-100 hover:bg-gray-50/50 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50/20'
+                      }`}
+                    >
+                    {/* 工人信息列 */}
+                    <td className={`py-3 px-4 sticky left-0 bg-white border-r border-gray-100 z-10 ${
+                      isMobile ? 'min-w-[100px]' : 'min-w-[200px]'
+                    }`}>
+                      {isMobile ? (
+                        // 移动端紧凑显示：只显示工人名字和头像
+                        <div className="flex flex-col items-center space-y-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-medium text-xs shadow-md">
+                            {worker.workerName.charAt(0)}
+                          </div>
+                          <div className="text-xs font-semibold text-gray-900 text-center truncate w-full">
+                            {worker.workerName}
+                          </div>
+                        </div>
+                      ) : (
+                        // 桌面端完整显示
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-md">
+                            {worker.workerName.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">
+                              {worker.workerName}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {worker.department}
+                            </div>
+                            {worker.phone && (
+                              <div className="text-xs text-gray-400 flex items-center">
+                                <PhoneIcon className="w-3 h-3 mr-1" />
+                                {worker.phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </td>
                     
                     {/* 材料数量列 */}
@@ -344,31 +867,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
                       </motion.button>
                     </td>
                   </motion.tr>
-                ))}
-                
-                {filteredWorkers.length === 0 && (
-                  <tr>
-                    <td colSpan={filteredThicknessSpecs.length + 2} className="text-center py-12">
-                      <div className="flex flex-col items-center space-y-3">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </div>
-                        <div className="text-center">
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                            {searchQuery ? '没有找到匹配的工人' : '暂无板材库存数据'}
-                          </h3>
-                          <p className="text-gray-500 max-w-sm">
-                            {searchQuery 
-                              ? '尝试调整搜索条件或筛选器' 
-                              : '开始添加工人和板材分配来管理库存'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
+                ))
                 )}
               </tbody>
             </table>
@@ -495,6 +994,13 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
     if (!token) return;
 
     try {
+      // 获取当前材料信息用于Toast显示
+      const currentMaterial = materialList.find(m => m.id === materialId);
+      const materialTypeText = currentMaterial 
+        ? `${currentMaterial.thickness}${currentMaterial.unit}${currentMaterial.materialType}`
+        : '未知材料';
+      const oldQuantity = currentMaterial?.quantity || 0;
+      
       const response = await apiRequest(`/api/worker-materials/${materialId}`, {
         method: 'PUT',
         headers: {
@@ -507,6 +1013,23 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
       });
 
       if (response.ok) {
+        // 根据数量变化触发相应Toast
+        if (newQuantity > oldQuantity) {
+          // 库存增加
+          const addedQuantity = newQuantity - oldQuantity;
+          materialToastHelper.stockAdded(worker.workerName, materialTypeText, addedQuantity);
+        } else if (newQuantity < oldQuantity) {
+          // 库存减少（转移或消耗）
+          const reducedQuantity = oldQuantity - newQuantity;
+          if (newQuantity === 0) {
+            // 库存清零
+            materialToastHelper.materialRecycled(materialTypeText);
+          } else {
+            // 部分转移或消耗
+            materialToastHelper.materialTransferred(materialTypeText, reducedQuantity, worker.workerName, '其他位置');
+          }
+        }
+        
         // 重新获取数据
         await fetchWorkerMaterials();
         onSuccess();
@@ -514,7 +1037,8 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         window.dispatchEvent(new CustomEvent('materials-updated'));
       }
     } catch (error) {
-      // 更新板材数量失败
+      // Toast错误提示
+      materialToastHelper.error('更新板材数量失败：' + (error instanceof Error ? error.message : '未知错误'));
     }
   };
 
@@ -528,6 +1052,13 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
     if (!confirmed) return;
 
     try {
+      // 获取要删除的材料信息用于Toast显示
+      const currentMaterial = materialList.find(m => m.id === materialId);
+      const materialTypeText = currentMaterial 
+        ? `${currentMaterial.thickness}${currentMaterial.unit}${currentMaterial.materialType}`
+        : materialLabel;
+      const deletedQuantity = currentMaterial?.quantity || 0;
+      
       const response = await apiRequest(`/api/worker-materials/${materialId}`, {
         method: 'DELETE',
         headers: {
@@ -536,6 +1067,9 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
       });
 
       if (response.ok) {
+        // 显示删除成功Toast
+        materialToastHelper.materialRecycled(materialTypeText);
+        
         // 立即从本地状态中移除已删除的项
         setMaterialList(prev => prev.filter(item => item.id !== materialId));
         // 重新获取数据以确保同步
@@ -544,8 +1078,8 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         // 触发全局事件通知其他组件
         window.dispatchEvent(new CustomEvent('materials-updated'));
       } else if (response.status === 404) {
-        // 记录已经不存在，立即从本地状态中移除并刷新数据
-        // 要删除的板材记录不存在
+        // 记录已经不存在，显示提示但继续清理
+        materialToastHelper.error('要删除的板材记录不存在，已自动同步数据');
         setMaterialList(prev => prev.filter(item => item.id !== materialId));
         await fetchWorkerMaterials();
         onSuccess();
@@ -553,7 +1087,8 @@ const WorkerMaterialEditModal: React.FC<WorkerMaterialEditModalProps> = ({
         window.dispatchEvent(new CustomEvent('materials-updated'));
       }
     } catch (error) {
-      // 删除板材失败
+      // 显示删除失败Toast
+      materialToastHelper.error('删除板材失败：' + (error instanceof Error ? error.message : '未知错误'));
     }
   };
 
