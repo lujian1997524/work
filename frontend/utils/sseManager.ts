@@ -93,6 +93,7 @@ class SSEManager {
   private listeners: Map<SSEEventType, Set<(data: any) => void>> = new Map();
   private notificationCallbacks: Set<(notification: NotificationMessage) => void> = new Set();
   private recentEvents: Set<string> = new Set(); // 用于去重的最近事件集合
+  private localOperations: Map<string, number> = new Map(); // 跟踪本地操作，时间戳作为值
 
   constructor() {
     // 绑定方法上下文
@@ -264,13 +265,62 @@ class SSEManager {
     const timestamp = Date.now();
 
     switch (eventType) {
-      // 项目相关事件 - 临时禁用，使用本地通知
+      // 项目相关事件 - 智能去重处理
       case 'project-created':
+        // 只有非本地操作才显示Toast通知
+        if (!this.isLocalOperation(eventType, data)) {
+          notification = {
+            id: `project-created-${data.project?.id || 'unknown'}-${timestamp}`,
+            type: 'success',
+            title: '项目创建成功',
+            message: `项目 "${String(data.project?.name || '未知项目')}" 已创建${data.project?.assignedWorker?.name ? `，负责人：${String(data.project.assignedWorker.name)}` : ''}`,
+            timestamp: new Date().toISOString(),
+            duration: 4000
+          };
+        }
+        break;
+
       case 'project-status-changed':
+        if (!this.isLocalOperation(eventType, data)) {
+          const statusText = this.getStatusText(data.newStatus || data.project?.status || '');
+          notification = {
+            id: `project-status-changed-${data.projectId || data.project?.id}-${timestamp}`,
+            type: 'info',
+            title: '项目状态更新',
+            message: `项目 "${String(data.project?.name || '未知项目')}" 状态更新为：${statusText}`,
+            timestamp: new Date().toISOString(),
+            duration: 4000
+          };
+        }
+        break;
+
       case 'project-deleted':
+        if (!this.isLocalOperation(eventType, data)) {
+          notification = {
+            id: `project-deleted-${data.projectId}-${timestamp}`,
+            type: 'warning',
+            title: '项目删除成功',
+            message: `项目 "${String(data.projectName || '未知项目')}" 已删除`,
+            timestamp: new Date().toISOString(),
+            duration: 4000
+          };
+        }
+        break;
+
       case 'project-worker-assigned':
       case 'project-worker-reassigned':
-        return; // 临时禁用SSE项目通知，避免与本地通知重复
+        if (!this.isLocalOperation(eventType, data)) {
+          const actionText = eventType === 'project-worker-assigned' ? '分配' : '重新分配';
+          notification = {
+            id: `${eventType}-${data.projectId}-${timestamp}`,
+            type: 'info',
+            title: `工人${actionText}成功`,
+            message: `项目 "${String(data.projectName || '未知项目')}" 已${actionText}给 ${String(data.workerName || '某工人')}`,
+            timestamp: new Date().toISOString(),
+            duration: 4000
+          };
+        }
+        break;
 
       // 材料相关事件
       case 'material-allocated':
@@ -432,8 +482,20 @@ class SSEManager {
         break;
 
       // 材料相关事件
-      case 'material-status-changed': // 临时禁用材料状态变化通知，避免重复
-        return; // 不显示通知
+      case 'material-status-changed': 
+        // 智能去重：只有非本地操作才显示Toast通知
+        if (!this.isLocalOperation(eventType, data)) {
+          const statusText = this.getStatusText(data.newStatus || '');
+          notification = {
+            id: `material-status-changed-${data.material?.id || 'unknown'}-${timestamp}`,
+            type: 'info',
+            title: '材料状态更新',
+            message: `${String(data.material?.thicknessSpec?.thickness || '')}${String(data.material?.thicknessSpec?.unit || 'mm')} ${String(data.material?.thicknessSpec?.materialType || '材料')} 状态更新为：${statusText}`,
+            timestamp: new Date().toISOString(),
+            duration: 3000
+          };
+        }
+        break;
         
       // 其他不需要显示通知的事件可以在这里过滤
       case 'heartbeat':
@@ -481,8 +543,53 @@ class SSEManager {
     }
   }
 
+  // 记录本地操作，用于智能去重
+  markLocalOperation(eventType: SSEEventType, entityId: string | number): void {
+    const key = `${eventType}-${entityId}`;
+    this.localOperations.set(key, Date.now());
+    
+    // 5秒后清理记录
+    setTimeout(() => {
+      this.localOperations.delete(key);
+    }, 5000);
+  }
+
+  // 检查是否为本地操作（避免重复通知）
+  private isLocalOperation(eventType: SSEEventType, data: any): boolean {
+    let entityId: string | number = 'unknown';
+    
+    // 根据事件类型提取实体ID
+    switch (eventType) {
+      case 'project-created':
+      case 'project-updated':
+      case 'project-status-changed':
+        entityId = data.project?.id || data.projectId || 'unknown';
+        break;
+      case 'project-deleted':
+        entityId = data.projectId || 'unknown';
+        break;
+      case 'material-status-changed':
+        entityId = data.material?.id || data.materialId || 'unknown';
+        break;
+      default:
+        // 对于其他事件类型，不进行本地操作检查
+        return false;
+    }
+    
+    const key = `${eventType}-${entityId}`;
+    const localOpTime = this.localOperations.get(key);
+    
+    if (localOpTime) {
+      const timeDiff = Date.now() - localOpTime;
+      // 如果在3秒内有本地操作，则认为是本地操作触发的SSE事件
+      return timeDiff < 3000;
+    }
+    
+    return false;
+  }
+
   // 处理连接错误
-  private handleError(event: Event) {
+  private handleError(_event: Event) {
     // 如果是手动断开，不进行重连
     if (this.isManuallyDisconnected) {
       return;
@@ -499,7 +606,8 @@ class SSEManager {
     
     this.reconnectTimer = setTimeout(() => {
       if (!this.isManuallyDisconnected && this.currentToken) {
-        this.connect(this.currentToken).catch(error => {
+        this.connect(this.currentToken).catch(_error => {
+          // 重连失败，忽略错误
         });
       }
     }, delay);

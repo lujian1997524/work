@@ -264,6 +264,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const data = await response.json();
       const newProject = data.project;
       
+      // 标记本地操作，避免SSE重复通知
+      sseManager.markLocalOperation('project-created', newProject.id);
+      
       // 更新本地状态
       set(state => ({
         projects: [...state.projects, newProject],
@@ -328,6 +331,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const data = await response.json();
       const updatedProject = data.project;
       
+      // 标记本地操作，避免SSE重复通知
+      sseManager.markLocalOperation('project-updated', id);
+      sseManager.markLocalOperation('project-status-changed', id);
+      
       // 更新本地状态
       set(state => ({
         projects: state.projects.map(p => 
@@ -390,6 +397,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (!response.ok) {
         throw new Error('删除项目失败');
       }
+      
+      // 标记本地操作，避免SSE重复通知
+      sseManager.markLocalOperation('project-deleted', id);
       
       // 更新本地状态
       set(state => ({

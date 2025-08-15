@@ -6,6 +6,7 @@ import type { Project, Material, ThicknessSpec } from '@/types/project';
 import { notificationManager } from './notificationManager';
 import { materialToastHelper } from './materialToastHelper';
 import { apiRequest } from '@/utils/api';
+import { sseManager } from '@/utils/sseManager';
 
 // 获取认证token的辅助函数
 const getAuthToken = (): string | null => {
@@ -191,6 +192,11 @@ export const updateMaterialStatusShared = async (
       : await createNewMaterial(projectId, thicknessSpecId, newStatus, token);
     
     if (!success) return false;
+    
+    // 标记本地操作，避免SSE重复通知
+    if (existingMaterial) {
+      sseManager.markLocalOperation('material-status-changed', existingMaterial.id);
+    }
     
     // 根据状态变更触发相应的Toast通知
     triggerMaterialStatusToast(previousStatus, newStatus, {

@@ -25,38 +25,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 绝不主动执行
 
 ### 服务器架构配置
-**重要说明**：本项目采用分离式架构
+**重要说明**：本项目采用远程后端分离式架构
 - **前端服务**: 本地开发服务器 http://localhost:4000
 - **后端服务**: 远程云服务器 https://api.gei5.com
-- **数据库**: 远程MySQL服务器，不需要本地Docker
+- **数据库**: 远程MySQL服务器，无需本地数据库
 
 **端口检查约束**：
 ```bash
 lsof -ti:4000    # 检查前端端口（仅需检查此端口）
 ```
-**重要**：不要尝试启动本地后端服务或数据库，所有API请求直接连接远程服务器 https://api.gei5.com
 
-**后端文件修改流程**：
-- Claude只能修改本地backend文件
-- 用户负责将修改后的文件上传到远程服务器
-- 绝不在本地运行后端服务进行测试
+**关键架构要点**：
+- 所有API请求通过前端的 `utils/api.ts` 直接连接远程服务器
+- 后端代码仅用于开发和部署参考，不在本地运行
+- 前端环境变量 `NEXT_PUBLIC_BACKEND_URL=https://api.gei5.com` 配置远程连接
 
 ## 快速开始
 
-### 初次设置（仅需一次）
-```bash
-# 1. 启动数据库服务
-docker-compose up -d
-
-# 2. 安装依赖
-cd backend && npm install
-cd frontend && npm install
-
-# 3. 初始化数据库
-cd backend && npm run init:db && npm run create:sample
-```
-
-### 日常开发工作流（远程后端架构）
+### 前端开发工作流（远程后端架构）
 ```bash
 # 1. 检查前端服务状态
 lsof -ti:4000 && echo "前端已启动" || echo "前端未启动"
@@ -64,17 +50,18 @@ lsof -ti:4000 && echo "前端已启动" || echo "前端未启动"
 # 2. 仅启动前端开发服务器（仅在未启动时）
 cd frontend && npm run dev     # 前端: http://localhost:4000
 
-# 3. 健康检查（远程服务器）
+# 3. 健康检查
 curl http://localhost:4000     # 前端服务（本地）
-# 后端API通过前端代理访问，无需直接访问
+# 后端API: https://api.gei5.com（远程，通过前端代理访问）
 ```
 
-### 关键开发端点（远程后端架构）
+### 关键开发端点
 - **主应用**: http://localhost:4000
 - **组件系统**: http://localhost:4000/design-system
 - **API测试**: http://localhost:4000/debug-api
-- **后端API**: https://api.gei5.com（远程服务器）
 - **考勤管理**: http://localhost:4000（导航至考勤模块）
+- **移动端测试**: http://localhost:4000/mobile-test
+- **Toast测试**: http://localhost:4000/toast-test
 
 ## 严格遵守
 - 所有回复必须使用中文
@@ -92,17 +79,17 @@ curl http://localhost:4000     # 前端服务（本地）
 这是一个激光切割生产管理系统，采用VS Code风格的界面布局，支持项目管理、板材状态追踪、图纸管理和工人资源管理。
 
 ### 技术架构
-- **后端**: Node.js + Express + Sequelize ORM + MySQL 8.0 (Docker)
+- **后端**: Node.js + Express + Sequelize ORM + MySQL（远程部署）
 - **前端**: Next.js 15.4.3 + React 18 + TypeScript + Zustand状态管理
 - **UI系统**: Tailwind CSS + @heroicons/react + iOS 18设计规范  
 - **实时通信**: Server-Sent Events (SSE) + 音频通知
 - **桌面应用**: Tauri多平台打包 (Rust + Web技术)
+- **移动端适配**: 专用移动端组件 + 响应式设计
 
-### 端口和服务（远程后端架构）
+### 端口和服务
 - 前端开发服务器: http://localhost:4000
 - 后端API服务: https://api.gei5.com（远程云服务器）
 - MySQL数据库: 远程云数据库（通过API访问）
-- phpMyAdmin: 不适用（远程数据库管理）
 
 ### 默认用户
 - **高春强** (admin) - 管理员权限
@@ -139,26 +126,33 @@ curl http://localhost:4000     # 前端服务（本地）
 
 ## 开发命令
 
-### 环境搭建和服务启动
+### 前端开发（主要工作流）
 ```bash
-# 启动Docker服务 (MySQL + phpMyAdmin)
-docker-compose up -d
-
-# 安装依赖
-cd backend && npm install
+# 安装依赖（仅需一次）
 cd frontend && npm install
 
-# 单独启动服务
+# 启动前端开发服务器
 cd frontend && npm run dev         # 前端端口4000 (Next.js开发服务器)
-cd backend && npm run dev          # 后端端口35001 (nodemon热重载)
 
-# 生产环境运行
+# 生产环境构建（谨慎使用）
+cd frontend && npm run build       # 仅在最终部署时使用
 cd frontend && npm run start       # 前端生产服务器
-cd backend && npm run start        # 后端生产服务器
 
 # Tauri桌面应用开发
 cd frontend && npm run tauri dev   # 开发模式启动桌面应用
 cd frontend && npm run tauri build # 构建桌面应用(Windows/macOS/Linux)
+```
+
+### 代码检查命令（用户手动运行）
+```bash
+# TypeScript类型检查（推荐方式，不构建）
+cd frontend && npx tsc --noEmit
+
+# 代码质量检查
+cd frontend && npm run lint
+
+# 注意：项目无单元测试框架，主要依靠开发服务器热重载和类型检查
+# 注意：Claude 不能自动运行这些命令，只能建议用户运行
 ```
 
 ### 后端API架构
@@ -172,8 +166,10 @@ cd frontend && npm run tauri build # 构建桌面应用(Windows/macOS/Linux)
 - **工人管理** - `/api/workers` - 工人信息CRUD、部门分配
 - **部门管理** - `/api/departments` - 部门增删改查
 - **图纸管理** - `/api/drawings` - 文件上传、版本控制、DXF预览
-- **全局搜索** - `/api/search` - 跨模块搜索功能
+- **全局搜索** - `/api/search` - 跨模块搜索功能（支持考勤、项目、材料、图纸搜索）
 - **仪表盘** - `/api/dashboard` - 统计数据和概览信息
+- **考勤管理** - `/api/attendance` - 员工考勤记录、请假、加班管理
+- **员工管理** - `/api/employees` - 员工信息管理
 - **SSE通信** - `/api/sse` - Server-Sent Events实时通知
 
 #### 数据库模型
@@ -198,12 +194,13 @@ cd frontend && npm run tauri build # 构建桌面应用(Windows/macOS/Linux)
 - **组件化架构**: 40+自研UI组件，高度模块化
 
 #### 关键前端功能
-- **实时状态管理**: 5个Zustand Store（projectStore、materialStore、workerMaterialStore、notificationStore、globalSyncStore）
+- **实时状态管理**: 6个Zustand Store（projectStore、materialStore、workerMaterialStore、notificationStore、globalSyncStore、attendanceStore）
 - **事件驱动通信**: 使用浏览器原生事件系统实现组件间通信
-- **全局搜索**: Ctrl+K/Cmd+K快捷键，跨模块搜索功能
+- **全局搜索**: Ctrl+K/Cmd+K快捷键，跨模块搜索功能（支持考勤、项目、材料、工人、图纸）
 - **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染
 - **音频通知系统**: 5种智能音效(success/error/warning/info/wancheng)，操作反馈
 - **实时通知**: SSE + 桌面通知 + 音频提示的多重反馈
+- **移动端适配**: MobileEmployeeCard、MobileFormWizard、StatCardSwiper等专用移动端组件
 - **Tauri桌面集成**: Rust后端处理系统级操作，Web前端负责UI
 
 ### Zustand Store架构详细说明
@@ -227,6 +224,16 @@ interface MaterialState {
   fetchMaterials(): Promise<void>;
 }
 
+// attendanceStore.ts - 考勤系统状态管理（新增）
+interface AttendanceState {
+  employees: Employee[];
+  attendanceExceptions: AttendanceException[];
+  loading: boolean;
+  createEmployee(data: Partial<Employee>): Promise<boolean>;
+  addException(data: AttendanceExceptionData): Promise<boolean>;
+  calculateMonthlySummary(year: number, month: number): Promise<void>;
+}
+
 // workerMaterialStore.ts - 工人材料关联管理
 // globalSyncStore.ts - 全局同步状态
 // notificationStore.ts - 通知消息管理
@@ -237,24 +244,23 @@ interface MaterialState {
 # 前端开发（热重载）
 cd frontend && npm run dev
 
-# 后端开发（nodemon）
-cd backend && npm run dev
+# 后端开发（仅修改文件，不运行）
+# 注意：本地不运行后端服务，仅修改代码文件供部署使用
 ```
 
-### 数据库管理命令
+### 数据库管理（远程）
 ```bash
-# 数据库操作（后端目录）
-cd backend
-npm run init:db                      # 初始化数据库结构
-npm run create:sample                # 创建测试数据
-node sync-db.js                      # 同步数据库结构更新
-node create-sample-data.js           # 创建样本数据
-node fix-users.js                    # 修复用户数据
+# 数据库操作（远程管理，不在本地执行）
+# 以下命令仅供参考，实际由远程服务器管理：
+# npm run init:db                      # 初始化数据库结构
+# npm run create:sample                # 创建测试数据
+# node sync-db.js                      # 同步数据库结构更新
+# node create-sample-data.js           # 创建样本数据
 
-# 数据库访问
-# phpMyAdmin: http://localhost:8880
-# 直连: mysql -h localhost -P 3330 -u laser_user -p laser_cutting_db
-# 凭据: user=laser_user, pass=laser_pass, db=laser_cutting_db
+# 数据库访问（远程）
+# 远程数据库: laser_cutting_db @ https://api.gei5.com
+# 用户: laser_user
+# 注意：无本地数据库访问权限
 ```
 
 ### 代码检查命令（用户手动运行）
@@ -274,21 +280,17 @@ cd frontend && npm run build         # 仅在部署时使用，生成优化后�
 
 ### 故障排除命令
 ```bash
-# 检查服务状态
-docker ps                           # Docker容器状态
-docker-compose logs mysql           # MySQL日志
-docker-compose logs phpmyadmin      # phpMyAdmin日志
-
-# 端口占用检查
-lsof -ti:4000                       # 前端端口
-lsof -ti:35001                      # 后端端口
-lsof -ti:3330                       # 数据库端口
-lsof -ti:8880                       # phpMyAdmin端口
+# 检查前端服务状态
+lsof -ti:4000                       # 前端端口检查
 
 # 网络连接测试
-curl http://localhost:35001/health  # 后端健康检查
 curl http://localhost:4000          # 前端服务
-curl http://localhost:8880          # phpMyAdmin
+curl https://api.gei5.com/health    # 远程后端健康检查（如果可用）
+
+# 前端日志查看
+cd frontend && npm run dev          # 开发服务器会显示实时日志
+
+# 注意：不需要检查本地后端服务或数据库，因为使用远程服务
 ```
 
 ## 关键开发模式和工作流程
@@ -423,19 +425,19 @@ SELECT * FROM v_monthly_attendance_stats;
 ```bash
 # 解决方案
 1. 确认JWT token有效性
-2. 检查后端服务状态: curl http://localhost:35001/health
-3. 验证CORS配置允许前端域名
+2. 检查前端服务状态: curl http://localhost:4000
+3. 检查环境变量: NEXT_PUBLIC_BACKEND_URL=https://api.gei5.com
 4. 确认API端点路径正确: /api/projects 而非 /projects
 ```
 
-### 数据库连接问题
-**症状**: 数据库连接超时、表不存在
+### 前端服务问题
+**症状**: 前端无法启动、页面无法访问
 ```bash
 # 解决步骤
-1. 检查MySQL容器: docker ps | grep mysql
-2. 重新初始化: cd backend && npm run init:db
-3. 检查凭据: user=laser_user, pass=laser_pass
-4. 端口确认: 3330(开发) 而非 3306
+1. 检查端口占用: lsof -ti:4000
+2. 重启前端服务: cd frontend && npm run dev
+3. 清理缓存: rm -rf .next && npm run dev
+4. 检查Node.js版本兼容性
 ```
 
 ### 状态同步问题
@@ -472,10 +474,17 @@ SELECT * FROM v_monthly_attendance_stats;
   - `frontend/utils/toastAccessibility.ts` - 无障碍访问支持
   - `frontend/utils/sseToastMapper.ts` - SSE事件到Toast映射
 
-### 增强组件库 (新增)
-- **高级选择器**: `frontend/components/ui/SearchableSelect.tsx` - 支持搜索的下拉选择组件
-- **Toast系统**: `frontend/components/ui/Toast.tsx` - 增强的智能提示组件
-- **响应式布局**: `frontend/components/ui/ResponsiveLayout.tsx` - 自适应布局容器
+### 移动端专用组件 (新增)
+- **StatCardSwiper**: 移动端统计卡片轮播组件，支持触摸滑动浏览统计数据
+- **MobileEmployeeCard**: 移动端员工卡片组件，卡片式员工信息展示，触摸友好的大按钮
+- **MobileFormWizard**: 移动端分步表单向导，复杂表单拆分为多步骤，降低认知负担
+- **MobileStatsOverview**: 移动端统计概览组件，紧凑的统计信息显示
+
+### 全局搜索增强 (v2.4.0新增)
+- **考勤模块搜索**: 支持按请假、加班、缺勤等类型搜索考勤异常记录
+- **中文关键词映射**: 请假→leave、加班→overtime、缺勤→absent等自动转换
+- **智能搜索结果**: 按原因搜索和按员工搜索的双重机制，支持并行查询和结果合并
+- **搜索结果导航**: 从搜索结果直接跳转到对应模块（考勤、项目、材料等）
 
 ## 关键文件位置
 
@@ -506,15 +515,24 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/utils/*ToastHelper.ts` - 专业化Toast助手集合 (新增)
 - `frontend/utils/toastAnimationOptimizer.ts` - Toast性能优化 (新增)
 
-### 配置文件
-- `frontend/.env.local` - 前端环境配置
-- `backend/src/config/envConfig.js` - 后端环境配置
-- `docker-compose.yml` - 数据库容器配置
-- `database/init/01-create-tables.sql` - 基础数据库结构
-- `database/migrations/attendance_system.sql` - 考勤系统数据库结构 (新增)
-- `frontend/next.config.js` - Next.js开发配置(标准模式，非export)
+### 核心配置文件
+- `frontend/.env.local` - 前端环境配置（远程后端URL配置）
+- `frontend/next.config.js` - Next.js开发配置（标准模式，非export）
 - `frontend/tailwind.config.js` - iOS 18/macOS 15 设计系统配置
-- `deploy-to-server.sh` - 云服务器部署脚本
+- `frontend/utils/envConfig.ts` - 环境配置管理（支持远程API连接）
+- `frontend/utils/api.ts` - API请求统一管理（远程后端连接）
+
+### 移动端组件
+- `frontend/components/ui/StatCardSwiper.tsx` - 响应式统计卡片轮播组件
+- `frontend/components/ui/MobileEmployeeCard.tsx` - 移动端员工卡片组件
+- `frontend/components/ui/MobileFormWizard.tsx` - 移动端分步表单向导
+- `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
+
+### 版本历史
+- **当前版本**: v2.4.0 (2025-08-15)
+- **重点更新**: 全局搜索功能完善、考勤模块搜索支持、代码质量提升
+- **架构变更**: 远程后端分离式部署、移动端专用组件系统
+- **更新日志**: 详见 `/更新日志.txt` 和 `frontend/CHANGELOG.md`
 
 ### 数据模型文件
 - `backend/src/models/index.js` - Sequelize模型汇总和关联定义
