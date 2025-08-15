@@ -529,10 +529,78 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.4.0 (2025-08-15)
-- **重点更新**: 全局搜索功能完善、考勤模块搜索支持、代码质量提升
+- **当前版本**: v2.4.1 (2025-08-15)
+- **更新内容**: 修复SSE实时推送功能，恢复项目和材料状态变更通知
 - **架构变更**: 远程后端分离式部署、移动端专用组件系统
 - **更新日志**: 详见 `/更新日志.txt` 和 `frontend/CHANGELOG.md`
+
+## 版本管理原则
+
+### 语义化版本控制
+本项目采用语义化版本控制（Semantic Versioning），版本号格式为：`MAJOR.MINOR.PATCH`
+
+#### 版本号更新规则
+1. **PATCH版本（2.4.0 → 2.4.1）**
+   - **用途**: Bug修复、小优化、代码重构
+   - **示例**: 
+     - 修复SSE通知重复问题
+     - 修复UI显示错误
+     - 性能优化
+     - 代码清理和注释完善
+   - **兼容性**: 完全向后兼容
+   - **数据库**: 无需变更
+
+2. **MINOR版本（2.4.1 → 2.5.0）**
+   - **用途**: 新功能添加、功能增强、新模块
+   - **示例**:
+     - 添加考勤管理系统
+     - 新增全局搜索功能
+     - 增加移动端专用组件
+     - API接口扩展
+   - **兼容性**: 向后兼容
+   - **数据库**: 可能需要数据库迁移
+
+3. **MAJOR版本（2.5.0 → 3.0.0）**
+   - **用途**: 重大架构变更、不兼容的API变更、重要依赖升级
+   - **示例**:
+     - 技术栈升级（Next.js 16、React 19）
+     - 数据库架构重大变更
+     - API接口重大变更
+     - UI/UX大幅重构
+   - **兼容性**: 可能存在破坏性变更
+   - **数据库**: 需要完整数据迁移
+
+#### 版本更新流程
+1. **开发阶段**: 在开发分支进行功能开发
+2. **版本确定**: 根据变更内容确定版本号类型
+3. **更新文件**:
+   - `frontend/package.json` - 更新version字段
+   - `CLAUDE.md` - 更新版本历史部分
+   - 可选：`frontend/CHANGELOG.md` - 详细更新日志
+4. **提交代码**: 使用规范的commit message
+5. **创建标签**: `git tag v2.4.1`
+6. **推送更新**: `git push && git push --tags`
+
+#### Commit Message规范
+```
+类型(范围): 简短描述
+
+详细描述（可选）
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+**常用类型**:
+- `fix`: Bug修复 (PATCH)
+- `feat`: 新功能 (MINOR)
+- `BREAKING CHANGE`: 破坏性变更 (MAJOR)
+- `refactor`: 代码重构 (PATCH)
+- `docs`: 文档更新 (PATCH)
+- `style`: 代码格式化 (PATCH)
+- `perf`: 性能优化 (PATCH)
+- `test`: 测试相关 (PATCH)
 
 ### 数据模型文件
 - `backend/src/models/index.js` - Sequelize模型汇总和关联定义
