@@ -5,8 +5,10 @@ import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { ActivityBar } from './ActivityBar';
 import { useResponsive } from '@/hooks/useResponsive';
-import { MobileDrawer, BottomSheet, IconButton } from '@/components/ui';
+import { MobileDrawer, BottomSheet, IconButton, ToastContainer, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSSEToastMapping } from '@/utils/sseToastMapper';
+import { useBatchOperationToastListener } from '@/utils/batchOperationToastHelper';
 import { 
   ClipboardDocumentListIcon,
   CheckCircleIcon,
@@ -46,6 +48,21 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
   const [showMobileSidebar, setShowMobileSidebar] = React.useState(false);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const { user, logout } = useAuth();
+
+  // 初始化Toast系统 - 与MainLayout保持一致
+  const toast = useToast();
+
+  // 启用SSE到Toast自动映射
+  useSSEToastMapping({
+    autoStart: true,
+    projectEvents: true,
+    materialEvents: true,
+    drawingEvents: true,
+    workerEvents: true,
+  });
+
+  // 启用批量操作Toast监听器
+  useBatchOperationToastListener(toast);
 
   // 桌面端布局 - VS Code风格
   if (isDesktop) {
@@ -290,6 +307,9 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
           inMobileDrawer: true
         })}
       </MobileDrawer>
+
+      {/* Toast容器 - 确保Toast能正常显示 */}
+      <ToastContainer position="top-right" />
     </div>
   );
 };

@@ -8,7 +8,6 @@ import {
   TabBar,
   ModernTable,
   MonthSelector,
-  Avatar,
   Loading,
   useToast,
   IconButton,
@@ -71,7 +70,7 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
         const data = await response.json();
         setServerToday(data.date);
       } catch (error) {
-        console.warn('获取服务器时间失败，使用本地时间:', error);
+        
         // 如果获取失败，使用本地时间作为后备
         setServerToday(new Date().toISOString().split('T')[0]);
       }
@@ -96,17 +95,33 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
     }
   }, [serverToday, selectedDate]);
 
-  // 过滤员工
-  const filteredEmployees = employees.filter(employee =>
-    employee && 
-    employee.name && 
-    employee.employeeId && 
-    employee.department && (
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.department.toLowerCase().includes(searchTerm.toLowerCase())
+  // 过滤员工并按工号排序
+  const filteredEmployees = employees
+    .filter(employee =>
+      employee && 
+      employee.name && 
+      employee.employeeId && 
+      employee.department && (
+        employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        employee.department.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     )
-  );
+    .sort((a, b) => {
+      // 按工号排序
+      const employeeIdA = a.employeeId || '';
+      const employeeIdB = b.employeeId || '';
+      
+      if (employeeIdA && employeeIdB) {
+        return employeeIdA.localeCompare(employeeIdB);
+      } else if (employeeIdA && !employeeIdB) {
+        return -1;
+      } else if (!employeeIdA && employeeIdB) {
+        return 1;
+      } else {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+    });
 
   // Tab配置
   const tabs = [
@@ -334,7 +349,7 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
       });
       
     } catch (error) {
-      console.error('考勤状态更新失败:', error);
+      
       toast.addToast({
         type: 'error',
         message: '更新失败，请重试'
@@ -414,7 +429,7 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
                     message: '导出成功'
                   });
                 } catch (error) {
-                  console.error('导出失败:', error);
+                  
                   toast.addToast({
                     type: 'error',
                     message: '导出失败，请重试'
@@ -466,19 +481,6 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
 
   return (
     <div className={`space-y-4 sm:space-y-6 ${className}`}>
-      {/* 页面标题 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-ios18-blue rounded-xl flex items-center justify-center">
-            <UsersIcon className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary">考勤管理</h1>
-            <p className="text-sm sm:text-base text-text-secondary">简单实用的员工考勤管理</p>
-          </div>
-        </div>
-      </div>
-
       {/* Tab导航 */}
       <TabBar
         tabs={tabs.map(tab => ({

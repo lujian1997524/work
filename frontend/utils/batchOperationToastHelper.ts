@@ -1,11 +1,10 @@
-// 批量操作Toast辅助模块
-// 用于在非React组件中触发批量操作相关Toast提示
+// 批量操作通知辅助模块
+// 使用统一的通知系统（NotificationContainer + notificationStore）
 
+import { useNotificationStore } from '@/stores/notificationStore';
+import { audioManager } from './audioManager';
+import { configManager } from './configManager';
 import React from 'react';
-import { projectToastHelper } from './projectToastHelper';
-import { materialToastHelper } from './materialToastHelper';
-import { workerToastHelper } from './workerToastHelper';
-import { drawingToastHelper } from './drawingToastHelper';
 
 // 批量操作类型
 export type BatchOperationType = 
@@ -34,7 +33,7 @@ export interface BatchOperationProgress {
   currentItem?: string;
 }
 
-// 批量操作Toast辅助接口
+// 批量操作通知辅助接口
 interface BatchOperationToastHelper {
   // 批量操作开始
   batchStarted: (operation: string, total: number, type: BatchOperationType) => void;
@@ -78,329 +77,303 @@ interface BatchOperationToastHelper {
   error: (message: string) => void;
 }
 
-// 创建全局事件来触发Toast
-export const batchOperationToastEvents = {
-  emit: (eventType: string, data: any) => {
-    window.dispatchEvent(new CustomEvent(`batch-toast-${eventType}`, { detail: data }));
+// 播放批量操作相关音效的辅助函数
+const playBatchSound = async (soundType: 'info' | 'success' | 'warning' | 'error' | 'wancheng') => {
+  try {
+    const config = configManager.getConfig();
+    if (!config.notifications.sound || !audioManager.getConfig().enabled) {
+      return;
+    }
+    await audioManager.playNotificationSound(soundType);
+  } catch (error) {
+    // 静默处理音频播放错误
   }
 };
 
-// Toast事件处理器（在React组件中使用）
-export const useBatchOperationToastListener = (toast: any) => {
-  React.useEffect(() => {
-    const handlers = {
-      'batch-toast-started': (e: CustomEvent) => {
-        const { operation, total, type } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message: `开始执行批量${operation}，共${total}项任务`,
-          duration: 3000
-        });
-      },
-      
-      'batch-toast-progress': (e: CustomEvent) => {
-        const { progress } = e.detail;
-        const { operation, current, total, percentage, currentItem } = progress;
-        const currentInfo = currentItem ? `正在处理：${currentItem}` : '';
-        toast.addToast({
-          type: 'info',
-          message: `${operation}进度：${current}/${total} (${percentage.toFixed(1)}%) ${currentInfo}`,
-          duration: 2000
-        });
-      },
-      
-      'batch-toast-completed': (e: CustomEvent) => {
-        const { result, type } = e.detail;
-        const { operation, total, successful, failed } = result;
-        
-        if (failed === 0) {
-          toast.addToast({
-            type: 'success',
-            message: `批量${operation}成功完成，共处理${total}项`,
-            duration: 4000
-          });
-        } else {
-          toast.addToast({
-            type: 'warning',
-            message: `批量${operation}完成，成功${successful}项，失败${failed}项`,
-            duration: 5000
-          });
-        }
-      },
-      
-      'batch-toast-failed': (e: CustomEvent) => {
-        const { operation, error } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message: `批量${operation}执行失败：${error}`,
-          duration: 6000
-        });
-      },
-      
-      // 项目批量操作事件
-      'batch-toast-project-update': (e: CustomEvent) => {
-        const { updatedCount, total, updateType } = e.detail;
-        if (updatedCount === total) {
-          toast.addToast({
-            type: 'success',
-            message: `成功批量更新${updatedCount}个项目的${updateType}`
-          });
-        } else {
-          toast.addToast({
-            type: 'warning',
-            message: `批量更新项目${updateType}：成功${updatedCount}个，共${total}个`
-          });
-        }
-      },
-      
-      'batch-toast-project-delete': (e: CustomEvent) => {
-        const { deletedCount, total } = e.detail;
-        toast.addToast({
-          type: deletedCount === total ? 'success' : 'warning',
-          message: `批量删除项目完成：成功删除${deletedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-project-status-change': (e: CustomEvent) => {
-        const { changedCount, total, newStatus } = e.detail;
-        toast.addToast({
-          type: changedCount === total ? 'success' : 'warning',
-          message: `批量更改项目状态为"${newStatus}"：成功${changedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-project-assign': (e: CustomEvent) => {
-        const { assignedCount, total, workerName } = e.detail;
-        toast.addToast({
-          type: assignedCount === total ? 'success' : 'warning',
-          message: `批量分配项目给${workerName}：成功${assignedCount}个，共${total}个`
-        });
-      },
-      
-      // 材料批量操作事件
-      'batch-toast-material-status-update': (e: CustomEvent) => {
-        const { updatedCount, total, newStatus } = e.detail;
-        toast.addToast({
-          type: updatedCount === total ? 'success' : 'warning',
-          message: `批量更新材料状态为"${newStatus}"：成功${updatedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-material-transfer': (e: CustomEvent) => {
-        const { transferredCount, total, fromWorker, toWorker } = e.detail;
-        toast.addToast({
-          type: transferredCount === total ? 'success' : 'warning',
-          message: `批量转移材料从${fromWorker}到${toWorker}：成功${transferredCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-material-recycle': (e: CustomEvent) => {
-        const { recycledCount, total } = e.detail;
-        toast.addToast({
-          type: recycledCount === total ? 'success' : 'warning',
-          message: `批量回收材料：成功${recycledCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-material-allocation': (e: CustomEvent) => {
-        const { allocatedCount, total, projectName } = e.detail;
-        toast.addToast({
-          type: allocatedCount === total ? 'success' : 'warning',
-          message: `批量分配材料到项目"${projectName}"：成功${allocatedCount}个，共${total}个`
-        });
-      },
-      
-      // 工人批量操作事件
-      'batch-toast-worker-create': (e: CustomEvent) => {
-        const { createdCount, total, department } = e.detail;
-        toast.addToast({
-          type: createdCount === total ? 'success' : 'warning',
-          message: `批量创建${department}部门工人：成功${createdCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-worker-update': (e: CustomEvent) => {
-        const { updatedCount, total, updateType } = e.detail;
-        toast.addToast({
-          type: updatedCount === total ? 'success' : 'warning',
-          message: `批量更新工人${updateType}：成功${updatedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-worker-assign': (e: CustomEvent) => {
-        const { assignedCount, total, projectName } = e.detail;
-        toast.addToast({
-          type: assignedCount === total ? 'success' : 'warning',
-          message: `批量分配工人到项目"${projectName}"：成功${assignedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-worker-department-change': (e: CustomEvent) => {
-        const { changedCount, total, newDepartment } = e.detail;
-        toast.addToast({
-          type: changedCount === total ? 'success' : 'warning',
-          message: `批量调整工人到${newDepartment}部门：成功${changedCount}个，共${total}个`
-        });
-      },
-      
-      // 图纸批量操作事件
-      'batch-toast-drawing-upload': (e: CustomEvent) => {
-        const { uploadedCount, total, projectName } = e.detail;
-        toast.addToast({
-          type: uploadedCount === total ? 'success' : 'warning',
-          message: `批量上传图纸到项目"${projectName}"：成功${uploadedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-drawing-delete': (e: CustomEvent) => {
-        const { deletedCount, total } = e.detail;
-        toast.addToast({
-          type: deletedCount === total ? 'success' : 'warning',
-          message: `批量删除图纸：成功${deletedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-drawing-move': (e: CustomEvent) => {
-        const { movedCount, total, targetProject } = e.detail;
-        toast.addToast({
-          type: movedCount === total ? 'success' : 'warning',
-          message: `批量移动图纸到项目"${targetProject}"：成功${movedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-drawing-version-update': (e: CustomEvent) => {
-        const { updatedCount, total } = e.detail;
-        toast.addToast({
-          type: updatedCount === total ? 'success' : 'warning',
-          message: `批量更新图纸版本：成功${updatedCount}个，共${total}个`
-        });
-      },
-      
-      'batch-toast-info': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message
-        });
-      },
-      
-      'batch-toast-error': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message
-        });
-      }
-    };
-
-    // 注册事件监听器
-    Object.entries(handlers).forEach(([eventType, handler]) => {
-      window.addEventListener(eventType, handler as EventListener);
-    });
-
-    // 清理函数
-    return () => {
-      Object.entries(handlers).forEach(([eventType, handler]) => {
-        window.removeEventListener(eventType, handler as EventListener);
-      });
-    };
-  }, [toast]);
+// 使用统一的通知系统显示批量操作通知
+const showBatchNotification = (
+  type: 'info' | 'success' | 'warning' | 'error',
+  title: string,
+  message: string,
+  duration: number = 4000
+) => {
+  // 获取 notificationStore 的 addNotification 方法
+  const notificationStore = useNotificationStore.getState();
+  
+  // 生成唯一ID
+  const id = `batch-${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  
+  // 播放对应音效
+  playBatchSound(type === 'success' && message.includes('完成') ? 'wancheng' : type);
+  
+  // 添加通知到系统
+  notificationStore.addNotification({
+    id,
+    type,
+    title,
+    message,
+    timestamp: new Date().toISOString(),
+    duration
+  });
 };
 
-// 批量操作Toast辅助函数
+// 批量操作辅助函数（直接调用通知系统）
 export const batchOperationToastHelper: BatchOperationToastHelper = {
   // 通用批量操作
   batchStarted: (operation: string, total: number, type: BatchOperationType) => {
-    batchOperationToastEvents.emit('started', { operation, total, type });
+    playBatchSound('info');
+    showBatchNotification(
+      'info',
+      '批量操作开始',
+      `开始执行批量${operation}，共${total}项任务`,
+      3000
+    );
   },
   
   batchProgress: (progress: BatchOperationProgress) => {
-    batchOperationToastEvents.emit('progress', { progress });
+    const { operation, current, total, percentage, currentItem } = progress;
+    const currentInfo = currentItem ? `正在处理：${currentItem}` : '';
+    showBatchNotification(
+      'info',
+      '批量操作进度',
+      `${operation}进度：${current}/${total} (${percentage.toFixed(1)}%) ${currentInfo}`,
+      2000
+    );
   },
   
   batchCompleted: (result: BatchOperationResult, type: BatchOperationType) => {
-    batchOperationToastEvents.emit('completed', { result, type });
+    const { operation, total, successful, failed } = result;
+    
+    if (failed === 0) {
+      playBatchSound('wancheng');
+      showBatchNotification(
+        'success',
+        '批量操作完成',
+        `批量${operation}成功完成，共处理${total}项`,
+        4000
+      );
+    } else {
+      playBatchSound('warning');
+      showBatchNotification(
+        'warning',
+        '批量操作部分完成',
+        `批量${operation}完成，成功${successful}项，失败${failed}项`,
+        5000
+      );
+    }
   },
   
   batchFailed: (operation: string, error: string, type: BatchOperationType) => {
-    batchOperationToastEvents.emit('failed', { operation, error, type });
+    playBatchSound('error');
+    showBatchNotification(
+      'error',
+      '批量操作失败',
+      `批量${operation}执行失败：${error}`,
+      6000
+    );
   },
   
   // 项目批量操作
   projectBatchUpdate: (updatedCount: number, total: number, updateType: string) => {
-    batchOperationToastEvents.emit('project-update', { updatedCount, total, updateType });
+    const sound = updatedCount === total ? 'wancheng' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      updatedCount === total ? 'success' : 'warning',
+      '项目批量更新',
+      updatedCount === total 
+        ? `成功批量更新${updatedCount}个项目的${updateType}`
+        : `批量更新项目${updateType}：成功${updatedCount}个，共${total}个`,
+      4000
+    );
   },
   
   projectBatchDelete: (deletedCount: number, total: number) => {
-    batchOperationToastEvents.emit('project-delete', { deletedCount, total });
+    const sound = deletedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      deletedCount === total ? 'success' : 'warning',
+      '项目批量删除',
+      `批量删除项目完成：成功删除${deletedCount}个，共${total}个`,
+      4000
+    );
   },
   
   projectBatchStatusChange: (changedCount: number, total: number, newStatus: string) => {
-    batchOperationToastEvents.emit('project-status-change', { changedCount, total, newStatus });
+    const sound = changedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      changedCount === total ? 'success' : 'warning',
+      '项目状态批量更改',
+      `批量更改项目状态为"${newStatus}"：成功${changedCount}个，共${total}个`,
+      4000
+    );
   },
   
   projectBatchAssign: (assignedCount: number, total: number, workerName: string) => {
-    batchOperationToastEvents.emit('project-assign', { assignedCount, total, workerName });
+    const sound = assignedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      assignedCount === total ? 'success' : 'warning',
+      '项目批量分配',
+      `批量分配项目给${workerName}：成功${assignedCount}个，共${total}个`,
+      4000
+    );
   },
   
   // 材料批量操作
   materialBatchStatusUpdate: (updatedCount: number, total: number, newStatus: string) => {
-    batchOperationToastEvents.emit('material-status-update', { updatedCount, total, newStatus });
+    const sound = updatedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      updatedCount === total ? 'success' : 'warning',
+      '材料状态批量更新',
+      `批量更新材料状态为"${newStatus}"：成功${updatedCount}个，共${total}个`,
+      4000
+    );
   },
   
   materialBatchTransfer: (transferredCount: number, total: number, fromWorker: string, toWorker: string) => {
-    batchOperationToastEvents.emit('material-transfer', { transferredCount, total, fromWorker, toWorker });
+    const sound = transferredCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      transferredCount === total ? 'success' : 'warning',
+      '材料批量调拨',
+      `批量转移材料从${fromWorker}到${toWorker}：成功${transferredCount}个，共${total}个`,
+      4000
+    );
   },
   
   materialBatchRecycle: (recycledCount: number, total: number) => {
-    batchOperationToastEvents.emit('material-recycle', { recycledCount, total });
+    const sound = recycledCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      recycledCount === total ? 'success' : 'warning',
+      '材料批量回收',
+      `批量回收材料：成功${recycledCount}个，共${total}个`,
+      4000
+    );
   },
   
   materialBatchAllocation: (allocatedCount: number, total: number, projectName: string) => {
-    batchOperationToastEvents.emit('material-allocation', { allocatedCount, total, projectName });
+    const sound = allocatedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      allocatedCount === total ? 'success' : 'warning',
+      '材料批量分配',
+      `批量分配材料到项目"${projectName}"：成功${allocatedCount}个，共${total}个`,
+      4000
+    );
   },
   
   // 工人批量操作
   workerBatchCreate: (createdCount: number, total: number, department: string) => {
-    batchOperationToastEvents.emit('worker-create', { createdCount, total, department });
+    const sound = createdCount === total ? 'wancheng' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      createdCount === total ? 'success' : 'warning',
+      '工人批量创建',
+      `批量创建${department}部门工人：成功${createdCount}个，共${total}个`,
+      4000
+    );
   },
   
   workerBatchUpdate: (updatedCount: number, total: number, updateType: string) => {
-    batchOperationToastEvents.emit('worker-update', { updatedCount, total, updateType });
+    const sound = updatedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      updatedCount === total ? 'success' : 'warning',
+      '工人信息批量更新',
+      `批量更新工人${updateType}：成功${updatedCount}个，共${total}个`,
+      4000
+    );
   },
   
   workerBatchAssign: (assignedCount: number, total: number, projectName: string) => {
-    batchOperationToastEvents.emit('worker-assign', { assignedCount, total, projectName });
+    const sound = assignedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      assignedCount === total ? 'success' : 'warning',
+      '工人批量分配',
+      `批量分配工人到项目"${projectName}"：成功${assignedCount}个，共${total}个`,
+      4000
+    );
   },
   
   workerBatchDepartmentChange: (changedCount: number, total: number, newDepartment: string) => {
-    batchOperationToastEvents.emit('worker-department-change', { changedCount, total, newDepartment });
+    const sound = changedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      changedCount === total ? 'success' : 'warning',
+      '工人部门批量调整',
+      `批量调整工人到${newDepartment}部门：成功${changedCount}个，共${total}个`,
+      4000
+    );
   },
   
   // 图纸批量操作
   drawingBatchUpload: (uploadedCount: number, total: number, projectName: string) => {
-    batchOperationToastEvents.emit('drawing-upload', { uploadedCount, total, projectName });
+    const sound = uploadedCount === total ? 'wancheng' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      uploadedCount === total ? 'success' : 'warning',
+      '图纸批量上传',
+      `批量上传图纸到项目"${projectName}"：成功${uploadedCount}个，共${total}个`,
+      4000
+    );
   },
   
   drawingBatchDelete: (deletedCount: number, total: number) => {
-    batchOperationToastEvents.emit('drawing-delete', { deletedCount, total });
+    const sound = deletedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      deletedCount === total ? 'success' : 'warning',
+      '图纸批量删除',
+      `批量删除图纸：成功${deletedCount}个，共${total}个`,
+      4000
+    );
   },
   
   drawingBatchMove: (movedCount: number, total: number, targetProject: string) => {
-    batchOperationToastEvents.emit('drawing-move', { movedCount, total, targetProject });
+    const sound = movedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      movedCount === total ? 'success' : 'warning',
+      '图纸批量移动',
+      `批量移动图纸到项目"${targetProject}"：成功${movedCount}个，共${total}个`,
+      4000
+    );
   },
   
   drawingBatchVersionUpdate: (updatedCount: number, total: number) => {
-    batchOperationToastEvents.emit('drawing-version-update', { updatedCount, total });
+    const sound = updatedCount === total ? 'success' : 'warning';
+    playBatchSound(sound);
+    showBatchNotification(
+      updatedCount === total ? 'success' : 'warning',
+      '图纸版本批量更新',
+      `批量更新图纸版本：成功${updatedCount}个，共${total}个`,
+      4000
+    );
   },
   
   // 通用消息
   info: (message: string) => {
-    batchOperationToastEvents.emit('info', { message });
+    playBatchSound('info');
+    showBatchNotification(
+      'info',
+      '批量操作提示',
+      message,
+      4000
+    );
   },
   
   error: (message: string) => {
-    batchOperationToastEvents.emit('error', { message });
+    playBatchSound('error');
+    showBatchNotification(
+      'error',
+      '批量操作错误',
+      message,
+      5000
+    );
   }
 };
 
@@ -467,4 +440,10 @@ export const useBatchOperationTracker = () => {
       new BatchOperationTracker(operation, total, type),
     helper: batchOperationToastHelper
   };
+};
+
+// 简化的React Hook（移除复杂的事件监听）
+export const useBatchOperationToastListener = (toast?: any) => {
+  // 不再需要复杂的事件监听，直接使用notificationStore
+  return;
 };

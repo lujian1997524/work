@@ -10,7 +10,6 @@ import {
   Input,
   Select,
   Button,
-  Avatar,
   Alert,
   Badge,
   useToast
@@ -387,11 +386,6 @@ export const DailyAttendanceEntry: React.FC<DailyAttendanceEntryProps> = ({
           {selectedEmployee && (
             <div className={`p-4 rounded-lg ${typeInfo.bgColor}`}>
               <div className="flex items-center gap-4">
-                <Avatar 
-                  name={selectedEmployee.name}
-                  src={selectedEmployee.avatar}
-                  size="sm"
-                />
                 <div className="flex-1">
                   <div className="font-medium text-text-primary">
                     {selectedEmployee.name} ({selectedEmployee.employeeId})

@@ -1,7 +1,7 @@
 {
   "name": "laser-cutting-manager-frontend",
-  "version": "0.1.0",
-  "description": "激光切割生产管理系统",
+  "version": "2.3.0",
+  "description": "激光切割生产管理系统 - 修复项目详情移动端适配，优化板材状态显示",
   "author": "LaserCut Team",
   "private": true,
   "scripts": {

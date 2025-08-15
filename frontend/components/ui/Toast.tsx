@@ -16,7 +16,6 @@ import {
   TrashIcon,
   PlusIcon,
   CloudArrowUpIcon,
-  CloudArrowDownIcon,
   // 新增智能Toast所需图标
   UserGroupIcon,
   ChartBarIcon,
@@ -37,27 +36,20 @@ export interface ToastProps {
   id?: string
   message: string
   type?: 'success' | 'error' | 'warning' | 'info' | 'project-created' | 'project-updated' | 'project-deleted' | 'material-changed' | 'file-uploaded' | 'sync-completed' | 'wancheng' | 
-        // 真实业务场景类型（基于修订方案）
-        // 项目管理
+        // 真实业务场景类型
         'project-status-auto' | 'project-archived' | 'worker-reassigned' |
-        // 材料管理（四状态循环）
         'material-allocated' | 'material-started' | 'material-completed' | 'material-recycled' |
         'stock-added' | 'stock-warning' | 'dimension-added' | 'material-transferred' |
         'strategy-deviation' | 'strategy-warning' | 'strategy-balanced' |
-        // 图纸管理
         'file-uploading' | 'dxf-parsed' | 'common-part-tagged' | 'upload-error' |
         'version-updated' | 'version-conflict' | 'version-deprecated' |
         'drawing-linked' | 'drawing-unlinked' |
-        // 工人管理
         'worker-updated' | 'worker-added' | 'worker-removed' |
         'worker-overloaded' | 'worker-available' | 'workload-balanced' |
-        // 实时协作（SSE）
         'collaboration-notify' | 'sync-updated' | 'collaboration-alert' | 'assignment-changed' |
-        'sync-completed' | 'sync-error' | 'connection-lost' | 'connection-restored' |
-        // 智能辅助
+        'sync-error' | 'connection-lost' | 'connection-restored' |
         'smart-suggestion' | 'pattern-insight' | 'skill-match' | 'timeline-insight' |
         'efficiency-insight' | 'performance-report' | 'bottleneck-detected' | 'workflow-optimization' |
-        // 批量操作
         'batch-operation'
   duration?: number
   position?: 'top' | 'top-right' | 'top-left' | 'bottom' | 'bottom-right' | 'bottom-left' | 'top-center'
@@ -69,22 +61,21 @@ export interface ToastProps {
     onClick: () => void
     variant?: 'primary' | 'secondary'
   }>
-  progress?: number // 0-100，用于显示任务进度
+  progress?: number
   showProgress?: boolean
-  persistent?: boolean // 是否持久显示（不自动关闭）
+  persistent?: boolean
   size?: 'sm' | 'md' | 'lg'
-  variant?: 'filled' | 'outline' | 'glass' // 视觉变体
-  // 真实业务扩展属性
-  priority?: 'low' | 'normal' | 'high' | 'urgent' // 优先级
-  category?: 'project' | 'material' | 'drawing' | 'worker' | 'system' | 'collaboration' // 真实分类
-  relatedId?: string // 关联的业务ID（项目ID、材料ID等）
-  metadata?: Record<string, any> // 附加业务数据
-  showAvatar?: boolean // 显示头像（协作场景）
-  avatarUrl?: string // 头像URL
-  showTime?: boolean // 显示时间戳
-  expandable?: boolean // 可展开显示详情
-  details?: string // 详细信息内容
-  linkTo?: string // 点击跳转链接
+  variant?: 'filled' | 'outline' | 'glass'
+  priority?: 'low' | 'normal' | 'high' | 'urgent'
+  category?: 'project' | 'material' | 'drawing' | 'worker' | 'system' | 'collaboration'
+  relatedId?: string
+  metadata?: Record<string, any>
+  showAvatar?: boolean
+  avatarUrl?: string
+  showTime?: boolean
+  expandable?: boolean
+  details?: string
+  linkTo?: string
 }
 
 export interface ToastContextType {
@@ -222,7 +213,6 @@ const getToastIcon = (type: ToastProps['type']) => {
 // 基于真实业务场景的样式映射
 const getToastStyles = (type: ToastProps['type'], variant: ToastProps['variant'] = 'filled') => {
   const baseStyles = {
-    // 基础样式
     'success': {
       filled: 'bg-green-500 text-white border-green-500',
       outline: 'bg-green-50 text-green-800 border-green-500 border',
@@ -243,142 +233,10 @@ const getToastStyles = (type: ToastProps['type'], variant: ToastProps['variant']
       outline: 'bg-blue-50 text-blue-800 border-blue-500 border',
       glass: 'bg-blue-500/90 backdrop-blur-md text-white border-blue-400/50 border'
     },
-
-    // 项目管理样式
-    'project-created': {
-      filled: 'bg-green-600 text-white border-green-600',
-      outline: 'bg-green-50 text-green-800 border-green-600 border',
-      glass: 'bg-green-600/90 backdrop-blur-md text-white border-green-500/50 border'
-    },
-    'project-updated': {
-      filled: 'bg-blue-600 text-white border-blue-600',
-      outline: 'bg-blue-50 text-blue-800 border-blue-600 border',
-      glass: 'bg-blue-600/90 backdrop-blur-md text-white border-blue-500/50 border'
-    },
-    'project-deleted': {
-      filled: 'bg-red-600 text-white border-red-600',
-      outline: 'bg-red-50 text-red-800 border-red-600 border',
-      glass: 'bg-red-600/90 backdrop-blur-md text-white border-red-500/50 border'
-    },
-    'project-status-auto': {
-      filled: 'bg-indigo-600 text-white border-indigo-600',
-      outline: 'bg-indigo-50 text-indigo-800 border-indigo-600 border',
-      glass: 'bg-indigo-600/90 backdrop-blur-md text-white border-indigo-500/50 border'
-    },
-    'project-archived': {
-      filled: 'bg-gray-600 text-white border-gray-600',
-      outline: 'bg-gray-50 text-gray-800 border-gray-600 border',
-      glass: 'bg-gray-600/90 backdrop-blur-md text-white border-gray-500/50 border'
-    },
-    'worker-reassigned': {
-      filled: 'bg-purple-600 text-white border-purple-600',
-      outline: 'bg-purple-50 text-purple-800 border-purple-600 border',
-      glass: 'bg-purple-600/90 backdrop-blur-md text-white border-purple-500/50 border'
-    },
-
-    // 材料管理样式（四状态循环）
-    'material-changed': {
-      filled: 'bg-purple-500 text-white border-purple-500',
-      outline: 'bg-purple-50 text-purple-800 border-purple-500 border',
-      glass: 'bg-purple-500/90 backdrop-blur-md text-white border-purple-400/50 border'
-    },
-    'material-allocated': {
-      filled: 'bg-orange-500 text-white border-orange-500',
-      outline: 'bg-orange-50 text-orange-800 border-orange-500 border',
-      glass: 'bg-orange-500/90 backdrop-blur-md text-white border-orange-400/50 border'
-    },
-    'material-started': {
-      filled: 'bg-blue-500 text-white border-blue-500',
-      outline: 'bg-blue-50 text-blue-800 border-blue-500 border',
-      glass: 'bg-blue-500/90 backdrop-blur-md text-white border-blue-400/50 border'
-    },
-    'material-completed': {
-      filled: 'bg-green-500 text-white border-green-500',
-      outline: 'bg-green-50 text-green-800 border-green-500 border',
-      glass: 'bg-green-500/90 backdrop-blur-md text-white border-green-400/50 border'
-    },
-    'material-recycled': {
-      filled: 'bg-gray-500 text-white border-gray-500',
-      outline: 'bg-gray-50 text-gray-800 border-gray-500 border',
-      glass: 'bg-gray-500/90 backdrop-blur-md text-white border-gray-400/50 border'
-    },
-    'stock-added': {
-      filled: 'bg-emerald-500 text-white border-emerald-500',
-      outline: 'bg-emerald-50 text-emerald-800 border-emerald-500 border',
-      glass: 'bg-emerald-500/90 backdrop-blur-md text-white border-emerald-400/50 border'
-    },
-    'stock-warning': {
-      filled: 'bg-red-500 text-white border-red-500',
-      outline: 'bg-red-50 text-red-800 border-red-500 border',
-      glass: 'bg-red-500/90 backdrop-blur-md text-white border-red-400/50 border'
-    },
-
-    // 图纸管理样式
-    'file-uploaded': {
-      filled: 'bg-indigo-500 text-white border-indigo-500',
-      outline: 'bg-indigo-50 text-indigo-800 border-indigo-500 border',
-      glass: 'bg-indigo-500/90 backdrop-blur-md text-white border-indigo-400/50 border'
-    },
-    'file-uploading': {
-      filled: 'bg-blue-500 text-white border-blue-500',
-      outline: 'bg-blue-50 text-blue-800 border-blue-500 border',
-      glass: 'bg-blue-500/90 backdrop-blur-md text-white border-blue-400/50 border'
-    },
-    'dxf-parsed': {
-      filled: 'bg-cyan-500 text-white border-cyan-500',
-      outline: 'bg-cyan-50 text-cyan-800 border-cyan-500 border',
-      glass: 'bg-cyan-500/90 backdrop-blur-md text-white border-cyan-400/50 border'
-    },
-    'version-updated': {
-      filled: 'bg-purple-500 text-white border-purple-500',
-      outline: 'bg-purple-50 text-purple-800 border-purple-500 border',
-      glass: 'bg-purple-500/90 backdrop-blur-md text-white border-purple-400/50 border'
-    },
-
-    // 协作与同步样式
-    'sync-completed': {
-      filled: 'bg-teal-500 text-white border-teal-500',
-      outline: 'bg-teal-50 text-teal-800 border-teal-500 border',
-      glass: 'bg-teal-500/90 backdrop-blur-md text-white border-teal-400/50 border'
-    },
-    'collaboration-notify': {
-      filled: 'bg-pink-500 text-white border-pink-500',
-      outline: 'bg-pink-50 text-pink-800 border-pink-500 border',
-      glass: 'bg-pink-500/90 backdrop-blur-md text-white border-pink-400/50 border'
-    },
-    'sync-error': {
-      filled: 'bg-red-600 text-white border-red-600',
-      outline: 'bg-red-50 text-red-800 border-red-600 border',
-      glass: 'bg-red-600/90 backdrop-blur-md text-white border-red-500/50 border'
-    },
-
-    // 智能辅助样式
-    'smart-suggestion': {
-      filled: 'bg-purple-500 text-white border-purple-500',
-      outline: 'bg-purple-50 text-purple-800 border-purple-500 border',
-      glass: 'bg-purple-500/90 backdrop-blur-md text-white border-purple-400/50 border'
-    },
-    'efficiency-insight': {
-      filled: 'bg-cyan-500 text-white border-cyan-500',
-      outline: 'bg-cyan-50 text-cyan-800 border-cyan-500 border',
-      glass: 'bg-cyan-500/90 backdrop-blur-md text-white border-cyan-400/50 border'
-    },
-    'workflow-optimization': {
-      filled: 'bg-lime-500 text-white border-lime-500',
-      outline: 'bg-lime-50 text-lime-800 border-lime-500 border',
-      glass: 'bg-lime-500/90 backdrop-blur-md text-white border-lime-400/50 border'
-    },
-
-    // 特殊状态
     'wancheng': {
       filled: 'bg-emerald-500 text-white border-emerald-500',
       outline: 'bg-emerald-50 text-emerald-800 border-emerald-500 border',
       glass: 'bg-emerald-500/90 backdrop-blur-md text-white border-emerald-400/50 border'
-    },
-    'batch-operation': {
-      filled: 'bg-slate-600 text-white border-slate-600',
-      outline: 'bg-slate-50 text-slate-800 border-slate-600 border',
-      glass: 'bg-slate-600/90 backdrop-blur-md text-white border-slate-500/50 border'
     }
   }
 
@@ -386,11 +244,11 @@ const getToastStyles = (type: ToastProps['type'], variant: ToastProps['variant']
     return baseStyles.info?.filled || 'bg-blue-500 text-white'
   }
   
-  const typeStyles = baseStyles[type as keyof typeof baseStyles]
+  const typeStyles = baseStyles[type as keyof typeof baseStyles] || baseStyles.info
   return typeStyles?.[variant] || baseStyles.info?.[variant] || 'bg-blue-500 text-white'
 }
 
-// Toast 组件 - 增强版
+// Toast 组件 - 简化版
 export const Toast: React.FC<ToastProps & { onRemove: () => void }> = ({
   message,
   type = 'info',
@@ -475,14 +333,14 @@ export const Toast: React.FC<ToastProps & { onRemove: () => void }> = ({
         ${linkTo ? 'cursor-pointer hover:shadow-xl' : ''}
         ${priority === 'urgent' ? 'animate-pulse' : ''}
       `}
-      initial={{ opacity: 0, y: -50, scale: 0.9 }}
-      animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : -20, scale: isVisible ? 1 : 0.9 }}
-      exit={{ opacity: 0, y: -20, scale: 0.9 }}
+      initial={{ opacity: 0, x: 400, scale: 0.8 }}
+      animate={{ opacity: isVisible ? 1 : 0, x: isVisible ? 0 : 400, scale: isVisible ? 1 : 0.8 }}
+      exit={{ opacity: 0, x: 400, scale: 0.8 }}
       transition={{ 
         type: "spring", 
         stiffness: 500, 
         damping: 30,
-        duration: 0.3
+        mass: 0.8 
       }}
       onClick={handleClick}
     >
@@ -608,809 +466,41 @@ export const Toast: React.FC<ToastProps & { onRemove: () => void }> = ({
   )
 }
 
-// 全局Toast状态管理器（修复状态同步问题）
-class GlobalToastManager {
-  private toasts: ToastProps[] = []
-  private listeners: Set<(toasts: ToastProps[]) => void> = new Set()
-
-  addToast(toast: Omit<ToastProps, 'id'>) {
-    const id = `toast-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-    const newToast = { ...toast, id }
-    
-    this.toasts = [...this.toasts, newToast]
-    this.notifyListeners()
-    
-    // 自动移除
-    if (!toast.persistent && toast.duration !== 0) {
-      setTimeout(() => {
-        this.removeToast(id)
-      }, toast.duration || 4000)
-    }
-    
-    return id
-  }
-
-  removeToast(id: string) {
-    this.toasts = this.toasts.filter(t => t.id !== id)
-    this.notifyListeners()
-  }
-
-  updateToast(id: string, updates: Partial<ToastProps>) {
-    this.toasts = this.toasts.map(toast => 
-      toast.id === id ? { ...toast, ...updates } : toast
-    )
-    this.notifyListeners()
-  }
-
-  clearAll() {
-    this.toasts = []
-    this.notifyListeners()
-  }
-
-  subscribe(listener: (toasts: ToastProps[]) => void) {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
-
-  private notifyListeners() {
-    this.listeners.forEach(listener => listener([...this.toasts]))
-  }
-
-  getToasts() {
-    return [...this.toasts]
-  }
-}
-
-// 全局单例
-const globalToastManager = new GlobalToastManager()
-
-// 简化的自包含Toast容器（用于布局组件）
-export const ToastContainer: React.FC<{
-  position?: ToastProps['position']
-}> = ({ position = 'top-right' }) => {
-  const [toasts, setToasts] = useState<ToastProps[]>([])
-
-  useEffect(() => {
-    const unsubscribe = globalToastManager.subscribe(setToasts)
-    setToasts(globalToastManager.getToasts())
-    return () => {
-      unsubscribe()
-    }
-  }, [])
-
-  return <InternalToastContainer 
-    toasts={toasts} 
-    position={position}
-    onRemove={globalToastManager.removeToast}
-  />
-}
-
-// 重命名原来的ToastContainer为内部组件
-const InternalToastContainer: React.FC<{
-  toasts: ToastProps[]
-  position?: ToastProps['position']
-  onRemove: (id: string) => void
-}> = ({ 
-  toasts, 
-  position = 'top-right',
-  onRemove 
-}) => {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const positionClasses = {
-    'top': 'top-4 left-1/2 transform -translate-x-1/2',
-    'top-center': 'top-4 left-1/2 transform -translate-x-1/2',
-    'top-right': 'top-4 right-4',
-    'top-left': 'top-4 left-4',
-    'bottom': 'bottom-4 left-1/2 transform -translate-x-1/2',
-    'bottom-right': 'bottom-4 right-4',
-    'bottom-left': 'bottom-4 left-4'
-  }
-
-  if (!mounted) {
-    return null
-  }
-
-  return createPortal(
-    <div 
-      className={`fixed ${positionClasses[position]} z-50 space-y-3 pointer-events-none`}
-      data-testid="toast-container"
-    >
-      <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => (
-          <div key={toast.id} className="pointer-events-auto">
-            <Toast
-              {...toast}
-              onRemove={() => onRemove(toast.id!)}
-            />
-          </div>
-        ))}
-      </AnimatePresence>
-    </div>,
-    document.body
-  )
-}
-
-// Enhanced Toast Hook（使用全局管理器）
-export const useToast = () => {
-  const [toasts, setToasts] = useState<ToastProps[]>([])
-
-  useEffect(() => {
-    const unsubscribe = globalToastManager.subscribe(setToasts)
-    setToasts(globalToastManager.getToasts())
-    return () => {
-      unsubscribe()
-    }
-  }, [])
-
-  const addToast = (toast: Omit<ToastProps, 'id'>) => {
-    return globalToastManager.addToast(toast)
-  }
-
-  const removeToast = (id: string) => {
-    globalToastManager.removeToast(id)
-  }
-
-  const updateToast = (id: string, updates: Partial<ToastProps>) => {
-    globalToastManager.updateToast(id, updates)
-  }
-
-  const clearAllToasts = () => {
-    globalToastManager.clearAll()
-  }
-
-  // 业务专用方法
-  const projectCreated = (projectName: string) => {
-    return addToast({
-      type: 'project-created',
-      message: `项目 "${projectName}" 创建成功`,
-      duration: 3000
-    })
-  }
-
-  const projectUpdated = (projectName: string) => {
-    return addToast({
-      type: 'project-updated', 
-      message: `项目 "${projectName}" 更新成功`,
-      duration: 3000
-    })
-  }
-
-  const projectDeleted = (projectName: string) => {
-    return addToast({
-      type: 'project-deleted',
-      message: `项目 "${projectName}" 删除成功`,
-      duration: 3000
-    })
-  }
-
-  const materialStatusChanged = (materialName: string, newStatus: string) => {
-    const statusNames = {
-      'empty': '空闲',
-      'pending': '待处理', 
-      'in_progress': '进行中',
-      'completed': '已完成'
-    }
-    
-    return addToast({
-      type: newStatus === 'completed' ? 'wancheng' : 'material-changed',
-      message: `${materialName} 状态变更为 ${statusNames[newStatus as keyof typeof statusNames] || newStatus}`,
-      duration: newStatus === 'completed' ? 5000 : 3000
-    })
-  }
-
-  const fileUploaded = (fileName: string) => {
-    return addToast({
-      type: 'file-uploaded',
-      message: `文件 "${fileName}" 上传成功`,
-      duration: 3000
-    })
-  }
-
-  const syncCompleted = () => {
-    return addToast({
-      type: 'sync-completed',
-      message: '数据同步完成',
-      duration: 2000
-    })
-  }
-
-  // 智能业务方法 - 基于深度分析的扩展
-  const smartSuggestion = (suggestion: string, actions?: ToastProps['actions']) => {
-    return addToast({
-      type: 'smart-suggestion',
-      message: suggestion,
-      variant: 'glass',
-      size: 'lg',
-      priority: 'normal',
-      expandable: true,
-      details: '基于您的操作历史和系统数据分析生成',
-      actions: actions || [
-        { label: '应用建议', variant: 'primary', onClick: () => console.log('应用建议') },
-        { label: '暂时跳过', variant: 'secondary', onClick: () => console.log('跳过') }
-      ],
-      duration: 8000
-    })
-  }
-
-  const efficiencyInsight = (insight: string, data?: string) => {
-    return addToast({
-      type: 'efficiency-insight',
-      message: insight,
-      variant: 'glass',
-      showTime: true,
-      expandable: !!data,
-      details: data,
-      duration: 6000
-    })
-  }
-
-  const workflowReminder = (reminder: string, nextSteps: string[]) => {
-    return addToast({
-      type: 'info',
-      message: reminder,
-      priority: 'high',
-      expandable: true,
-      details: `下一步：${nextSteps.join(' → ')}`,
-      actions: [
-        { label: '开始处理', variant: 'primary', onClick: () => console.log('开始处理') },
-        { label: '稍后提醒', variant: 'secondary', onClick: () => console.log('稍后提醒') }
-      ],
-      persistent: true
-    })
-  }
-
-  const collaborationNotify = (workerName: string, action: string, avatarUrl?: string) => {
-    return addToast({
-      type: 'collaboration-notify',
-      message: `${workerName} ${action}`,
-      showAvatar: true,
-      avatarUrl: avatarUrl || '/avatars/default.png',
-      showTime: true,
-      actions: [
-        { label: '查看详情', variant: 'primary', onClick: () => console.log('查看详情') },
-        { label: '回复', variant: 'secondary', onClick: () => console.log('回复') }
-      ],
-      duration: 5000
-    })
-  }
-
-  const stockWarning = (materialType: string, currentStock: number, minStock: number) => {
-    return addToast({
-      type: 'stock-warning',
-      message: `${materialType}库存不足：${currentStock}/${minStock}`,
-      priority: 'urgent',
-      persistent: true,
-      actions: [
-        { label: '立即采购', variant: 'primary', onClick: () => console.log('立即采购') },
-        { label: '调配库存', variant: 'secondary', onClick: () => console.log('调配库存') }
-      ],
-      expandable: true,
-      details: '建议采购数量：' + Math.max(minStock * 2, 50) + '件'
-    })
-  }
-
-  const qualityAlert = (itemName: string, issue: string, severity: 'low' | 'medium' | 'high') => {
-    const priorityMap = { low: 'normal', medium: 'high', high: 'urgent' } as const
-    return addToast({
-      type: severity === 'high' ? 'error' : 'warning',
-      message: `质检异常：${itemName} - ${issue}`,
-      priority: priorityMap[severity],
-      actions: [
-        { label: '立即处理', variant: 'primary', onClick: () => console.log('立即处理') },
-        { label: '标记跟进', variant: 'secondary', onClick: () => console.log('标记跟进') }
-      ],
-      persistent: severity === 'high'
-    })
-  }
-
-  const equipmentStatus = (equipmentName: string, status: string, actionRequired?: boolean) => {
-    return addToast({
-      type: actionRequired ? 'error' : 'info',
-      message: `${equipmentName}: ${status}`,
-      priority: actionRequired ? 'urgent' : 'normal',
-      actions: actionRequired ? [
-        { label: '暂停设备', variant: 'primary', onClick: () => console.log('暂停设备') },
-        { label: '联系维修', variant: 'secondary', onClick: () => console.log('联系维修') }
-      ] : [
-        { label: '查看详情', variant: 'primary', onClick: () => console.log('查看详情') }
-      ],
-      persistent: actionRequired
-    })
-  }
-
-  const scheduleUpdate = (change: string, impact: string) => {
-    return addToast({
-      type: 'info',
-      message: `生产计划调整：${change}`,
-      expandable: true,
-      details: `影响评估：${impact}`,
-      showTime: true,
-      actions: [
-        { label: '确认调整', variant: 'primary', onClick: () => console.log('确认调整') },
-        { label: '查看详情', variant: 'secondary', onClick: () => console.log('查看详情') }
-      ]
-    })
-  }
-
-  const workerUpdate = (workerName: string, updateType: 'checkin' | 'checkout' | 'task-complete', details?: string) => {
-    const messages = {
-      checkin: `${workerName} 已签到`,
-      checkout: `${workerName} 已签退`,
-      'task-complete': `${workerName} 完成任务`
-    }
-
-    return addToast({
-      type: 'info',
-      message: messages[updateType],
-      showTime: true,
-      expandable: !!details,
-      details,
-      duration: 3000
-    })
-  }
-
-  const optimizationTip = (tip: string, potentialSaving: string) => {
-    return addToast({
-      type: 'info',
-      message: `优化建议：${tip}`,
-      variant: 'outline',
-      expandable: true,
-      details: `预期效果：${potentialSaving}`,
-      actions: [
-        { label: '应用建议', variant: 'primary', onClick: () => console.log('应用建议') },
-        { label: '了解更多', variant: 'secondary', onClick: () => console.log('了解更多') }
-      ],
-      duration: 10000
-    })
-  }
-
-  return {
-    toasts,
-    addToast,
-    removeToast,
-    updateToast,
-    clearAllToasts,
-    
-    // 基础业务方法
-    projectCreated,
-    projectUpdated,
-    projectDeleted,
-    materialStatusChanged,
-    fileUploaded,
-    syncCompleted,
-    
-    // 真实业务场景方法（简化版 - 纯提示功能）
-    
-    // 项目管理
-    projectStatusAuto: (projectName: string, newStatus: string, reason: string) => {
-      return addToast({
-        type: 'project-status-auto',
-        message: `项目"${projectName}"状态自动更新为${newStatus}，原因：${reason}`,
-        showTime: true,
-        duration: 6000
-      })
-    },
-
-    projectArchived: (projectName: string) => {
-      return addToast({
-        type: 'project-archived',
-        message: `项目"${projectName}"已移动到过往项目库，释放活跃列表空间`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    workerReassigned: (projectName: string, fromWorker: string, toWorker: string) => {
-      return addToast({
-        type: 'worker-reassigned',
-        message: `项目"${projectName}"已重新分配：${fromWorker} → ${toWorker}`,
-        showTime: true,
-        duration: 5000
-      })
-    },
-
-    // 材料管理（四状态循环）
-    materialAllocated: (materialType: string, projectName: string, quantity: number) => {
-      return addToast({
-        type: 'material-allocated',
-        message: `${materialType} ${quantity}张已分配给项目"${projectName}"`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    materialStarted: (materialType: string, workerName: string) => {
-      return addToast({
-        type: 'material-started',
-        message: `${workerName}开始加工 ${materialType}`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    materialCompleted: (materialType: string, workerName?: string) => {
-      return addToast({
-        type: 'material-completed',
-        message: `${materialType} 加工完成！${workerName ? `由${workerName}完成` : ''}`,
-        showTime: true,
-        priority: 'high',
-        duration: 5000
-      })
-    },
-
-    materialRecycled: (materialType: string) => {
-      return addToast({
-        type: 'material-recycled',
-        message: `${materialType} 已回收为空闲状态，可重新分配使用`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    stockAdded: (workerName: string, materialType: string, quantity: number) => {
-      return addToast({
-        type: 'stock-added',
-        message: `${workerName}库存增加：${materialType} ${quantity}张`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    stockWarning: (workerName: string, materialType: string, currentStock: number, required: number) => {
-      return addToast({
-        type: 'stock-warning',
-        message: `警告：${workerName} ${materialType}库存不足：剩余${currentStock}张，需求${required}张`,
-        priority: 'urgent',
-        persistent: true
-      })
-    },
-
-    dimensionAdded: (materialType: string, dimensions: string, quantity: number) => {
-      return addToast({
-        type: 'dimension-added',
-        message: `已添加尺寸规格：${materialType} ${dimensions} 共${quantity}张`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    materialTransferred: (materialType: string, quantity: number, fromWorker: string, toWorker: string) => {
-      return addToast({
-        type: 'material-transferred',
-        message: `${quantity}张${materialType}已从${fromWorker}调拨给${toWorker}`,
-        showTime: true,
-        duration: 5000
-      })
-    },
-
-    // 95/5策略提醒
-    strategyDeviation: (carbonRatio: number, target: number = 95) => {
-      return addToast({
-        type: 'strategy-deviation',
-        message: `警告：碳板使用率${carbonRatio}%，偏离${target}%目标，建议减少特殊材料使用`,
-        priority: 'high',
-        duration: 8000
-      })
-    },
-
-    strategyBalanced: () => {
-      return addToast({
-        type: 'strategy-balanced',
-        message: `材料配比已回归95/5策略目标，保持良好状态`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    // 图纸管理
-    fileUploading: (fileName: string, progress: number) => {
-      return addToast({
-        type: 'file-uploading',
-        message: `正在上传图纸"${fileName}" (${progress}%)`,
-        showProgress: true,
-        progress,
-        persistent: true
-      })
-    },
-
-    dxfParsed: (fileName: string) => {
-      return addToast({
-        type: 'dxf-parsed',
-        message: `图纸"${fileName}"解析完成，可进行3D预览和编辑`,
-        duration: 6000
-      })
-    },
-
-    commonPartTagged: (fileName: string) => {
-      return addToast({
-        type: 'common-part-tagged',
-        message: `图纸"${fileName}"已标记为常用零件，将在库中分类显示`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    versionUpdated: (fileName: string, version: string) => {
-      return addToast({
-        type: 'version-updated',
-        message: `图纸"${fileName}"版本已自动更新至 ${version}`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    versionConflict: (fileName: string) => {
-      return addToast({
-        type: 'version-conflict',
-        message: `注意：发现同名图纸"${fileName}"，系统将自动创建新版本`,
-        priority: 'high',
-        duration: 8000
-      })
-    },
-
-    drawingLinked: (fileName: string, projectName: string) => {
-      return addToast({
-        type: 'drawing-linked',
-        message: `图纸"${fileName}"已成功关联到项目"${projectName}"`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    drawingUploaded: (fileName: string, projectName?: string) => {
-      return addToast({
-        type: 'file-uploading',
-        message: projectName 
-          ? `图纸"${fileName}"已上传至项目"${projectName}"` 
-          : `图纸"${fileName}"上传成功`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    drawingUploadFailed: (fileName: string, error: string) => {
-      return addToast({
-        type: 'upload-error',
-        message: `图纸"${fileName}"上传失败：${error}`,
-        priority: 'high',
-        duration: 6000
-      })
-    },
-
-    batchUploadComplete: (successCount: number, totalCount: number) => {
-      return addToast({
-        type: 'batch-operation',
-        message: `批量上传完成：成功${successCount}个，共${totalCount}个文件`,
-        showTime: true,
-        duration: 5000
-      })
-    },
-
-    drawingDeleted: (fileName: string) => {
-      return addToast({
-        type: 'success',
-        message: `图纸"${fileName}"已删除`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    drawingVersionUpdated: (fileName: string, newVersion: string) => {
-      return addToast({
-        type: 'version-updated',
-        message: `图纸"${fileName}"版本已更新至${newVersion}`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    versionCreated: (fileName: string, version: string) => {
-      return addToast({
-        type: 'version-updated',
-        message: `图纸"${fileName}"创建新版本：${version}`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    dxfPreviewGenerated: (fileName: string) => {
-      return addToast({
-        type: 'dxf-parsed',
-        message: `DXF图纸"${fileName}"预览生成成功`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    dxfPreviewFailed: (fileName: string) => {
-      return addToast({
-        type: 'upload-error',
-        message: `DXF图纸"${fileName}"预览生成失败`,
-        priority: 'high',
-        duration: 5000
-      })
-    },
-
-    drawingArchived: (fileName: string) => {
-      return addToast({
-        type: 'success',
-        message: `图纸"${fileName}"已归档`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    // 工人管理
-    workerUpdated: (workerName: string, updateType: string) => {
-      return addToast({
-        type: 'worker-updated',
-        message: `工人信息已更新：${workerName} - ${updateType}`,
-        showTime: true,
-        duration: 3000
-      })
-    },
-
-    workerAdded: (workerName: string, department: string) => {
-      return addToast({
-        type: 'worker-added',
-        message: `新工人加入团队：${workerName} (${department})`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    workerOverloaded: (workerName: string, projectCount: number) => {
-      return addToast({
-        type: 'worker-overloaded',
-        message: `注意：${workerName}当前负责${projectCount}个项目，工作负载较重`,
-        priority: 'high',
-        duration: 8000
-      })
-    },
-
-    workerAvailable: (workerName: string) => {
-      return addToast({
-        type: 'worker-available',
-        message: `${workerName}目前无在进行项目，可分配新任务`,
-        duration: 6000
-      })
-    },
-
-    // 实时协作
-    collaborationNotify: (userName: string, action: string) => {
-      return addToast({
-        type: 'collaboration-notify',
-        message: `${userName} ${action}`,
-        showTime: true,
-        duration: 5000
-      })
-    },
-
-    syncUpdated: (userName: string, updateType: string, itemName: string) => {
-      return addToast({
-        type: 'sync-updated',
-        message: `${userName}更新了${updateType}：${itemName}`,
-        showTime: true,
-        duration: 4000
-      })
-    },
-
-    syncError: () => {
-      return addToast({
-        type: 'sync-error',
-        message: `数据同步失败，请检查网络连接后重试`,
-        persistent: true,
-        priority: 'urgent'
-      })
-    },
-
-    connectionLost: () => {
-      return addToast({
-        type: 'connection-lost',
-        message: `实时连接中断，正在自动重连中...`,
-        persistent: true,
-        priority: 'high'
-      })
-    },
-
-    connectionRestored: () => {
-      return addToast({
-        type: 'connection-restored',
-        message: `实时连接已恢复，数据同步正常`,
-        duration: 2000
-      })
-    },
-
-    // 智能辅助
-    smartSuggestion: (suggestion: string) => {
-      return addToast({
-        type: 'smart-suggestion',
-        message: `智能建议：${suggestion}`,
-        priority: 'normal',
-        duration: 8000
-      })
-    },
-
-    patternInsight: (insight: string, pattern: string) => {
-      return addToast({
-        type: 'pattern-insight',
-        message: `发现规律：${insight} (${pattern})`,
-        showTime: true,
-        duration: 6000
-      })
-    },
-
-    efficiencyInsight: (insight: string) => {
-      return addToast({
-        type: 'efficiency-insight',
-        message: `效率分析：${insight}`,
-        variant: 'glass',
-        showTime: true,
-        duration: 6000
-      })
-    },
-
-    workflowOptimization: (tip: string, potentialSaving: string) => {
-      return addToast({
-        type: 'workflow-optimization',
-        message: `优化建议：${tip}，预期效果：${potentialSaving}`,
-        duration: 10000
-      })
-    },
-
-    bottleneckDetected: (bottleneck: string, solution: string) => {
-      return addToast({
-        type: 'bottleneck-detected',
-        message: `发现生产瓶颈：${bottleneck}，建议：${solution}`,
-        priority: 'high',
-        persistent: true
-      })
-    },
-
-    // 批量操作
-    batchOperation: (operation: string, count: number, result: 'success' | 'partial' | 'failed') => {
-      const resultMessages = {
-        success: `${operation}完成：成功处理${count}条记录`,
-        partial: `${operation}部分完成：${count}条记录中部分成功`,
-        failed: `${operation}失败：${count}条记录处理失败`
-      }
-      
-      return addToast({
-        type: 'batch-operation',
-        message: resultMessages[result],
-        priority: result === 'failed' ? 'urgent' : result === 'partial' ? 'high' : 'normal',
-        showTime: true,
-        duration: result === 'success' ? 4000 : 6000
-      })
-    }
-  }
-}
-
-// 简化的全局 Toast 函数
+// 简化的全局 Toast 函数（保留向后兼容）
 export const toast = {
   success: (message: string, options?: Partial<ToastProps>) => {
-    // 需要全局 toast 管理器实现
-    console.log('Global toast success:', message)
+    // Toast success message
   },
   error: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Global toast error:', message)
+    // Toast error message
   },
   warning: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Global toast warning:', message)
+    // Toast warning message
   },
   info: (message: string, options?: Partial<ToastProps>) => {
-    console.log('Global toast info:', message)
-  },
-  // 业务专用全局方法
-  projectCreated: (projectName: string) => {
-    console.log('Global toast project created:', projectName)
-  },
-  materialChanged: (materialName: string, status: string) => {
-    console.log('Global toast material changed:', materialName, status)
+    // Toast info message
   }
-}
+};
+
+// 向后兼容的useToast Hook（已弃用，使用统一的通知系统）
+export const useToast = () => {
+  return {
+    addToast: (options: { type: string; message: string; duration?: number }) => {
+      // Deprecated useToast called
+      // 可以选择重定向到统一通知系统
+      // const notificationStore = useNotificationStore.getState();
+      // notificationStore.addNotification({...});
+    },
+    // 添加其他旧Toast方法的兼容性
+    projectCreated: (message: string) => {},
+    materialAllocated: (message: string) => {},
+    drawingUploaded: (message: string) => {},
+    workerAdded: (message: string) => {},
+  };
+};
+
+// 向后兼容的ToastContainer组件（已弃用，使用NotificationContainer）
+export const ToastContainer: React.FC = () => {
+  // 返回空的div，因为现在使用NotificationContainer
+  return <div style={{ display: 'none' }} />;
+};

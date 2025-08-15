@@ -14,7 +14,9 @@ import {
   ClockIcon,
   PhoneIcon,
   EnvelopeIcon,
-  Squares2X2Icon
+  Squares2X2Icon,
+  IdentificationIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 // 搜索结果类型定义
@@ -45,6 +47,11 @@ interface SearchResultItem {
   }>;
   // 新增：工人项目和库存信息
   assignedProjects?: Array<{ id: number; name: string; status: string }>;
+  // 新增：考勤模块相关字段
+  employeeId?: string;
+  exceptionType?: string;
+  employee?: { id: number; employeeId: string; name: string; department?: string; position?: string };
+  date?: string;
 }
 
 interface SearchResults {
@@ -88,6 +95,18 @@ const SEARCH_CATEGORIES = {
     icon: UsersIcon, 
     weight: 8,
     color: 'text-green-600'
+  },
+  employees: {
+    name: '员工考勤',
+    icon: IdentificationIcon,
+    weight: 7,
+    color: 'text-purple-600'
+  },
+  attendanceExceptions: {
+    name: '考勤记录',
+    icon: ExclamationTriangleIcon,
+    weight: 6.5,
+    color: 'text-orange-600'
   },
   departments: { 
     name: '部门', 
@@ -476,6 +495,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         return '查看库存详情';
       case 'thicknessSpecs':
         return '查看该厚度的所有库存';
+      case 'employees':
+        return '查看员工考勤详情';
+      case 'attendanceExceptions':
+        return '查看考勤记录详情';
       default:
         return '查看详情';
     }
@@ -562,6 +585,34 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         
         return `${specThickness}${specUnit} • ${specMaterialType} • 规格定义`;
         
+      case 'employees':
+        // 新增：员工考勤元信息
+        const empDepartment = item.department || '未分配部门';
+        const empPosition = item.position || '未分配岗位';
+        const empWorkHours = (item as any).dailyWorkHours || 9;
+        const empId = item.employeeId || '无工号';
+        
+        return `工号: ${empId} • ${empDepartment} • ${empPosition} • ${empWorkHours}小时工作制`;
+        
+      case 'attendanceExceptions':
+        // 新增：考勤异常记录元信息
+        const attendanceEmployee = item.employee;
+        const attendanceDate = item.date || '';
+        const exceptionType = item.exceptionType || '';
+        const exceptionTypeText = {
+          'leave': '请假',
+          'overtime': '加班', 
+          'absent': '缺勤',
+          'late': '迟到',
+          'early': '早退'
+        }[exceptionType] || exceptionType;
+        
+        const employeeName = attendanceEmployee?.name || '未知员工';
+        const employeeDept = attendanceEmployee?.department || '未知部门';
+        const formattedDate = attendanceDate ? new Date(attendanceDate).toLocaleDateString('zh-CN') : '';
+        
+        return `${employeeName} • ${employeeDept} • ${formattedDate} ${exceptionTypeText}`;
+        
       default:
         return item.meta || '';
     }
@@ -582,6 +633,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         return Squares2X2Icon;
       case 'thicknessSpecs':
         return Squares2X2Icon;
+      case 'employees':
+        return IdentificationIcon;
+      case 'attendanceExceptions':
+        return ExclamationTriangleIcon;
       default:
         return FolderIcon;
     }
@@ -608,7 +663,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               const inputValue = e.target.value;
               setQuery(inputValue);
             }}
-            placeholder="搜索项目、工人、部门、图纸..."
+            placeholder="搜索项目、工人、部门、图纸、员工考勤..."
             leftIcon={<MagnifyingGlassIcon className="w-5 h-5" />}
             rightIcon={loading ? <Loading type="dots" size="sm" /> : null}
             className="text-lg py-4"
@@ -732,7 +787,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               <div className="text-gray-500 text-sm">
                 <div className="mb-2">输入关键词开始搜索</div>
                 <div className="text-xs text-gray-400 space-y-3">
-                  <div>支持搜索项目、工人、部门、图纸、板材库存等内容</div>
+                  <div>支持搜索项目、工人、部门、图纸、板材库存、员工考勤等内容</div>
                   
                   {/* 厚度搜索示例 - 更新示例 */}
                   <div className="border-t pt-2">
@@ -757,11 +812,23 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                     </div>
                   </div>
                   
+                  {/* 考勤搜索示例 */}
+                  <div className="border-t pt-2">
+                    <div className="font-medium text-purple-600 mb-1">考勤搜索示例：</div>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      <kbd className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">请假</kbd>
+                      <kbd className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">加班</kbd>
+                      <kbd className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">缺勤</kbd>
+                      <kbd className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">员工姓名</kbd>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">搜索员工考勤记录、请假加班信息</div>
+                  </div>
+                  
                   {/* 综合搜索示例 */}
                   <div className="border-t pt-2">
                     <div className="font-medium text-green-600 mb-1">综合搜索示例：</div>
                     <div className="flex flex-wrap gap-1 justify-center">
-                      <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">张三 3mm</kbd>
+                      <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">工人 3mm</kbd>
                       <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">碳板项目</kbd>
                       <kbd className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">库存充足</kbd>
                     </div>

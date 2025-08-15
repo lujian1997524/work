@@ -30,9 +30,12 @@ export interface Drawing {
   originalFilename?: string;
   version: number;
   filePath: string;
-  uploadedAt: string;
-  uploadedBy: { id: number; name: string };
+  uploadTime: string; // 修改为uploadTime
+  uploader?: { id: number; name: string }; // 修改为uploader，并且可选
+  uploadedBy?: number; // 保留原字段作为备用
   isCurrentVersion?: boolean;
+  description?: string;
+  status?: string;
 }
 
 // 统一的Project接口 - 基础版本

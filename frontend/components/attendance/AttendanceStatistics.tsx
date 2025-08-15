@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Badge, Loading } from '@/components/ui';
+import { ResponsiveStatCards } from '@/components/ui/StatCardSwiper';
 import { 
   ChartBarIcon,
   DocumentArrowDownIcon,
@@ -106,7 +107,7 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
     return `共${Math.round(hours * 10) / 10}小时`;
   };
   
-  // 计算整体统计
+  // 计算整体统计（按工号排序）
   const overallStats = {
     totalEmployees: currentStats.length,
     totalWorkHours: Math.round(currentStats.reduce((sum, stat) => sum + (stat?.totalWorkHours || 0), 0) * 10) / 10,
@@ -115,6 +116,56 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
     avgAttendanceRate: currentStats.length > 0 ? 
       (currentStats.reduce((sum, stat) => sum + (stat?.attendanceRate || 0), 0) / currentStats.length).toFixed(1) : '0'
   };
+
+  // 对统计数据按员工工号排序
+  const sortedStats = [...currentStats].sort((a, b) => {
+    const employeeIdA = a.employee?.employeeId || '';
+    const employeeIdB = b.employee?.employeeId || '';
+    
+    if (employeeIdA && employeeIdB) {
+      return employeeIdA.localeCompare(employeeIdB);
+    } else if (employeeIdA && !employeeIdB) {
+      return -1;
+    } else if (!employeeIdA && employeeIdB) {
+      return 1;
+    } else {
+      return (a.employee?.name || '').localeCompare(b.employee?.name || '');
+    }
+  });
+
+  // 转换为StatCardSwiper所需的格式
+  const statsData = [
+    { 
+      icon: UsersIcon, 
+      label: '员工总数', 
+      value: overallStats.totalEmployees, 
+      color: 'blue' as const 
+    },
+    { 
+      icon: ClockIcon, 
+      label: '总工作时长', 
+      value: formatWorkHours(overallStats.totalWorkHours), 
+      color: 'green' as const 
+    },
+    { 
+      icon: CalendarDaysIcon, 
+      label: '总请假时长', 
+      value: formatWorkHours(overallStats.totalLeaveHours), 
+      color: 'yellow' as const 
+    },
+    { 
+      icon: ClockIcon, 
+      label: '总加班时长', 
+      value: formatWorkHours(overallStats.totalOvertimeHours), 
+      color: 'purple' as const 
+    },
+    { 
+      icon: ChartBarIcon, 
+      label: '平均出勤率', 
+      value: `${overallStats.avgAttendanceRate}%`, 
+      color: 'indigo' as const 
+    }
+  ];
 
   if (statsLoading) {
     return (
@@ -239,34 +290,11 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
         </div>
       </motion.div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        {[
-          { icon: UsersIcon, label: '员工总数', value: overallStats.totalEmployees, color: 'blue' },
-          { icon: ClockIcon, label: '总工作时长', value: formatWorkHours(overallStats.totalWorkHours), color: 'green' },
-          { icon: CalendarDaysIcon, label: '总请假时长', value: formatWorkHours(overallStats.totalLeaveHours), color: 'yellow' },
-          { icon: ClockIcon, label: '总加班时长', value: formatWorkHours(overallStats.totalOvertimeHours), color: 'purple' },
-          { icon: ChartBarIcon, label: '平均出勤率', value: `${overallStats.avgAttendanceRate}%`, color: 'indigo' }
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            className="bg-white rounded-xl p-3 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-${stat.color}-100 rounded-xl flex items-center justify-center`}>
-                <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 text-${stat.color}-600`} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{stat.value}</div>
-                <div className="text-xs sm:text-sm text-gray-500">{stat.label}</div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {/* 统计卡片 - 使用新的响应式组件 */}
+      <ResponsiveStatCards 
+        stats={statsData}
+        className="animate-in slide-in-from-bottom-4 duration-500"
+      />
 
       {/* 员工统计表格 */}
       {currentStats.length > 0 ? (
@@ -279,7 +307,7 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
           <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">员工统计详情</h3>
             <p className="text-sm text-gray-500 mt-1">
-              {selectedPeriod.label} · 共 {currentStats.length} 名员工
+              {selectedPeriod.label} · 共 {sortedStats.length} 名员工
             </p>
           </div>
           
@@ -305,7 +333,7 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {currentStats.map((stat, index) => (
+                {sortedStats.map((stat, index) => (
                   <motion.tr 
                     key={index}
                     className="hover:bg-gray-50 transition-colors"
@@ -315,11 +343,6 @@ export const AttendanceStatistics: React.FC<AttendanceStatisticsProps> = ({
                   >
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-medium text-xs sm:text-sm">
-                            {(stat.employee?.name || '未知')[0]}
-                          </span>
-                        </div>
                         <div className="ml-2 sm:ml-4 min-w-0">
                           <div className="font-medium text-gray-900 text-sm truncate">
                             {stat.employee?.name || '未知员工'}

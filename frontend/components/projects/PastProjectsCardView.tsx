@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProjectStore } from '@/stores';
 import { Loading, Empty, EmptyData } from '@/components/ui';
 import { PastProjectCard } from '@/components/projects/ProjectCard';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, FolderIcon, CubeIcon, CheckIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 interface PastProject {
   id: number;
@@ -166,32 +166,51 @@ export const PastProjectsCardView: React.FC<PastProjectsCardViewProps> = ({
 
   return (
     <div className={`h-full flex flex-col ${className}`}>
-      {/* 总体统计 - 移动端优化 */}
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-sm border p-3 sm:p-6 m-3 sm:m-4 flex-shrink-0">
-        <h2 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">过往项目统计</h2>
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
-          <div className="bg-white/50 rounded-lg p-2 sm:p-4">
-            <div className="text-base sm:text-2xl font-bold text-gray-900">{stats.totalProjects}</div>
-            <div className="text-xs sm:text-sm text-gray-500">归档项目</div>
+      {/* 现代化统计面板 */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 md:p-4 m-3 md:m-4 flex-shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-green-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <FolderIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-green-600">{stats.totalProjects}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">归档项目</div>
+            </div>
           </div>
-          <div className="bg-white/50 rounded-lg p-2 sm:p-4">
-            <div className="text-base sm:text-2xl font-bold text-blue-600">{stats.totalMaterials}</div>
-            <div className="text-xs sm:text-sm text-gray-500">板材总数</div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-blue-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <CubeIcon className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-blue-600">{stats.totalMaterials}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">板材总数</div>
+            </div>
           </div>
-          <div className="bg-white/50 rounded-lg p-2 sm:p-4">
-            <div className="text-base sm:text-2xl font-bold text-green-600">{stats.completedMaterials}</div>
-            <div className="text-xs sm:text-sm text-gray-500">已完成</div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-emerald-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <CheckIcon className="w-6 h-6 md:w-8 md:h-8 text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-emerald-600">{stats.completedMaterials}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">已完成</div>
+            </div>
           </div>
-          <div className="bg-white/50 rounded-lg p-2 sm:p-4">
-            <div className="text-base sm:text-2xl font-bold text-purple-600">{stats.completionRate}%</div>
-            <div className="text-xs sm:text-sm text-gray-500">完成率</div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-purple-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <ChartBarIcon className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-purple-600">{stats.completionRate}%</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">完成率</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 按月份分组显示 - 移动端优化 */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4">
-        <div className="space-y-3 sm:space-y-4 pb-4">
+      {/* 按月份分组显示 */}
+      <div className="flex-1 overflow-y-auto px-3 md:px-4">
+        <div className="space-y-3 md:space-y-4 pb-4">
         {Object.entries(pastProjectsByMonth || {}).map(([monthKey, monthProjects]) => (
           <div key={monthKey} className="bg-white rounded-lg shadow-sm border overflow-hidden">
             {/* 月份标题 */}

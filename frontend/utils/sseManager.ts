@@ -5,6 +5,7 @@ import { configManager } from './configManager';
 export type SSEEventType = 
   | 'connected'
   | 'heartbeat'
+  // 项目相关事件
   | 'project-created'
   | 'project-updated'
   | 'project-deleted'
@@ -16,8 +17,50 @@ export type SSEEventType =
   | 'projects-batch-restored'
   | 'projects-batch-soft-deleted'
   | 'projects-batch-destroyed'
+  | 'project-worker-assigned'
+  | 'project-worker-reassigned'
+  // 材料相关事件
   | 'material-status-changed'
   | 'material-batch-status-changed'
+  | 'material-allocated'
+  | 'material-started'
+  | 'material-completed'
+  | 'material-recycled'
+  | 'material-transferred'
+  | 'material-stock-added'
+  | 'material-stock-warning'
+  | 'material-dimension-added'
+  // 图纸相关事件
+  | 'drawing-uploaded'
+  | 'drawing-deleted'
+  | 'drawing-version-updated'
+  | 'drawing-moved'
+  | 'drawing-linked'
+  | 'drawing-unlinked'
+  | 'dxf-parsed'
+  | 'drawing-batch-uploaded'
+  | 'drawing-batch-deleted'
+  // 工人相关事件
+  | 'worker-added'
+  | 'worker-updated'
+  | 'worker-deleted'
+  | 'worker-department-changed'
+  | 'worker-overloaded'
+  | 'worker-available'
+  | 'workload-balanced'
+  | 'worker-skill-added'
+  | 'worker-permission-updated'
+  // 协作相关事件
+  | 'collaboration-invited'
+  | 'task-assigned'
+  | 'message-received'
+  | 'sync-updated'
+  | 'assignment-changed'
+  // 系统相关事件
+  | 'system-maintenance'
+  | 'backup-completed'
+  | 'connection-lost'
+  | 'connection-restored'
   | 'test';
 
 // SSE事件数据接口
@@ -208,68 +251,207 @@ class SSEManager {
         });
       }
 
-      // 处理项目相关事件的通知（板材事件不显示通知）
-      if (eventType.startsWith('project-')) {
-        this.handleProjectNotification(eventType, eventData.data);
-      }
+      // 处理通知消息（根据事件类型分发）
+      this.handleEventNotification(eventType, eventData.data);
 
     } catch (error) {
     }
   }
 
-  // 处理项目通知
-  private handleProjectNotification(eventType: SSEEventType, data: any) {
+  // 处理事件通知（统一通知处理）
+  private handleEventNotification(eventType: SSEEventType, data: any) {
     let notification: NotificationMessage | null = null;
     const timestamp = Date.now();
 
     switch (eventType) {
+      // 项目相关事件 - 临时禁用，使用本地通知
       case 'project-created':
+      case 'project-status-changed':
+      case 'project-deleted':
+      case 'project-worker-assigned':
+      case 'project-worker-reassigned':
+        return; // 临时禁用SSE项目通知，避免与本地通知重复
+
+      // 材料相关事件
+      case 'material-allocated':
         notification = {
-          id: `project-created-${data.project?.id}-${timestamp}`,
+          id: `material-allocated-${data.materialId}-${timestamp}`,
           type: 'info',
-          title: '新项目创建',
-          message: `${data.userName || '某用户'} 创建了项目 "${data.project?.name || '未知项目'}"`,
+          title: '材料分配成功',
+          message: `${String(data.materialType || '材料')} ${data.quantity || 0}张已分配至项目 "${String(data.projectName || '未知项目')}"`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'material-completed':
+        notification = {
+          id: `material-completed-${data.materialId}-${timestamp}`,
+          type: 'success',
+          title: '材料加工完成',
+          message: `${String(data.workerName || '某工人')} 完成了 ${String(data.materialType || '材料')} 加工`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'material-stock-warning':
+        notification = {
+          id: `material-stock-warning-${data.materialId}-${timestamp}`,
+          type: 'warning',
+          title: '库存不足警告',
+          message: `${String(data.workerName || '某工人')} 的 ${String(data.materialType || '材料')} 库存不足：当前${data.currentStock || 0}张，需要${data.required || 0}张`,
+          timestamp: new Date().toISOString(),
+          duration: 6000
+        };
+        break;
+
+      // 图纸相关事件
+      case 'drawing-uploaded':
+        notification = {
+          id: `drawing-uploaded-${data.drawingId}-${timestamp}`,
+          type: 'success',
+          title: '图纸上传成功',
+          message: `图纸 "${String(data.filename || '未知文件')}" 已上传${data.projectName ? `至项目 "${String(data.projectName)}"` : ''}`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'drawing-deleted':
+        notification = {
+          id: `drawing-deleted-${data.drawingId}-${timestamp}`,
+          type: 'warning',
+          title: '图纸删除成功',
+          message: `图纸 "${String(data.filename || '未知文件')}" 已删除`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'dxf-parsed':
+        notification = {
+          id: `dxf-parsed-${data.drawingId}-${timestamp}`,
+          type: 'success',
+          title: 'DXF解析完成',
+          message: `DXF文件 "${String(data.filename || '未知文件')}" 解析完成：${String(data.details || '')}`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'drawing-batch-uploaded':
+        notification = {
+          id: `drawing-batch-uploaded-${timestamp}`,
+          type: 'success',
+          title: '批量上传完成',
+          message: `成功上传 ${data.successCount || 0} 个图纸，共 ${data.totalCount || 0} 个文件`,
           timestamp: new Date().toISOString(),
           duration: 5000
         };
         break;
 
-      case 'project-status-changed':
-        const statusText = this.getStatusText(data.newStatus);
-        const reasonText = data.reason ? ` (${data.reason})` : '';
-        const materialInfo = data.materialChanged 
-          ? ` - ${data.materialChanged.thicknessSpec} 从${this.getStatusText(data.materialChanged.oldStatus)}改为${this.getStatusText(data.materialChanged.newStatus)}`
-          : '';
-        
-        // 从项目对象或直接字段获取项目名称
-        const projectName = data.project?.name || data.projectName || '未知项目';
-        
+      // 工人相关事件
+      case 'worker-added':
         notification = {
-          id: `project-status-${data.projectId}-${timestamp}`,
-          type: data.newStatus === 'completed' ? 'success' : 'info',
-          title: '项目状态自动更新',
-          message: `项目 "${projectName}" 状态从${this.getStatusText(data.oldStatus)}改为${statusText}${reasonText}${materialInfo}`,
+          id: `worker-added-${data.workerId}-${timestamp}`,
+          type: 'success',
+          title: '工人添加成功',
+          message: `工人 "${String(data.workerName || '未知')}" 已添加到 ${String(data.department || '未知部门')}`,
           timestamp: new Date().toISOString(),
-          duration: 6000 // 增加显示时间，因为信息更详细
+          duration: 4000
         };
         break;
 
-      case 'project-deleted':
-        const drawingText = data.deletedDrawingsCount && data.deletedDrawingsCount > 0
-          ? ` (同时删除了 ${data.deletedDrawingsCount} 个图纸)`
-          : '';
-        
-        // 从项目对象或直接字段获取项目名称
-        const deletedProjectName = data.project?.name || data.projectName || '未知项目';
-        
+      case 'worker-overloaded':
         notification = {
-          id: `project-deleted-${data.projectId}-${timestamp}`,
+          id: `worker-overloaded-${data.workerId}-${timestamp}`,
           type: 'warning',
-          title: '项目已删除',
-          message: `${data.userName || '某用户'} 删除了项目 "${deletedProjectName}"${drawingText}`,
+          title: '工人任务过载',
+          message: `${String(data.workerName || '某工人')} 当前有 ${data.projectCount || 0} 个项目，建议重新分配任务`,
           timestamp: new Date().toISOString(),
-          duration: 8000 // 增加显示时间，因为信息更丰富
+          duration: 5000
         };
+        break;
+
+      case 'workload-balanced':
+        notification = {
+          id: `workload-balanced-${timestamp}`,
+          type: 'success',
+          title: '负载平衡完成',
+          message: '团队工作负载已平衡，所有工人任务分配合理',
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      // 协作相关事件
+      case 'collaboration-invited':
+        notification = {
+          id: `collaboration-invited-${data.projectId}-${timestamp}`,
+          type: 'info',
+          title: '协作邀请',
+          message: `邀请 ${String(data.workerName || '某工人')} 参与项目 "${String(data.projectName || '未知项目')}" 协作`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      case 'task-assigned':
+        notification = {
+          id: `task-assigned-${data.taskId}-${timestamp}`,
+          type: 'info',
+          title: '任务分配',
+          message: `任务 "${String(data.taskName || '未知任务')}" 已分配给 ${String(data.workerName || '某工人')}`,
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      // 系统相关事件
+      case 'connection-restored':
+        notification = {
+          id: `connection-restored-${timestamp}`,
+          type: 'success',
+          title: '连接已恢复',
+          message: '实时同步连接已恢复',
+          timestamp: new Date().toISOString(),
+          duration: 3000
+        };
+        break;
+
+      case 'backup-completed':
+        notification = {
+          id: `backup-completed-${timestamp}`,
+          type: 'success',
+          title: '数据备份完成',
+          message: '系统数据备份已完成',
+          timestamp: new Date().toISOString(),
+          duration: 4000
+        };
+        break;
+
+      // 材料相关事件
+      case 'material-status-changed': // 临时禁用材料状态变化通知，避免重复
+        return; // 不显示通知
+        
+      // 其他不需要显示通知的事件可以在这里过滤
+      case 'heartbeat':
+      case 'connected':
+        return; // 不显示通知
+
+      default:
+        // 对于未处理的事件类型，可以显示通用通知
+        if (data.message) {
+          notification = {
+            id: `generic-${eventType}-${timestamp}`,
+            type: 'info',
+            title: '系统通知',
+            message: data.message,
+            timestamp: new Date().toISOString(),
+            duration: 4000
+          };
+        }
         break;
     }
 

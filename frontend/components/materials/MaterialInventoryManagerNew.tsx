@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Badge, Loading, useDialog } from '@/components/ui';
-import { useToast } from '@/components/ui/Toast';
-import { useMaterialToastListener, materialToastHelper } from '@/utils/materialToastHelper';
+import { materialToastHelper } from '@/utils/materialToastHelper';
 import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
 import { useAuth } from '@/contexts/AuthContext';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -100,11 +99,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
   const { token } = useAuth();
   const { confirm, DialogRenderer } = useDialog();
   const { isMobile, isTablet } = useResponsive();
-  const toast = useToast();
   const { createTracker } = useBatchOperationTracker();
-  
-  // 监听材料Toast事件
-  useMaterialToastListener(toast);
 
   // 用于同步滚动的refs
   const topScrollRef = React.useRef<HTMLDivElement>(null);
@@ -240,7 +235,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
   // 批量更新材料状态
   const handleBatchStatusUpdate = async (newStatus: string) => {
     if (selectedItems.size === 0) {
-      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      materialToastHelper.error('请先选择要操作的材料');
       return;
     }
 
@@ -293,10 +288,9 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       }
 
       tracker.complete();
-      toast.addToast({
-        type: successCount === selectedItems.size ? 'success' : 'warning',
-        message: `批量更新状态完成：成功 ${successCount} 个，共 ${selectedItems.size} 个材料，状态为 "${newStatus}"`
-      });
+      materialToastHelper.batchOperationComplete(
+        `批量更新状态完成：成功 ${successCount} 个，共 ${selectedItems.size} 个材料，状态为 "${newStatus}"`
+      );
       
       if (successCount > 0) {
         await fetchData();
@@ -313,7 +307,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
   // 批量材料调拨
   const handleBatchTransfer = async (fromWorker: string, toWorker: string) => {
     if (selectedItems.size === 0) {
-      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      materialToastHelper.error('请先选择要操作的材料');
       return;
     }
 
@@ -342,10 +336,9 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       }
 
       tracker.complete();
-      toast.addToast({
-        type: successCount === selectedItems.size ? 'success' : 'warning',
-        message: `批量调拨完成：成功调拨 ${successCount} 个材料从 ${fromWorker} 到 ${toWorker}`
-      });
+      materialToastHelper.batchOperationComplete(
+        `批量调拨完成：成功调拨 ${successCount} 个材料从 ${fromWorker} 到 ${toWorker}`
+      );
       
       if (successCount > 0) {
         await fetchData();
@@ -362,7 +355,7 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
   // 批量添加库存
   const handleBatchAddStock = async (quantity: number) => {
     if (selectedItems.size === 0) {
-      toast.addToast({ type: 'warning', message: '请先选择要操作的材料' });
+      materialToastHelper.error('请先选择要操作的材料');
       return;
     }
 
@@ -416,10 +409,9 @@ export const MaterialInventoryManagerNew: React.FC<MaterialInventoryManagerNewPr
       }
 
       tracker.complete();
-      toast.addToast({
-        type: successCount === selectedItems.size ? 'success' : 'warning',
-        message: `批量添加库存完成：成功增加 ${successCount} 个材料的库存`
-      });
+      materialToastHelper.batchOperationComplete(
+        `批量添加库存完成：成功增加 ${successCount} 个材料的库存`
+      );
       
       if (successCount > 0) {
         await fetchData();

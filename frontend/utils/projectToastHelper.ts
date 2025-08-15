@@ -1,7 +1,21 @@
-// 项目操作Toast辅助模块
-// 用于在非React组件中触发Toast提示
+// 项目操作通知辅助模块
+// 使用统一的通知系统（NotificationContainer + notificationStore）
 
+import { useNotificationStore } from '@/stores/notificationStore';
+import { audioManager } from './audioManager';
+import { configManager } from './configManager';
 import React from 'react';
+
+// 状态转换函数 - 确保中文显示
+const getStatusText = (status: string): string => {
+  switch (status) {
+    case 'pending': return '待处理';
+    case 'in_progress': return '进行中';
+    case 'completed': return '已完成';
+    case 'cancelled': return '已取消';
+    default: return status;
+  }
+};
 
 interface ProjectToastHelper {
   projectCreated: (projectName: string, workerName?: string) => void;
@@ -17,153 +31,173 @@ interface ProjectToastHelper {
   error: (message: string) => void;
 }
 
-// 创建全局事件来触发Toast
-export const projectToastEvents = {
-  emit: (eventType: string, data: any) => {
-    window.dispatchEvent(new CustomEvent(`project-toast-${eventType}`, { detail: data }));
+// 播放项目相关音效的辅助函数
+const playProjectSound = async (soundType: 'info' | 'success' | 'warning' | 'error' | 'wancheng') => {
+  try {
+    const config = configManager.getConfig();
+    if (!config.notifications.sound || !audioManager.getConfig().enabled) {
+      return;
+    }
+    await audioManager.playNotificationSound(soundType);
+  } catch (error) {
+    // 静默处理音频播放错误
   }
 };
 
-// Toast事件处理器（在React组件中使用）
-export const useProjectToastListener = (toast: any) => {
-  React.useEffect(() => {
-    const handlers = {
-      'project-toast-created': (e: CustomEvent) => {
-        const { projectName, workerName } = e.detail;
-        if (workerName) {
-          toast.projectCreated(`${projectName}，已分配给${workerName}`);
-        } else {
-          toast.projectCreated(projectName);
-        }
-      },
-      
-      'project-toast-updated': (e: CustomEvent) => {
-        const { projectName } = e.detail;
-        toast.projectUpdated(projectName);
-      },
-      
-      'project-toast-deleted': (e: CustomEvent) => {
-        const { projectName, drawingsCount } = e.detail;
-        if (drawingsCount && drawingsCount > 0) {
-          toast.projectDeleted(`${projectName}，包含${drawingsCount}个图纸文件`);
-        } else {
-          toast.projectDeleted(projectName);
-        }
-      },
-      
-      'project-toast-status-auto': (e: CustomEvent) => {
-        const { projectName, newStatus, reason } = e.detail;
-        toast.projectStatusAuto(projectName, newStatus, reason);
-      },
-      
-      'project-toast-worker-reassigned': (e: CustomEvent) => {
-        const { projectName, fromWorker, toWorker } = e.detail;
-        toast.workerReassigned(projectName, fromWorker, toWorker);
-      },
-      
-      'project-toast-archived': (e: CustomEvent) => {
-        const { projectName } = e.detail;
-        toast.projectArchived(projectName);
-      },
-      
-      'project-toast-restored': (e: CustomEvent) => {
-        const { projectName } = e.detail;
-        toast.addToast({
-          type: 'success',
-          message: `项目"${projectName}"已从过往库恢复`
-        });
-      },
-      
-      'project-toast-status-changed': (e: CustomEvent) => {
-        const { projectName, oldStatus, newStatus, reason } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message: `项目"${projectName}"状态从${oldStatus}改为${newStatus}（${reason}）`
-        });
-      },
-      
-      'project-toast-batch-operation': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message
-        });
-      },
-      
-      'project-toast-info': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message
-        });
-      },
-      
-      'project-toast-error': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message
-        });
-      }
-    };
-
-    // 注册事件监听器
-    Object.entries(handlers).forEach(([eventType, handler]) => {
-      window.addEventListener(eventType, handler as EventListener);
-    });
-
-    // 清理函数
-    return () => {
-      Object.entries(handlers).forEach(([eventType, handler]) => {
-        window.removeEventListener(eventType, handler as EventListener);
-      });
-    };
-  }, [toast]);
+// 使用统一的通知系统显示项目通知
+const showProjectNotification = (
+  type: 'info' | 'success' | 'warning' | 'error',
+  title: string,
+  message: string,
+  duration: number = 4000
+) => {
+  // 获取 notificationStore 的 addNotification 方法
+  const notificationStore = useNotificationStore.getState();
+  
+  // 生成唯一ID
+  const id = `project-${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  
+  // 播放对应音效
+  playProjectSound(type === 'success' && (message.includes('完成') || message.includes('创建')) ? 'wancheng' : type);
+  
+  // 添加通知到系统
+  notificationStore.addNotification({
+    id,
+    type,
+    title,
+    message,
+    timestamp: new Date().toISOString(),
+    duration
+  });
 };
 
-// 在projectStore中使用的辅助函数
+// 项目操作辅助函数（直接调用通知系统）
 export const projectToastHelper: ProjectToastHelper = {
   projectCreated: (projectName: string, workerName?: string) => {
-    projectToastEvents.emit('created', { projectName, workerName });
+    playProjectSound('wancheng');
+    showProjectNotification(
+      'success',
+      '项目创建成功',
+      workerName 
+        ? `项目"${projectName}"已创建并分配给${workerName}` 
+        : `项目"${projectName}"创建成功`,
+      4000
+    );
   },
   
   projectUpdated: (projectName: string, updateType?: string) => {
-    projectToastEvents.emit('updated', { projectName, updateType });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '项目更新',
+      updateType 
+        ? `项目"${projectName}"${updateType}已更新` 
+        : `项目"${projectName}"信息已更新`,
+      3000
+    );
   },
   
   projectDeleted: (projectName: string, userName?: string, drawingsCount?: number) => {
-    projectToastEvents.emit('deleted', { projectName, userName, drawingsCount });
+    playProjectSound('warning');
+    let message = `项目"${projectName}"已删除`;
+    if (drawingsCount && drawingsCount > 0) {
+      message += `，包含${drawingsCount}个图纸文件`;
+    }
+    if (userName) {
+      message += `（由${userName}执行）`;
+    }
+    
+    showProjectNotification(
+      'warning',
+      '项目已删除',
+      message,
+      5000
+    );
   },
   
   projectArchived: (projectName: string) => {
-    projectToastEvents.emit('archived', { projectName });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '项目归档',
+      `项目"${projectName}"已归档至过往库`,
+      4000
+    );
   },
   
   projectRestored: (projectName: string) => {
-    projectToastEvents.emit('restored', { projectName });
+    playProjectSound('success');
+    showProjectNotification(
+      'success',
+      '项目恢复',
+      `项目"${projectName}"已从过往库恢复`,
+      4000
+    );
   },
   
   projectStatusAuto: (projectName: string, newStatus: string, reason: string) => {
-    projectToastEvents.emit('status-auto', { projectName, newStatus, reason });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '项目状态自动更新',
+      `项目"${projectName}"状态自动更新为"${getStatusText(newStatus)}"（${reason}）`,
+      5000
+    );
   },
   
   projectStatusChanged: (projectName: string, oldStatus: string, newStatus: string, reason: string) => {
-    projectToastEvents.emit('status-changed', { projectName, oldStatus, newStatus, reason });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '项目状态变更',
+      `项目"${projectName}"状态从"${getStatusText(oldStatus)}"改为"${getStatusText(newStatus)}"（${reason}）`,
+      4000
+    );
   },
   
   workerReassigned: (projectName: string, fromWorker: string, toWorker: string) => {
-    projectToastEvents.emit('worker-reassigned', { projectName, fromWorker, toWorker });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '工人重新分配',
+      `项目"${projectName}"工人从${fromWorker}重新分配给${toWorker}`,
+      4000
+    );
   },
   
   batchOperationComplete: (message: string) => {
-    projectToastEvents.emit('batch-operation', { message });
+    playProjectSound('success');
+    showProjectNotification(
+      'success',
+      '批量操作完成',
+      message,
+      5000
+    );
   },
   
   info: (message: string) => {
-    projectToastEvents.emit('info', { message });
+    playProjectSound('info');
+    showProjectNotification(
+      'info',
+      '操作提示',
+      message,
+      4000
+    );
   },
   
   error: (message: string) => {
-    projectToastEvents.emit('error', { message });
+    playProjectSound('error');
+    showProjectNotification(
+      'error',
+      '操作失败',
+      message,
+      5000
+    );
   }
+};
+
+// 简化的React Hook（移除复杂的事件监听）
+export const useProjectToastListener = (toast?: any) => {
+  // 不再需要复杂的事件监听，直接使用notificationStore
+  return;
 };

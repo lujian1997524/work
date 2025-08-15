@@ -5,12 +5,9 @@ import { motion } from 'framer-motion'
 import { Header } from './Header'
 import { Sidebar, SidebarItem } from './Sidebar'
 import { NotificationContainer, SSEConnectionIndicator, AudioSettingsButton, Button } from '@/components/ui';
-import { ToastContainer, useToast } from '@/components/ui/Toast';
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProjectStore } from '@/stores'
 import { sseManager } from '@/utils/sseManager'
-import { useSSEToastMapping } from '@/utils/sseToastMapper'
-import { useBatchOperationToastListener } from '@/utils/batchOperationToastHelper'
 import { useAuth } from '@/contexts/AuthContext'
 
 export interface MainLayoutProps {
@@ -36,19 +33,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const { connectSSE, disconnectSSE } = useNotificationStore()
   const { fetchProjects } = useProjectStore()
   const { token, isAuthenticated } = useAuth()
-  const toast = useToast()
-
-  // 启用SSE到Toast自动映射
-  const sseToastMapping = useSSEToastMapping({
-    autoStart: true,
-    projectEvents: true,
-    materialEvents: true,
-    drawingEvents: true,
-    workerEvents: true,
-  })
-
-  // 启用批量操作Toast监听器
-  useBatchOperationToastListener(toast)
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed)
@@ -220,11 +204,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </motion.div>
       )}
 
-      {/* 通知容器 */}
+      {/* 通知容器 - 只使用新的NotificationContainer */}
       <NotificationContainer />
-      
-      {/* Toast容器 - 新增Toast系统 */}
-      <ToastContainer position="top-right" />
       
       {/* SSE连接状态指示器 */}
       <SSEConnectionIndicator />

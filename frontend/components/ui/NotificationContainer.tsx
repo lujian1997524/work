@@ -14,38 +14,34 @@ const iconMap = {
   info: InformationCircleIcon
 };
 
-// 样式映射（采用设计系统Notification组件风格）
+// 样式映射（采用Toast组件的样式设计）
 const styleMap = {
   success: {
-    icon: 'text-green-500',
-    bg: 'bg-green-50 border-green-200',
-    title: 'text-green-800',
-    message: 'text-green-700',
-    borderColor: 'border-l-green-500',
+    icon: 'text-white',
+    bg: 'bg-green-500 text-white border-green-500',
+    title: 'text-white',
+    message: 'text-green-100',
     progressBg: 'bg-green-400'
   },
   error: {
-    icon: 'text-red-500',
-    bg: 'bg-red-50 border-red-200',
-    title: 'text-red-800',
-    message: 'text-red-700',
-    borderColor: 'border-l-red-500',
+    icon: 'text-white',
+    bg: 'bg-red-500 text-white border-red-500',
+    title: 'text-white',
+    message: 'text-red-100',
     progressBg: 'bg-red-400'
   },
   warning: {
-    icon: 'text-yellow-500',
-    bg: 'bg-yellow-50 border-yellow-200',
-    title: 'text-yellow-800',
-    message: 'text-yellow-700',
-    borderColor: 'border-l-yellow-500',
+    icon: 'text-white',
+    bg: 'bg-yellow-500 text-white border-yellow-500',
+    title: 'text-white',
+    message: 'text-yellow-100',
     progressBg: 'bg-yellow-400'
   },
   info: {
-    icon: 'text-blue-500',
-    bg: 'bg-blue-50 border-blue-200',
-    title: 'text-blue-800',
-    message: 'text-blue-700',
-    borderColor: 'border-l-blue-500',
+    icon: 'text-white',
+    bg: 'bg-blue-500 text-white border-blue-500',
+    title: 'text-white',
+    message: 'text-blue-100',
     progressBg: 'bg-blue-400'
   }
 };
@@ -86,20 +82,19 @@ const NotificationItem = ({
       exit={{ opacity: 0, x: 400, scale: 0.8 }}
       transition={{ 
         type: "spring", 
-        stiffness: 300, 
+        stiffness: 500, 
         damping: 30,
         mass: 0.8 
       }}
       className={`
         relative w-full max-w-sm
         ${styles.bg}
-        border-l-4 ${styles.borderColor}
-        backdrop-blur-lg
-        rounded-ios-lg shadow-lg
+        rounded-ios-xl shadow-ios-lg
         p-4 mb-3
         cursor-pointer
         hover:shadow-xl
         transition-all duration-200
+        overflow-hidden
       `}
       onClick={handleClick}
     >
@@ -111,13 +106,13 @@ const NotificationItem = ({
         
         {/* 内容 */}
         <div className="flex-1 min-w-0">
-          <div className={`font-semibold text-sm ${styles.title} mb-1`}>
+          <div className={`font-medium text-sm ${styles.title} mb-1`}>
             {notification.title}
           </div>
           <div className={`text-sm ${styles.message} leading-relaxed`}>
             {notification.message}
           </div>
-          <div className="text-text-tertiary text-xs mt-2">
+          <div className="text-white/70 text-xs mt-2">
             {new Date(notification.timestamp).toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit'
@@ -133,7 +128,7 @@ const NotificationItem = ({
           }}
           className={`
             flex-shrink-0 p-1 rounded-full
-            ${styles.icon} hover:bg-black/10
+            ${styles.icon} hover:bg-white/20
             transition-colors duration-200
           `}
         >
@@ -147,7 +142,7 @@ const NotificationItem = ({
           className={`
             absolute bottom-0 left-0 h-1 
             ${styles.progressBg}
-            rounded-bl-ios-lg
+            rounded-bl-ios-xl
           `}
           initial={{ width: '100%' }}
           animate={{ width: '0%' }}
@@ -165,13 +160,8 @@ const NotificationItem = ({
 export const NotificationContainer = () => {
   const { notifications, removeNotification } = useNotificationStore();
 
-  // 调试日志：监控通知数组变化
-  React.useEffect(() => {
-    // 通知列表更新，无需日志输出
-  }, [notifications]);
-
   return (
-    <div className="fixed bottom-6 right-6 z-50 space-y-3 pointer-events-none">
+    <div className="fixed top-4 right-4 z-50 space-y-3 pointer-events-none">
       <AnimatePresence mode="popLayout">
         {notifications.map((notification) => {
           return (

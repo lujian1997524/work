@@ -1,16 +1,19 @@
-// 材料操作Toast辅助模块
-// 用于在非React组件中触发材料相关Toast提示
+// 材料操作通知辅助模块
+// 使用统一的通知系统（NotificationContainer + notificationStore）
 
+import { useNotificationStore } from '@/stores/notificationStore';
+import { audioManager } from './audioManager';
+import { configManager } from './configManager';
 import React from 'react';
 
 interface MaterialToastHelper {
-  // 四状态循环Toast
+  // 四状态循环通知
   materialAllocated: (materialType: string, projectName: string, quantity: number) => void;
   materialStarted: (materialType: string, workerName: string) => void;
   materialCompleted: (materialType: string, workerName?: string) => void;
   materialRecycled: (materialType: string) => void;
   
-  // 库存管理Toast
+  // 库存管理通知
   stockAdded: (workerName: string, materialType: string, quantity: number) => void;
   stockWarning: (workerName: string, materialType: string, currentStock: number, required: number) => void;
   dimensionAdded: (materialType: string, dimensions: string, quantity: number) => void;
@@ -20,151 +23,180 @@ interface MaterialToastHelper {
   strategyDeviation: (carbonRatio: number, target?: number) => void;
   strategyBalanced: () => void;
   
-  // 批量操作Toast
+  // 批量操作通知
   batchOperationComplete: (message: string) => void;
   
   // 通用错误
   error: (message: string) => void;
 }
 
-// 创建全局事件来触发Toast
-export const materialToastEvents = {
-  emit: (eventType: string, data: any) => {
-    window.dispatchEvent(new CustomEvent(`material-toast-${eventType}`, { detail: data }));
+// 播放材料相关音效的辅助函数
+const playMaterialSound = async (soundType: 'info' | 'success' | 'warning' | 'error' | 'wancheng') => {
+  try {
+    const config = configManager.getConfig();
+    if (!config.notifications.sound || !audioManager.getConfig().enabled) {
+      return;
+    }
+    await audioManager.playNotificationSound(soundType);
+  } catch (error) {
+    // 静默处理音频播放错误
   }
 };
 
-// Toast事件处理器（在React组件中使用）
-export const useMaterialToastListener = (toast: any) => {
-  React.useEffect(() => {
-    const handlers = {
-      'material-toast-allocated': (e: CustomEvent) => {
-        const { materialType, projectName, quantity } = e.detail;
-        toast.materialAllocated(materialType, projectName, quantity);
-      },
-      
-      'material-toast-started': (e: CustomEvent) => {
-        const { materialType, workerName } = e.detail;
-        toast.materialStarted(materialType, workerName);
-      },
-      
-      'material-toast-completed': (e: CustomEvent) => {
-        const { materialType, workerName } = e.detail;
-        toast.materialCompleted(materialType, workerName);
-      },
-      
-      'material-toast-recycled': (e: CustomEvent) => {
-        const { materialType } = e.detail;
-        toast.materialRecycled(materialType);
-      },
-      
-      'material-toast-stock-added': (e: CustomEvent) => {
-        const { workerName, materialType, quantity } = e.detail;
-        toast.stockAdded(workerName, materialType, quantity);
-      },
-      
-      'material-toast-stock-warning': (e: CustomEvent) => {
-        const { workerName, materialType, currentStock, required } = e.detail;
-        toast.stockWarning(workerName, materialType, currentStock, required);
-      },
-      
-      'material-toast-dimension-added': (e: CustomEvent) => {
-        const { materialType, dimensions, quantity } = e.detail;
-        toast.dimensionAdded(materialType, dimensions, quantity);
-      },
-      
-      'material-toast-transferred': (e: CustomEvent) => {
-        const { materialType, quantity, fromWorker, toWorker } = e.detail;
-        toast.materialTransferred(materialType, quantity, fromWorker, toWorker);
-      },
-      
-      'material-toast-strategy-deviation': (e: CustomEvent) => {
-        const { carbonRatio, target } = e.detail;
-        toast.strategyDeviation(carbonRatio, target);
-      },
-      
-      'material-toast-strategy-balanced': (e: CustomEvent) => {
-        toast.strategyBalanced();
-      },
-      
-      'material-toast-batch-operation-complete': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'info',
-          message
-        });
-      },
-      
-      'material-toast-error': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message
-        });
-      }
-    };
-
-    // 注册事件监听器
-    Object.entries(handlers).forEach(([eventType, handler]) => {
-      window.addEventListener(eventType, handler as EventListener);
-    });
-
-    // 清理函数
-    return () => {
-      Object.entries(handlers).forEach(([eventType, handler]) => {
-        window.removeEventListener(eventType, handler as EventListener);
-      });
-    };
-  }, [toast]);
+// 使用统一的通知系统显示材料通知
+const showMaterialNotification = (
+  type: 'info' | 'success' | 'warning' | 'error',
+  title: string,
+  message: string,
+  duration: number = 4000
+) => {
+  // 获取 notificationStore 的 addNotification 方法
+  const notificationStore = useNotificationStore.getState();
+  
+  // 生成唯一ID
+  const id = `material-${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  
+  // 播放对应音效
+  playMaterialSound(type === 'success' && message.includes('完成') ? 'wancheng' : type);
+  
+  // 添加通知到系统
+  notificationStore.addNotification({
+    id,
+    type,
+    title,
+    message,
+    timestamp: new Date().toISOString(),
+    duration
+  });
 };
 
-// 在材料相关组件中使用的辅助函数
+// 材料操作辅助函数（直接调用通知系统）
 export const materialToastHelper: MaterialToastHelper = {
   materialAllocated: (materialType: string, projectName: string, quantity: number) => {
-    materialToastEvents.emit('allocated', { materialType, projectName, quantity });
+    playMaterialSound('info');
+    showMaterialNotification(
+      'info',
+      '材料已分配',
+      `${materialType} ${quantity}张已分配至项目"${projectName}"`,
+      4000
+    );
   },
   
   materialStarted: (materialType: string, workerName: string) => {
-    materialToastEvents.emit('started', { materialType, workerName });
+    playMaterialSound('info');
+    showMaterialNotification(
+      'info',
+      '材料加工开始',
+      `${workerName}开始加工${materialType}`,
+      4000
+    );
   },
   
   materialCompleted: (materialType: string, workerName?: string) => {
-    materialToastEvents.emit('completed', { materialType, workerName });
+    playMaterialSound('wancheng');
+    showMaterialNotification(
+      'success',
+      '材料加工完成',
+      workerName 
+        ? `${workerName}完成${materialType}加工` 
+        : `${materialType}加工完成`,
+      4000
+    );
   },
   
   materialRecycled: (materialType: string) => {
-    materialToastEvents.emit('recycled', { materialType });
+    playMaterialSound('info');
+    showMaterialNotification(
+      'info',
+      '材料已回收',
+      `${materialType}已回收至库存`,
+      3000
+    );
   },
   
   stockAdded: (workerName: string, materialType: string, quantity: number) => {
-    materialToastEvents.emit('stock-added', { workerName, materialType, quantity });
+    playMaterialSound('success');
+    showMaterialNotification(
+      'success',
+      '库存增加',
+      `${workerName}的${materialType}库存增加${quantity}张`,
+      4000
+    );
   },
   
   stockWarning: (workerName: string, materialType: string, currentStock: number, required: number) => {
-    materialToastEvents.emit('stock-warning', { workerName, materialType, currentStock, required });
+    playMaterialSound('warning');
+    showMaterialNotification(
+      'warning',
+      '库存不足警告',
+      `${workerName}的${materialType}库存不足：当前${currentStock}张，需要${required}张`,
+      6000
+    );
   },
   
   dimensionAdded: (materialType: string, dimensions: string, quantity: number) => {
-    materialToastEvents.emit('dimension-added', { materialType, dimensions, quantity });
+    playMaterialSound('success');
+    showMaterialNotification(
+      'success',
+      '尺寸规格添加',
+      `${materialType}添加新尺寸${dimensions}，数量${quantity}张`,
+      4000
+    );
   },
   
   materialTransferred: (materialType: string, quantity: number, fromWorker: string, toWorker: string) => {
-    materialToastEvents.emit('transferred', { materialType, quantity, fromWorker, toWorker });
+    playMaterialSound('info');
+    showMaterialNotification(
+      'info',
+      '材料调拨',
+      `${materialType} ${quantity}张从${fromWorker}调拨至${toWorker}`,
+      4000
+    );
   },
   
   strategyDeviation: (carbonRatio: number, target: number = 95) => {
-    materialToastEvents.emit('strategy-deviation', { carbonRatio, target });
+    playMaterialSound('warning');
+    showMaterialNotification(
+      'warning',
+      '95/5策略偏离',
+      `碳板比例${carbonRatio.toFixed(1)}%，偏离目标${target}%`,
+      5000
+    );
   },
   
   strategyBalanced: () => {
-    materialToastEvents.emit('strategy-balanced', {});
+    playMaterialSound('success');
+    showMaterialNotification(
+      'success',
+      '95/5策略平衡',
+      '材料配比已达到95/5策略要求',
+      4000
+    );
   },
   
   batchOperationComplete: (message: string) => {
-    materialToastEvents.emit('batch-operation-complete', { message });
+    playMaterialSound('success');
+    showMaterialNotification(
+      'success',
+      '批量操作完成',
+      message,
+      5000
+    );
   },
   
   error: (message: string) => {
-    materialToastEvents.emit('error', { message });
+    playMaterialSound('error');
+    showMaterialNotification(
+      'error',
+      '操作失败',
+      message,
+      5000
+    );
   }
+};
+
+// 简化的React Hook（移除复杂的事件监听）
+export const useMaterialToastListener = (toast?: any) => {
+  // 不再需要复杂的事件监听，直接使用notificationStore
+  return;
 };

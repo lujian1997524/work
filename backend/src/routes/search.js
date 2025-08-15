@@ -30,7 +30,9 @@ router.get('/', authenticate, async (req, res) => {
         departments: [],
         drawings: [],
         materials: [],
-        thicknessSpecs: []
+        thicknessSpecs: [],
+        employees: [],
+        attendanceExceptions: []
       });
     }
 
@@ -38,7 +40,7 @@ router.get('/', authenticate, async (req, res) => {
     const searchPattern = `%${searchTerm}%`;
     
     // 导入模型
-    const { Project, Worker, Department, Drawing, User, Material, ThicknessSpec, WorkerMaterial } = require('../models');
+    const { Project, Worker, Department, Drawing, User, Material, ThicknessSpec, WorkerMaterial, Employee, AttendanceException } = require('../models');
 
     // 智能搜索词处理 - 增强数字和厚度识别
     const processSearchTerm = (searchTerm) => {
@@ -95,7 +97,7 @@ router.get('/', authenticate, async (req, res) => {
       return patterns.map(pattern => ({ [Op.like]: `%${pattern}%` }));
     };
     
-    const [projects, workers, departments, drawings, workerMaterials, thicknessSpecs, projectsByWorker] = await Promise.all([
+    const [projects, workers, departments, drawings, workerMaterials, thicknessSpecs, projectsByWorker, employees, attendanceExceptions, attendanceExceptionsByEmployee] = await Promise.all([
       // 1. 搜索项目 - 增强搜索范围，包括负责工人姓名
       Project.findAll({
         where: {
@@ -320,6 +322,83 @@ router.get('/', authenticate, async (req, res) => {
         ],
         limit: 10,
         order: [['updatedAt', 'DESC']]
+      }),
+
+      // 8. 搜索员工（考勤模块）
+      Employee.findAll({
+        where: {
+          [Op.and]: [
+            { status: 'active' },
+            {
+              [Op.or]: [
+                { name: { [Op.like]: searchPattern } },
+                { employeeId: { [Op.like]: searchPattern } },
+                { department: { [Op.like]: searchPattern } },
+                { position: { [Op.like]: searchPattern } },
+                ...buildSearchConditions(searchInfo.patterns).map(condition => ({ name: condition })),
+                ...buildSearchConditions(searchInfo.patterns).map(condition => ({ department: condition })),
+                ...buildSearchConditions(searchInfo.patterns).map(condition => ({ position: condition }))
+              ]
+            }
+          ]
+        },
+        limit: 10,
+        order: [['employeeId', 'ASC'], ['name', 'ASC']]
+      }),
+
+      // 9. 搜索考勤异常记录
+      AttendanceException.findAll({
+        where: {
+          [Op.or]: [
+            // 按异常原因搜索
+            { leaveReason: { [Op.like]: searchPattern } },
+            { overtimeReason: { [Op.like]: searchPattern } },
+            { absentReason: { [Op.like]: searchPattern } },
+            { notes: { [Op.like]: searchPattern } },
+            // 按异常类型搜索（中文关键词映射到英文枚举值）
+            ...(searchTerm.includes('请假') || searchTerm.includes('假') ? [{ exceptionType: 'leave' }] : []),
+            ...(searchTerm.includes('加班') ? [{ exceptionType: 'overtime' }] : []),
+            ...(searchTerm.includes('缺勤') || searchTerm.includes('旷工') ? [{ exceptionType: 'absent' }] : []),
+            ...(searchTerm.includes('迟到') ? [{ exceptionType: 'late' }] : []),
+            ...(searchTerm.includes('早退') ? [{ exceptionType: 'early' }] : []),
+            // 智能搜索模式
+            ...buildSearchConditions(searchInfo.patterns).map(condition => ({ leaveReason: condition })),
+            ...buildSearchConditions(searchInfo.patterns).map(condition => ({ overtimeReason: condition })),
+            ...buildSearchConditions(searchInfo.patterns).map(condition => ({ notes: condition }))
+          ]
+        },
+        include: [
+          {
+            model: Employee,
+            as: 'employee',
+            attributes: ['id', 'employeeId', 'name', 'department', 'position'],
+            required: true // 必须有员工关联，但不限制员工搜索条件
+          }
+        ],
+        limit: 15,
+        order: [['date', 'DESC']]
+      }),
+
+      // 10. 通过员工姓名搜索考勤异常记录
+      AttendanceException.findAll({
+        where: {},
+        include: [
+          {
+            model: Employee,
+            as: 'employee',
+            attributes: ['id', 'employeeId', 'name', 'department', 'position'],
+            where: {
+              [Op.or]: [
+                { name: { [Op.like]: searchPattern } },
+                { employeeId: { [Op.like]: searchPattern } },
+                ...buildSearchConditions(searchInfo.patterns).map(condition => ({ name: condition }))
+              ]
+            },
+            required: true
+          }
+        ],
+        limit: 15,
+        order: [['date', 'DESC']]
       })
     ]);
 
@@ -473,6 +552,89 @@ router.get('/', authenticate, async (req, res) => {
       sortOrder: spec.sortOrder
     }));
 
+    // 格式化员工结果（考勤模块）
+    const formatEmployees = employees.map(employee => ({
+      id: employee.id,
+      name: employee.name,
+      employeeId: employee.employeeId,
+      department: employee.department || '未分配部门',
+      position: employee.position || '未分配岗位',
+      status: employee.status,
+      dailyWorkHours: employee.dailyWorkHours || 9,
+      description: `工号: ${employee.employeeId || '无'} • ${employee.department || '未分配部门'} • ${employee.position || '未分配岗位'}`,
+      meta: `${employee.dailyWorkHours || 9}小时工作制`
+    }));
+
+    // 合并考勤异常搜索结果（按原因搜索 + 按员工搜索）
+    const allAttendanceExceptions = [...attendanceExceptions, ...attendanceExceptionsByEmployee];
+    // 去重（按ID）
+    const uniqueAttendanceExceptions = allAttendanceExceptions.filter((exception, index, self) => 
+      index === self.findIndex(e => e.id === exception.id)
+    );
+
+    // 格式化考勤异常记录结果
+    const formatAttendanceExceptions = uniqueAttendanceExceptions.map(exception => {
+      const employee = exception.employee;
+      const exceptionTypeText = {
+        'leave': '请假',
+        'overtime': '加班',
+        'absent': '缺勤',
+        'late': '迟到',
+        'early': '早退'
+      }[exception.exceptionType] || exception.exceptionType;
+
+      let details = '';
+      const exceptionDate = new Date(exception.date).toLocaleDateString('zh-CN');
+      
+      switch (exception.exceptionType) {
+        case 'leave':
+          const leaveTypeText = {
+            'sick': '病假',
+            'personal': '事假',
+            'annual': '年假',
+            'compensatory': '调休'
+          }[exception.leaveType] || '请假';
+          const leaveHours = exception.leaveHours || 9;
+          details = `${leaveTypeText} ${leaveHours}小时`;
+          if (exception.leaveReason) {
+            details += ` (${exception.leaveReason})`;
+          }
+          break;
+        case 'overtime':
+          const overtimeHours = (exception.overtimeMinutes || 0) / 60;
+          details = `加班 ${Math.round(overtimeHours * 10) / 10}小时`;
+          if (exception.overtimeReason) {
+            details += ` (${exception.overtimeReason})`;
+          }
+          break;
+        case 'absent':
+          details = exception.absentReason || '缺勤';
+          break;
+        case 'late':
+          details = `迟到${exception.lateArrivalTime ? ` 至${exception.lateArrivalTime}` : ''}`;
+          break;
+        case 'early':
+          details = `早退${exception.earlyLeaveTime ? ` 于${exception.earlyLeaveTime}` : ''}`;
+          break;
+      }
+
+      return {
+        id: exception.id,
+        name: `${employee?.name || '未知员工'} - ${exceptionDate} ${exceptionTypeText}`,
+        employee: employee ? {
+          id: employee.id,
+          employeeId: employee.employeeId,
+          name: employee.name,
+          department: employee.department,
+          position: employee.position
+        } : null,
+        date: exception.date,
+        exceptionType: exception.exceptionType,
+        description: details,
+        meta: `${exceptionDate} • ${employee?.department || '未知部门'}`
+      };
+    });
+
     res.json({
       success: true,
       query: searchTerm,
@@ -483,7 +645,9 @@ router.get('/', authenticate, async (req, res) => {
       drawings: formatDrawings,
       materials: formatWorkerMaterials,
       thicknessSpecs: formatThicknessSpecs, // 新增厚度规格结果
-      totalCount: formatProjects.length + formatWorkers.length + formatDepartments.length + formatDrawings.length + formatWorkerMaterials.length + formatThicknessSpecs.length
+      employees: formatEmployees, // 新增员工结果
+      attendanceExceptions: formatAttendanceExceptions, // 新增考勤异常结果
+      totalCount: formatProjects.length + formatWorkers.length + formatDepartments.length + formatDrawings.length + formatWorkerMaterials.length + formatThicknessSpecs.length + formatEmployees.length + formatAttendanceExceptions.length
     });
 
   } catch (error) {

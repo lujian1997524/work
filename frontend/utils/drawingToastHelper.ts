@@ -1,35 +1,38 @@
-// 图纸操作Toast辅助模块
-// 用于在非React组件中触发图纸相关Toast提示
+// 图纸操作通知辅助模块
+// 使用统一的通知系统（NotificationContainer + notificationStore）
 
+import { useNotificationStore } from '@/stores/notificationStore';
+import { audioManager } from './audioManager';
+import { configManager } from './configManager';
 import React from 'react';
 
 interface DrawingToastHelper {
-  // 图纸上传相关Toast
+  // 图纸上传相关
   drawingUploaded: (filename: string, projectName?: string) => void;
   drawingUploadProgress: (filename: string, progress: number) => void;
   drawingUploadFailed: (filename: string, error: string) => void;
   batchUploadComplete: (successCount: number, totalCount: number) => void;
   
-  // DXF处理相关Toast
+  // DXF处理相关
   dxfParsed: (filename: string, details: string) => void;
   dxfParsingFailed: (filename: string, error: string) => void;
   
-  // 图纸管理相关Toast  
+  // 图纸管理相关
   drawingDeleted: (filename: string) => void;
   drawingVersionUpdated: (filename: string, newVersion: string) => void;
   drawingRenamed: (oldName: string, newName: string) => void;
   drawingArchived: (filename: string) => void;
   
-  // 图纸版本控制Toast
+  // 图纸版本控制
   versionCreated: (filename: string, version: string) => void;
   versionRestored: (filename: string, version: string) => void;
   versionCompared: (filename: string, version1: string, version2: string) => void;
   
-  // 图纸分享和权限Toast
+  // 图纸分享和权限
   drawingShared: (filename: string, recipientName: string) => void;
   drawingPermissionUpdated: (filename: string, permission: string) => void;
   
-  // DXF预览相关Toast
+  // DXF预览相关
   dxfPreviewGenerated: (filename: string) => void;
   dxfPreviewFailed: (filename: string) => void;
   
@@ -37,204 +40,238 @@ interface DrawingToastHelper {
   error: (message: string) => void;
 }
 
-// 创建全局事件来触发Toast
-export const drawingToastEvents = {
-  emit: (eventType: string, data: any) => {
-    window.dispatchEvent(new CustomEvent(`drawing-toast-${eventType}`, { detail: data }));
+// 播放图纸相关音效的辅助函数
+const playDrawingSound = async (soundType: 'info' | 'success' | 'warning' | 'error' | 'wancheng') => {
+  try {
+    // 直接调用audioManager，不检查配置以确保音频播放
+    await audioManager.playNotificationSound(soundType);
+  } catch (error) {
+    // 静默处理音频播放错误
+    // 音频播放失败时静默处理
   }
 };
 
-// Toast事件处理器（在React组件中使用）
-export const useDrawingToastListener = (toast: any) => {
-  React.useEffect(() => {
-    const handlers = {
-      'drawing-toast-uploaded': (e: CustomEvent) => {
-        const { filename, projectName } = e.detail;
-        toast.drawingUploaded(filename, projectName);
-      },
-      
-      'drawing-toast-upload-progress': (e: CustomEvent) => {
-        const { filename, progress } = e.detail;
-        toast.drawingUploadProgress(filename, progress);
-      },
-      
-      'drawing-toast-upload-failed': (e: CustomEvent) => {
-        const { filename, error } = e.detail;
-        toast.drawingUploadFailed(filename, error);
-      },
-      
-      'drawing-toast-batch-upload-complete': (e: CustomEvent) => {
-        const { successCount, totalCount } = e.detail;
-        toast.batchUploadComplete(successCount, totalCount);
-      },
-      
-      'drawing-toast-dxf-parsed': (e: CustomEvent) => {
-        const { filename, details } = e.detail;
-        toast.addToast({
-          type: 'dxf-parsed',
-          message: `DXF文件"${filename}"解析完成: ${details}`,
-          duration: 4000
-        });
-      },
-      
-      'drawing-toast-dxf-parsing-failed': (e: CustomEvent) => {
-        const { filename, error } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message: `DXF文件"${filename}"解析失败: ${error}`,
-          duration: 6000
-        });
-      },
-      
-      'drawing-toast-deleted': (e: CustomEvent) => {
-        const { filename } = e.detail;
-        toast.drawingDeleted(filename);
-      },
-      
-      'drawing-toast-version-updated': (e: CustomEvent) => {
-        const { filename, newVersion } = e.detail;
-        toast.drawingVersionUpdated(filename, newVersion);
-      },
-      
-      'drawing-toast-renamed': (e: CustomEvent) => {
-        const { oldName, newName } = e.detail;
-        toast.drawingRenamed(oldName, newName);
-      },
-      
-      'drawing-toast-archived': (e: CustomEvent) => {
-        const { filename } = e.detail;
-        toast.drawingArchived(filename);
-      },
-      
-      'drawing-toast-version-created': (e: CustomEvent) => {
-        const { filename, version } = e.detail;
-        toast.versionCreated(filename, version);
-      },
-      
-      'drawing-toast-version-restored': (e: CustomEvent) => {
-        const { filename, version } = e.detail;
-        toast.versionRestored(filename, version);
-      },
-      
-      'drawing-toast-version-compared': (e: CustomEvent) => {
-        const { filename, version1, version2 } = e.detail;
-        toast.versionCompared(filename, version1, version2);
-      },
-      
-      'drawing-toast-shared': (e: CustomEvent) => {
-        const { filename, recipientName } = e.detail;
-        toast.drawingShared(filename, recipientName);
-      },
-      
-      'drawing-toast-permission-updated': (e: CustomEvent) => {
-        const { filename, permission } = e.detail;
-        toast.drawingPermissionUpdated(filename, permission);
-      },
-      
-      'drawing-toast-dxf-preview-generated': (e: CustomEvent) => {
-        const { filename } = e.detail;
-        toast.dxfPreviewGenerated(filename);
-      },
-      
-      'drawing-toast-dxf-preview-failed': (e: CustomEvent) => {
-        const { filename } = e.detail;
-        toast.dxfPreviewFailed(filename);
-      },
-      
-      'drawing-toast-error': (e: CustomEvent) => {
-        const { message } = e.detail;
-        toast.addToast({
-          type: 'error',
-          message
-        });
-      }
-    };
-
-    // 注册事件监听器
-    Object.entries(handlers).forEach(([eventType, handler]) => {
-      window.addEventListener(eventType, handler as EventListener);
-    });
-
-    // 清理函数
-    return () => {
-      Object.entries(handlers).forEach(([eventType, handler]) => {
-        window.removeEventListener(eventType, handler as EventListener);
-      });
-    };
-  }, [toast]);
+// 使用统一的通知系统显示图纸通知
+const showDrawingNotification = (
+  type: 'info' | 'success' | 'warning' | 'error',
+  title: string,
+  message: string,
+  duration: number = 4000
+) => {
+  // 获取 notificationStore 的 addNotification 方法
+  const notificationStore = useNotificationStore.getState();
+  
+  // 生成唯一ID
+  const id = `drawing-${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  
+  // 先播放音效
+  playDrawingSound(type === 'success' && message.includes('完成') ? 'wancheng' : type);
+  
+  // 添加通知到系统
+  notificationStore.addNotification({
+    id,
+    type,
+    title,
+    message,
+    timestamp: new Date().toISOString(),
+    duration
+  });
 };
 
-// 在图纸相关组件中使用的辅助函数
+// 图纸操作辅助函数（直接调用通知系统）
 export const drawingToastHelper: DrawingToastHelper = {
   drawingUploaded: (filename: string, projectName?: string) => {
-    drawingToastEvents.emit('uploaded', { filename, projectName });
+    playDrawingSound('success');
+    showDrawingNotification(
+      'success',
+      '图纸上传成功',
+      projectName 
+        ? `图纸"${filename}"已上传至项目"${projectName}"` 
+        : `图纸"${filename}"上传成功`,
+      4000
+    );
   },
   
   drawingUploadProgress: (filename: string, progress: number) => {
-    drawingToastEvents.emit('upload-progress', { filename, progress });
+    showDrawingNotification(
+      'info',
+      '正在上传图纸',
+      `正在上传图纸"${filename}" (${progress}%)`,
+      0 // 持续显示
+    );
   },
   
   drawingUploadFailed: (filename: string, error: string) => {
-    drawingToastEvents.emit('upload-failed', { filename, error });
+    playDrawingSound('error');
+    showDrawingNotification(
+      'error',
+      '图纸上传失败',
+      `图纸"${filename}"上传失败：${error}`,
+      6000
+    );
   },
   
   batchUploadComplete: (successCount: number, totalCount: number) => {
-    drawingToastEvents.emit('batch-upload-complete', { successCount, totalCount });
+    // 根据成功率选择音效
+    if (successCount === totalCount) {
+      playDrawingSound('wancheng');
+    } else if (successCount > 0) {
+      playDrawingSound('success');
+    } else {
+      playDrawingSound('error');
+    }
+    
+    showDrawingNotification(
+      successCount === totalCount ? 'success' : successCount > 0 ? 'warning' : 'error',
+      '批量上传完成',
+      `批量上传完成：成功${successCount}个，共${totalCount}个文件`,
+      5000
+    );
   },
   
   dxfParsed: (filename: string, details: string) => {
-    drawingToastEvents.emit('dxf-parsed', { filename, details });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'success',
+      'DXF解析完成',
+      `DXF文件"${filename}"解析完成: ${details}`,
+      4000
+    );
   },
   
   dxfParsingFailed: (filename: string, error: string) => {
-    drawingToastEvents.emit('dxf-parsing-failed', { filename, error });
+    playDrawingSound('error');
+    showDrawingNotification(
+      'error',
+      'DXF解析失败',
+      `DXF文件"${filename}"解析失败: ${error}`,
+      6000
+    );
   },
   
   drawingDeleted: (filename: string) => {
-    drawingToastEvents.emit('deleted', { filename });
+    playDrawingSound('error');
+    showDrawingNotification(
+      'warning',
+      '图纸已删除',
+      `图纸"${filename}"已删除`,
+      3000
+    );
   },
   
   drawingVersionUpdated: (filename: string, newVersion: string) => {
-    drawingToastEvents.emit('version-updated', { filename, newVersion });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '版本更新',
+      `图纸"${filename}"版本已更新至${newVersion}`,
+      4000
+    );
   },
   
   drawingRenamed: (oldName: string, newName: string) => {
-    drawingToastEvents.emit('renamed', { oldName, newName });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '图纸重命名',
+      `图纸已重命名：${oldName} → ${newName}`,
+      4000
+    );
   },
   
   drawingArchived: (filename: string) => {
-    drawingToastEvents.emit('archived', { filename });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '图纸归档',
+      `图纸"${filename}"已归档`,
+      3000
+    );
   },
   
   versionCreated: (filename: string, version: string) => {
-    drawingToastEvents.emit('version-created', { filename, version });
+    playDrawingSound('success');
+    showDrawingNotification(
+      'success',
+      '新版本创建',
+      `图纸"${filename}"创建新版本：${version}`,
+      4000
+    );
   },
   
   versionRestored: (filename: string, version: string) => {
-    drawingToastEvents.emit('version-restored', { filename, version });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '版本恢复',
+      `图纸"${filename}"已恢复到版本：${version}`,
+      4000
+    );
   },
   
   versionCompared: (filename: string, version1: string, version2: string) => {
-    drawingToastEvents.emit('version-compared', { filename, version1, version2 });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '版本比较',
+      `比较图纸"${filename}"版本：${version1} ↔ ${version2}`,
+      4000
+    );
   },
   
   drawingShared: (filename: string, recipientName: string) => {
-    drawingToastEvents.emit('shared', { filename, recipientName });
+    playDrawingSound('success');
+    showDrawingNotification(
+      'success',
+      '图纸分享',
+      `图纸"${filename}"已分享给 ${recipientName}`,
+      4000
+    );
   },
   
   drawingPermissionUpdated: (filename: string, permission: string) => {
-    drawingToastEvents.emit('permission-updated', { filename, permission });
+    playDrawingSound('info');
+    showDrawingNotification(
+      'info',
+      '权限更新',
+      `图纸"${filename}"权限已更新：${permission}`,
+      3000
+    );
   },
   
   dxfPreviewGenerated: (filename: string) => {
-    drawingToastEvents.emit('dxf-preview-generated', { filename });
+    playDrawingSound('success');
+    showDrawingNotification(
+      'success',
+      'DXF预览生成',
+      `DXF图纸"${filename}"预览生成成功`,
+      3000
+    );
   },
   
   dxfPreviewFailed: (filename: string) => {
-    drawingToastEvents.emit('dxf-preview-failed', { filename });
+    playDrawingSound('error');
+    showDrawingNotification(
+      'error',
+      'DXF预览失败',
+      `DXF图纸"${filename}"预览生成失败`,
+      5000
+    );
   },
   
   error: (message: string) => {
-    drawingToastEvents.emit('error', { message });
+    playDrawingSound('error');
+    showDrawingNotification(
+      'error',
+      '操作失败',
+      message,
+      5000
+    );
   }
+};
+
+// 简化的React Hook（移除复杂的事件监听）
+export const useDrawingToastListener = () => {
+  // 不再需要复杂的事件监听，直接使用notificationStore
+  return;
 };

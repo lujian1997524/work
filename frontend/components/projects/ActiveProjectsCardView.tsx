@@ -11,7 +11,7 @@ import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/bat
 import { ActiveProjectCard } from '@/components/projects/ProjectCard';
 import { StatusType } from '@/components/ui';
 import { Material } from '@/types/project';
-import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon, FolderIcon, CubeIcon, CheckIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 interface ActiveProject {
   id: number;
@@ -335,29 +335,6 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
     };
   };
 
-  // 计算碳板优先统计
-  const getCarbonPriorityStats = () => {
-    const allMaterials = projects.flatMap(project => project.materials || []);
-    const carbonMaterials = allMaterials.filter(m => 
-      !m.thicknessSpec?.materialType || m.thicknessSpec.materialType === '碳板'
-    );
-    const specialMaterials = allMaterials.filter(m => 
-      m.thicknessSpec?.materialType && m.thicknessSpec.materialType !== '碳板'
-    );
-    
-    const carbonCompleted = carbonMaterials.filter(m => m.status === 'completed').length;
-    const specialCompleted = specialMaterials.filter(m => m.status === 'completed').length;
-    
-    return {
-      carbonTotal: carbonMaterials.length,
-      carbonCompleted,
-      carbonRate: carbonMaterials.length > 0 ? Math.round((carbonCompleted / carbonMaterials.length) * 100) : 0,
-      specialTotal: specialMaterials.length,
-      specialCompleted,
-      specialRate: specialMaterials.length > 0 ? Math.round((specialCompleted / specialMaterials.length) * 100) : 0
-    };
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -378,43 +355,46 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
 
   const groupedProjects = groupProjectsByStatus();
   const stats = getOverallStats();
-  const carbonStats = getCarbonPriorityStats();
 
   return (
     <div className={`h-full flex flex-col p-4 ${className}`}>
-      {/* 总体统计 */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-sm border p-6 mb-4 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">活跃项目统计</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-4">
-          <div>
-            <div className="text-2xl font-bold text-gray-900">{stats.totalProjects}</div>
-            <div className="text-sm text-gray-500">活跃项目</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-blue-600">{stats.totalMaterials}</div>
-            <div className="text-sm text-gray-500">板材总数</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-green-600">{stats.completedMaterials}</div>
-            <div className="text-sm text-gray-500">已完成</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-600">{stats.completionRate}%</div>
-            <div className="text-sm text-gray-500">完成率</div>
-          </div>
-        </div>
-        
-        {/* 碳板优先统计 */}
-        <div className="border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">碳板优先进度 (95/5策略)</h3>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div className="bg-blue-100 rounded-lg p-3">
-              <div className="text-lg font-bold text-blue-800">{carbonStats.carbonRate}%</div>
-              <div className="text-xs text-blue-600">碳板完成率 ({carbonStats.carbonCompleted}/{carbonStats.carbonTotal})</div>
+      {/* 现代化统计面板 */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 md:p-4 mb-4 flex-shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-gray-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <FolderIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-600" />
             </div>
-            <div className="bg-orange-100 rounded-lg p-3">
-              <div className="text-lg font-bold text-orange-800">{carbonStats.specialRate}%</div>
-              <div className="text-xs text-orange-600">特殊材料完成率 ({carbonStats.specialCompleted}/{carbonStats.specialTotal})</div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-gray-900">{stats.totalProjects}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">活跃项目</div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-blue-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <CubeIcon className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-blue-600">{stats.totalMaterials}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">板材总数</div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-green-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <CheckIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-green-600">{stats.completedMaterials}</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">已完成</div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-purple-50 rounded-lg">
+            <div className="flex-shrink-0">
+              <ChartBarIcon className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg md:text-xl font-bold text-purple-600">{stats.completionRate}%</div>
+              <div className="text-xs md:text-sm text-gray-600 truncate">完成率</div>
             </div>
           </div>
         </div>

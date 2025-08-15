@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input, Select, Form, FormField, FormActions, Loading, Badge, SearchableSelect } from '@/components/ui';
-import { XMarkIcon, PlusIcon, TrashIcon, ChevronDownIcon, FireIcon, FolderIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlusIcon, TrashIcon, ChevronDownIcon, FireIcon, FolderIcon, CheckCircleIcon, CloudArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/utils/api';
 import { useWorkerMaterialStore } from '@/stores';
 import { useToast } from '@/components/ui/Toast';
 import { PROJECT_STATUS_OPTIONS, PROJECT_PRIORITY_OPTIONS } from '@/constants/projectEnums';
+import { drawingToastHelper } from '@/utils/drawingToastHelper';
 import type { ThicknessSpec, ProjectFormData } from '@/types/project';
 
 interface Worker {
@@ -26,10 +27,18 @@ interface WorkerMaterial {
   thicknessSpec: ThicknessSpec;
 }
 
+interface UploadFile {
+  file: File;
+  id: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
+
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ProjectFormData) => void;
+  onSubmit: (data: ProjectFormData) => Promise<any>; // 修改为返回Promise，支持返回项目数据
   project?: {
     id: number;
     name: string;
@@ -66,6 +75,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [deletingMaterialId, setDeletingMaterialId] = useState<number | null>(null);
   const [showSpecialMaterials, setShowSpecialMaterials] = useState(false);
+  
+  // 图纸上传相关状态
+  const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
+  const [isUploadingDrawings, setIsUploadingDrawings] = useState(false);
+  
   const { token } = useAuth();
   const { projectCreated, projectUpdated, smartSuggestion } = useToast();
 
@@ -81,10 +95,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   useEffect(() => {
     if (project) {
       setFormData({
-        name: project.name,
+        name: project.name || '',
         description: project.description || '',
-        status: project.status as any,
-        priority: project.priority as any,
+        status: project.status as any || 'pending',
+        priority: project.priority as any || 'medium',
         assignedWorkerId: project.assignedWorker?.id || null,
         requiredThickness: project.materials?.map(m => m.thicknessSpecId) || [] // 编辑模式下获取已选择的厚度规格
       });
@@ -99,6 +113,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       });
     }
     setFormErrors({});
+    
+    // 重置图纸上传状态
+    setUploadFiles([]);
+    setIsUploadingDrawings(false);
   }, [project, isOpen]);
 
   const fetchWorkers = async () => {
@@ -192,19 +210,63 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
 
-    onSubmit(formData);
-    
-    // 触发项目创建事件
-    window.dispatchEvent(new CustomEvent('project-created', {
-      detail: { projectData: formData }
-    }));
+    try {
+      // Step 1: 创建项目
+      const projectResult = await onSubmit(formData);
+      
+      // 如果项目创建失败，直接结束
+      if (!projectResult) {
+        return;
+      }
+      
+      // 如果是编辑模式或没有文件要上传，直接结束
+      if (project || uploadFiles.length === 0) {
+        // 触发项目创建事件
+        window.dispatchEvent(new CustomEvent('project-created', {
+          detail: { projectData: formData }
+        }));
+        return;
+      }
+
+      // Step 2: 上传图纸（仅在新建项目且有文件时）
+      if (projectResult && typeof projectResult === 'object' && 'id' in projectResult) {
+        const projectId = (projectResult as any).id;
+        
+        setIsUploadingDrawings(true);
+        
+        // 并发上传所有文件
+        const uploadPromises = uploadFiles
+          .filter(f => f.status === 'pending')
+          .map(file => uploadFile(file, projectId));
+        
+        const results = await Promise.all(uploadPromises);
+        const successCount = results.filter(Boolean).length;
+        const totalCount = uploadFiles.filter(f => f.status === 'pending').length;
+        
+        // 显示批量上传结果
+        if (totalCount > 1) {
+          drawingToastHelper.batchUploadComplete(successCount, totalCount);
+        }
+        
+        setIsUploadingDrawings(false);
+      }
+      
+      // 触发项目创建事件
+      window.dispatchEvent(new CustomEvent('project-created', {
+        detail: { projectData: formData }
+      }));
+      
+    } catch (error) {
+      setIsUploadingDrawings(false);
+      drawingToastHelper.error('创建项目或上传图纸失败');
+    }
   };
 
   const handleInputChange = (field: keyof ProjectFormData, value: any) => {
@@ -231,6 +293,107 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       : [...currentThickness, thicknessSpecId];
     
     handleInputChange('requiredThickness', newSelection);
+  };
+
+  // 图纸文件处理函数
+  const handleFileSelected = (selectedFile: File) => {
+    const newFile: UploadFile = {
+      file: selectedFile,
+      id: Math.random().toString(36).substr(2, 9),
+      progress: 0,
+      status: 'pending'
+    };
+    
+    setUploadFiles(prev => [...prev, newFile]);
+  };
+
+  const removeFile = (fileId: string) => {
+    setUploadFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // 获取状态图标
+  const getStatusIcon = (status: UploadFile['status']) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'uploading':
+        return (
+          <motion.svg 
+            className="w-4 h-4 text-blue-500" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </motion.svg>
+        );
+      case 'success':
+        return (
+          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        );
+      case 'error':
+        return (
+          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        );
+    }
+  };
+
+  // 上传单个文件
+  const uploadFile = async (uploadFile: UploadFile, projectId: number): Promise<boolean> => {
+    // 更新状态为上传中
+    setUploadFiles(prev => prev.map(f => 
+      f.id === uploadFile.id 
+        ? { ...f, status: 'uploading' as const, progress: 0 } 
+        : f
+    ));
+
+    try {
+      const formData = new FormData();
+      formData.append('drawing', uploadFile.file);
+      formData.append('description', '项目创建时上传');
+
+      const response = await apiRequest(`/api/drawings/project/${projectId}/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // 直接设置为100%完成，避免频繁的setTimeout调用
+        setUploadFiles(prev => prev.map(f => 
+          f.id === uploadFile.id 
+            ? { ...f, progress: 100, status: 'success' as const } 
+            : f
+        ));
+
+        drawingToastHelper.drawingUploaded(uploadFile.file.name);
+        return true;
+      } else {
+        throw new Error('上传失败');
+      }
+    } catch (error) {
+      // 标记为错误
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id 
+          ? { ...f, status: 'error' as const, progress: 0, error: '上传失败' } 
+          : f
+      ));
+
+      drawingToastHelper.drawingUploadFailed(uploadFile.file.name, error instanceof Error ? error.message : '未知错误');
+      return false;
+    }
   };
 
   // 获取工人在指定厚度规格下的库存数量
@@ -346,7 +509,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               <FormField label="项目名称" required error={formErrors.name}>
                 <Input
                   type="text"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="请输入项目名称"
                   error={formErrors.name}
@@ -358,7 +521,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 <Input
                   multiline
                   rows={3}
-                  value={formData.description}
+                  value={formData.description || ''}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="请输入项目描述（可选）"
                 />
@@ -368,7 +531,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="项目状态">
                   <Select
-                    value={formData.status}
+                    value={formData.status || 'pending'}
                     onChange={(value) => handleInputChange('status', value)}
                     options={[...PROJECT_STATUS_OPTIONS]}
                   />
@@ -376,7 +539,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
                 <FormField label="优先级">
                   <Select
-                    value={formData.priority}
+                    value={formData.priority || 'medium'}
                     onChange={(value) => handleInputChange('priority', value)}
                     options={[...PROJECT_PRIORITY_OPTIONS]}
                   />
@@ -559,6 +722,84 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   </>
                 )}
               </FormField>
+
+              {/* 图纸上传区域 - 仅在新建项目时显示 */}
+              {!project && (
+                <FormField label="项目图纸">
+                  <div className="space-y-3">
+                    {/* 简洁的上传按钮 */}
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = '.dxf';
+                          input.multiple = true;
+                          input.onchange = (e) => {
+                            const files = (e.target as HTMLInputElement).files;
+                            if (files) {
+                              Array.from(files).forEach(handleFileSelected);
+                            }
+                          };
+                          input.click();
+                        }}
+                        className="flex items-center space-x-2"
+                      >
+                        <CloudArrowUpIcon className="w-4 h-4" />
+                        <span>选择图纸文件</span>
+                      </Button>
+                      <span className="text-xs text-gray-500">
+                        可选，支持DXF格式，最大50MB
+                      </span>
+                    </div>
+
+                    {/* 已选择的文件列表 - 紧凑显示 */}
+                    {uploadFiles.length > 0 && (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            已选择 {uploadFiles.length} 个文件
+                          </span>
+                          {isUploadingDrawings && (
+                            <span className="text-xs text-blue-600">正在上传...</span>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          {uploadFiles.map((uploadFile) => (
+                            <div
+                              key={uploadFile.id}
+                              className="flex items-center justify-between text-sm"
+                            >
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                {getStatusIcon(uploadFile.status)}
+                                <span className="truncate text-gray-700">
+                                  {uploadFile.file.name}
+                                </span>
+                                {uploadFile.status === 'uploading' && (
+                                  <span className="text-xs text-blue-600">
+                                    {uploadFile.progress}%
+                                  </span>
+                                )}
+                              </div>
+                              {uploadFile.status === 'pending' && (
+                                <button
+                                  onClick={() => removeFile(uploadFile.id)}
+                                  className="text-red-500 hover:text-red-700 p-1"
+                                >
+                                  <XMarkIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </FormField>
+              )}
             </form>
           </div>
 
@@ -569,6 +810,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 type="button"
                 variant="ghost"
                 onClick={onClose}
+                disabled={loading || isUploadingDrawings}
               >
                 取消
               </Button>
@@ -576,10 +818,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 type="button"
                 variant="primary"
                 onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-                loading={loading}
-                disabled={loading}
+                loading={loading || isUploadingDrawings}
+                disabled={loading || isUploadingDrawings}
               >
-                {project ? '保存修改' : '创建项目'}
+                {loading ? '创建中...' : isUploadingDrawings ? '上传图纸中...' : project ? '保存修改' : `创建项目${uploadFiles.length > 0 ? ` + 上传${uploadFiles.length}个图纸` : ''}`}
               </Button>
             </FormActions>
           </div>

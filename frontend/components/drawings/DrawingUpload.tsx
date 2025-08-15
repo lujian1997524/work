@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Modal, Button, Input, Dropdown, FileDropzone, Alert, ProgressBar, useToast } from '@/components/ui';
+import { Modal, Button, Input, Dropdown, FileDropzone, Alert, ProgressBar } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/utils/api';
-import { drawingToastHelper, useDrawingToastListener } from '@/utils/drawingToastHelper';
+import { DrawingOptimisticUpdater } from '@/utils/optimisticUpdateManager';
+import { drawingToastHelper } from '@/utils/drawingToastHelper';
 
 export interface DrawingUploadProps {
   isOpen: boolean;
@@ -35,10 +36,8 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const { token } = useAuth();
-  const toast = useToast();
   
-  // 监听图纸Toast事件
-  useDrawingToastListener(toast);
+  // 移除旧的Toast监听系统
 
   // 处理文件选择
   const handleFileSelected = (selectedFile: File) => {
@@ -63,44 +62,51 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
     return 'DXF'; // 只支持DXF文件，直接返回
   };
 
-  // 上传单个文件
+  // 上传单个文件（使用乐观更新）
   const uploadFile = async (uploadFile: UploadFile): Promise<boolean> => {
-    const formData = new FormData();
-    formData.append('drawing', uploadFile.file); // 后端 upload.single('drawing') 
-    formData.append('description', description || '');
-    
-    // 根据是否有projectId选择API端点
-    let uploadEndpoint: string;
-    if (projectId) {
-      // 如果有项目ID，上传到特定项目
-      uploadEndpoint = `/api/drawings/project/${projectId}/upload`;
-    } else if (isCommonPart) {
-      // 如果是常用零件，使用专门的API端点
-      uploadEndpoint = '/api/drawings/common-parts/upload';
-    } else {
-      // 否则上传到图纸库
-      uploadEndpoint = '/api/drawings/upload';
-    }
-    
-    try {
-      // 更新文件状态为上传中
+    // 乐观更新：立即显示上传状态
+    const updateUI = () => {
       setFiles(prev => prev.map(f => 
         f.id === uploadFile.id 
-          ? { ...f, status: 'uploading' as const } 
+          ? { ...f, status: 'uploading' as const, progress: 0 } 
           : f
       ));
-
-      const response = await apiRequest(uploadEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
+    };
+    
+    // 回滚函数：恢复到pending状态
+    const rollback = () => {
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id 
+          ? { ...f, status: 'error' as const, progress: 0, error: '上传失败' } 
+          : f
+      ));
+    };
+    
+    // 成功后的处理
+    const onSuccess = () => {
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id 
+          ? { ...f, status: 'success' as const, progress: 100 } 
+          : f
+      ));
+    };
+    
+    try {
+      // 使用乐观更新模式上传文件
+      const result = await DrawingOptimisticUpdater.uploadDrawing(
+        uploadFile.file,
+        {
+          projectId,
+          isCommonPart,
+          description
         },
-        body: formData
-      });
-
-      if (response.ok) {
-        // 模拟进度更新
-        for (let progress = 0; progress <= 100; progress += 10) {
+        updateUI,
+        rollback
+      );
+      
+      if (result.success) {
+        // 模拟进度更新（为了用户体验）
+        for (let progress = 10; progress <= 100; progress += 10) {
           setFiles(prev => prev.map(f => 
             f.id === uploadFile.id 
               ? { ...f, progress } 
@@ -108,37 +114,14 @@ export const DrawingUpload: React.FC<DrawingUploadProps> = ({
           ));
           await new Promise(resolve => setTimeout(resolve, 50));
         }
-
-        setFiles(prev => prev.map(f => 
-          f.id === uploadFile.id 
-            ? { ...f, status: 'success' as const, progress: 100 } 
-            : f
-        ));
         
-        // 显示上传成功Toast
-        drawingToastHelper.drawingUploaded(uploadFile.file.name);
-        
+        onSuccess();
         return true;
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.message || '上传失败');
+        return false;
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '上传失败';
-      
-      setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id 
-          ? { 
-              ...f, 
-              status: 'error' as const, 
-              error: errorMessage 
-            } 
-          : f
-      ));
-      
-      // 显示上传失败Toast
-      drawingToastHelper.drawingUploadFailed(uploadFile.file.name, errorMessage);
-      
+      rollback();
       return false;
     }
   };

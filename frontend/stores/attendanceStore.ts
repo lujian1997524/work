@@ -122,7 +122,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         const data = await response.json();
         set({ employees: data.employees || [] });
       } catch (error) {
-        console.error('获取员工列表失败:', error);
+        // 获取员工列表失败
       } finally {
         set({ employeesLoading: false });
       }
@@ -145,7 +145,7 @@ export const useAttendanceStore = create<AttendanceState>()(
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('API错误详情:', errorText);
+          // API错误详情
           throw new Error('创建员工失败');
         }
 
@@ -156,7 +156,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('创建员工失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -191,7 +191,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('更新员工失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -222,7 +222,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('删除员工失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -270,7 +270,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         const data = await response.json();
         set({ attendanceExceptions: data.exceptions || [] });
       } catch (error) {
-        console.error('获取考勤记录失败:', error);
+        
       } finally {
         set({ loading: false });
       }
@@ -293,7 +293,7 @@ export const useAttendanceStore = create<AttendanceState>()(
 
         if (!response.ok) {
           const errorData = await response.text();
-          console.error('API错误详情:', errorData);
+          
           throw new Error('添加考勤异常失败');
         }
 
@@ -305,7 +305,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('添加考勤异常失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -341,7 +341,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('更新考勤异常失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -373,7 +373,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('删除考勤异常失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });
@@ -402,7 +402,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         const data = await response.json();
         set({ dailySummaries: data.summaries || [] });
       } catch (error) {
-        console.error('生成日报失败:', error);
+        
       } finally {
         set({ loading: false });
       }
@@ -428,7 +428,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         const data = await response.json();
         set({ monthlyStats: data.summaries || [] });
       } catch (error) {
-        console.error('生成月报失败:', error);
+        
         set({ monthlyStats: [] }); // 清空数据避免显示错误信息
       } finally {
         set({ statsLoading: false });
@@ -541,7 +541,7 @@ export const useAttendanceStore = create<AttendanceState>()(
 
         set({ yearlyStats: yearlyStats });
       } catch (error) {
-        console.error('生成年度统计失败:', error);
+        
         set({ yearlyStats: [] }); // 清空数据避免显示错误信息
       } finally {
         set({ statsLoading: false });
@@ -576,7 +576,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } catch (error) {
-        console.error('导出报表失败:', error);
+        
       }
     },
 
@@ -608,7 +608,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } catch (error) {
-        console.error('导出年度报表失败:', error);
+        
       }
     },
 
@@ -633,7 +633,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         const data = await response.json();
         set({ attendanceSettings: data.settings });
       } catch (error) {
-        console.error('获取设置失败:', error);
+        
       }
     },
 
@@ -661,7 +661,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         
         return true;
       } catch (error) {
-        console.error('更新设置失败:', error);
+        
         return false;
       } finally {
         set({ saving: false });

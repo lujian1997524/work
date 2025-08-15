@@ -149,3 +149,10 @@ export type { MaterialStatusType, MaterialInfo } from './MaterialStatusManager'
 // 响应式布局组件导出
 export { ResponsiveContainer, AdaptiveLayout, ResponsiveGrid, MobileDrawer, BottomSheet } from './ResponsiveLayout'
 export type { ResponsiveContainerProps, AdaptiveLayoutProps, ResponsiveGridProps, MobileDrawerProps, BottomSheetProps } from './ResponsiveLayout'
+
+// 考勤系统组件导出
+export { AttendanceGrid, AttendanceCell } from './AttendanceGrid';
+export { AttendanceDetailTooltip } from './AttendanceDetailTooltip';
+export { ResponsiveStatCards, StatCardSwiper, StatCardGrid } from './StatCardSwiper';
+export { MobileEmployeeList, MobileEmployeeCard, MobileStatsOverview } from './MobileEmployeeCard';
+export { MobileFormWizard, EMPLOYEE_FORM_STEPS } from './MobileFormWizard';

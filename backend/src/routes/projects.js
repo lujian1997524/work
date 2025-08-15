@@ -449,6 +449,7 @@ router.get('/:id', authenticate, async (req, res) => {
         },
         {
           association: 'drawings',
+          attributes: ['id', 'filename', 'originalFilename', 'filePath', 'version', 'uploadTime', 'uploadedBy', 'isCurrentVersion', 'description', 'status'],
           include: [
             {
               association: 'uploader',

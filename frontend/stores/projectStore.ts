@@ -279,7 +279,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         detail: { projectId: newProject.id, action: 'project-created' } 
       }));
       
-      // 触发Toast提示
+      // 本地成功通知（作为SSE的备用）
       const workerName = newProject.assignedWorker?.name;
       projectToastHelper.projectCreated(newProject.name, workerName);
       
@@ -343,7 +343,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           detail: { id, updates: updatedProject } 
         }));
         
-        // 触发Toast提示 - 获取项目名称
+        // 本地更新通知（作为SSE的备用）
         const projectName = updatedProject.name || get().projects.find(p => p.id === id)?.name || `项目${id}`;
         projectToastHelper.projectUpdated(projectName);
       }
@@ -356,7 +356,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         loading: false 
       });
       
-      // 触发错误Toast
+      // 触发错误Toast（本地错误，SSE不会发送）
       if (!silent) {
         projectToastHelper.error(errorMessage);
       }
@@ -403,8 +403,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         detail: { id } 
       }));
       
-      // 触发Toast提示
-      projectToastHelper.projectDeleted(projectName, drawingsCount.toString());
+      // 本地删除通知（作为SSE的备用）
+      // 参数顺序：projectName, userName, drawingsCount
+      projectToastHelper.projectDeleted(projectName, undefined, drawingsCount);
       
       return true;
     } catch (error) {
@@ -414,7 +415,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         loading: false 
       });
       
-      // 触发错误Toast
+      // 触发错误Toast（本地错误，SSE不会发送）
       projectToastHelper.error(errorMessage);
       
       return false;

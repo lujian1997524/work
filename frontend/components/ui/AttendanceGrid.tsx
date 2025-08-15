@@ -10,7 +10,7 @@ import {
   CalendarDaysIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
-import { Card, Button, Avatar, Modal, Select, Input, FormField } from '@/components/ui';
+import { Card, Button, Modal, Select, Input, FormField } from '@/components/ui';
 import { AttendanceDetailTooltip } from '@/components/ui/AttendanceDetailTooltip';
 import { type AttendanceException } from '@/types/attendance';
 
@@ -297,7 +297,6 @@ export const AttendanceCell: React.FC<AttendanceCellProps> = ({
         <div className="p-4 sm:p-6">
           {/* 员工信息头部 */}
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
-            <Avatar name={employee.name} src={employee.avatar} size="sm" />
             <div>
               <h3 className="text-base sm:text-lg font-semibold text-text-primary">
                 {employee.name}
@@ -620,7 +619,6 @@ export const AttendanceGrid: React.FC<AttendanceGridProps> = ({
                 {/* 员工信息 */}
                 <div className="flex-shrink-0 w-24 sm:w-32 p-2 sm:p-4 border-r border-gray-100">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                    <Avatar name={employee.name} src={employee.avatar} size="sm" className="hidden sm:block" />
                     <div className="min-w-0">
                       <div className="font-medium text-text-primary text-xs sm:text-sm truncate">
                         {employee.name}

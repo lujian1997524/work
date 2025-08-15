@@ -55,7 +55,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { DrawingUpload } from '@/components/drawings/DrawingUpload';
 import { MaterialRequirementManager } from '@/components/materials/MaterialRequirementManager';
 import { ProjectBorrowingDetails } from '@/components/materials/ProjectBorrowingDetails';
-import type { Project, Material, Drawing, ThicknessSpec, OperationHistory } from '@/types/project';
+import { DxfPreviewModal } from '@/components/ui/DxfPreviewModal';
 
 interface ProjectDetailModernProps {
   projectId: number;
@@ -107,6 +107,9 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   const [projectNotes, setProjectNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [operationHistory, setOperationHistory] = useState<OperationHistory[]>([]);
+  // 图纸预览相关状态
+  const [showDxfPreview, setShowDxfPreview] = useState(false);
+  const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
 
   // 材料编辑相关状态
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
@@ -329,6 +332,12 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   // 图纸上传成功回调
   const handleDrawingUploadSuccess = () => {
     fetchProjectDetail(); // 刷新项目详情以获取新上传的图纸
+  };
+  
+  // 预览图纸
+  const handlePreviewDrawing = (drawing: Drawing) => {
+    setSelectedDrawing(drawing);
+    setShowDxfPreview(true);
   };
 
   // 处理需求管理打开
@@ -617,6 +626,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
               project={project}
               onUploadClick={() => setShowUploadModal(true)}
               onDeleteDrawing={handleDeleteDrawing}
+              onPreviewDrawing={handlePreviewDrawing}
             />
           )}
 
@@ -678,6 +688,16 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
           onUpdate={handleRequirementUpdate}
         />
       )}
+      
+      {/* DXF预览模态框 */}
+      <DxfPreviewModal
+        drawing={selectedDrawing}
+        isOpen={showDxfPreview}
+        onClose={() => {
+          setShowDxfPreview(false);
+          setSelectedDrawing(null);
+        }}
+      />
 
       <DialogRenderer />
       </div>
@@ -994,27 +1014,29 @@ const MaterialsSection: React.FC<{
     const config = statusConfig[currentStatus];
     
     return (
-      <div key={spec.id} className="flex flex-col">
+      <div key={spec.id} className="flex flex-col min-w-0">
         {/* 状态切换按钮 - 使用Button实现点击状态切换 */}
-        <div className="flex flex-col items-center p-2 rounded-t-lg bg-white hover:shadow-sm transition-shadow">
+        <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-t-lg bg-white hover:shadow-sm transition-shadow">
           <button
             type="button"
-            className={`w-full py-1.5 rounded text-xs font-medium ${config.color} ${config.textColor} hover:opacity-80 transition-all hover:scale-105 border border-transparent hover:border-gray-300 cursor-pointer`}
+            className={`w-full py-1 sm:py-1.5 rounded text-xs font-medium ${config.color} ${config.textColor} hover:opacity-80 transition-all hover:scale-105 border border-transparent hover:border-gray-300 cursor-pointer min-h-[28px] sm:min-h-[32px]`}
             onClick={() => handleStatusClick(spec.id, status)}
             
           >
-            {getMaterialCode(spec.materialType)}{parseFloat(spec.thickness)}
+            <span className="truncate block px-1">
+              {getMaterialCode(spec.materialType)}{parseFloat(spec.thickness)}
+            </span>
           </button>
         </div>
         
         {/* 尺寸需求管理按钮 - 始终显示 */}
         <Button
           variant="ghost"
-          className={`w-full py-1 px-2 ${
+          className={`w-full py-0.5 sm:py-1 px-1 sm:px-2 ${ 
             spec.materialType === '碳板' || !spec.materialType 
               ? 'bg-blue-50 hover:bg-blue-100 border-t border-blue-200 text-blue-600' 
               : 'bg-orange-50 hover:bg-orange-100 border-t border-orange-200 text-orange-600'
-          } rounded-b text-xs transition-colors flex items-center justify-center space-x-1`}
+          } rounded-b text-xs transition-colors flex items-center justify-center space-x-1 min-h-[24px] sm:min-h-[28px]`}
           onClick={() => {
             // 打开需求管理模态框
             handleOpenRequirementManager(material || {
@@ -1027,27 +1049,27 @@ const MaterialsSection: React.FC<{
           }}
           
         >
-          <CogIcon className="w-3 h-3" />
-          <span>需求</span>
+          <CogIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
+          <span className="truncate">需求</span>
         </Button>
         
         {/* 板材tab特有的功能：编辑按钮和详细信息 */}
         {material && (
-          <div className="mt-1 flex flex-col space-y-1">
+          <div className="mt-0.5 sm:mt-1 flex flex-col space-y-0.5 sm:space-y-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onEditMaterial(material)}
-              className="text-xs py-1 px-2 h-6"
+              className="text-xs py-0.5 sm:py-1 px-1 sm:px-2 h-5 sm:h-6"
               
             >
-              <PencilIcon className="w-3 h-3 mr-1" />
-              编辑
+              <PencilIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1 flex-shrink-0" />
+              <span className="truncate">编辑</span>
             </Button>
-            <div className="text-xs text-gray-500 text-center">
-              {material.startDate && <div>始: {formatDate(material.startDate)}</div>}
-              {material.completedDate && <div>完: {formatDate(material.completedDate)}</div>}
-              {material.completedByUser && <div>人: {material.completedByUser.name}</div>}
+            <div className="text-xs text-gray-500 text-center leading-tight">
+              {material.startDate && <div className="truncate">始: {formatDate(material.startDate)}</div>}
+              {material.completedDate && <div className="truncate">完: {formatDate(material.completedDate)}</div>}
+              {material.completedByUser && <div className="truncate">人: {material.completedByUser.name}</div>}
             </div>
           </div>
         )}
@@ -1092,7 +1114,7 @@ const MaterialsSection: React.FC<{
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="p-6 space-y-8"
+      className="p-3 sm:p-6 space-y-6 sm:space-y-8"
     >
       {/* 碳板材料区域 */}
       {carbonSpecs.length > 0 && (
@@ -1128,8 +1150,8 @@ const MaterialsSection: React.FC<{
             </div>
           </div>
 
-          {/* 厚度规格按钮网格 */}
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(carbonSpecs.length, 8)}, 1fr)` }}>
+          {/* 厚度规格按钮网格 - 移动端适配 */}
+          <div className="grid gap-2 sm:gap-3 grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
             {carbonSpecs.map(renderThicknessButton)}
           </div>
         </div>
@@ -1169,8 +1191,8 @@ const MaterialsSection: React.FC<{
             </div>
           </div>
 
-          {/* 厚度规格按钮网格 */}
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(specialSpecs.length, 6)}, 1fr)` }}>
+          {/* 厚度规格按钮网格 - 移动端适配 */}
+          <div className="grid gap-2 sm:gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
             {specialSpecs.map(renderThicknessButton)}
           </div>
         </div>
@@ -1207,7 +1229,8 @@ const DrawingsSection: React.FC<{
   project: Project;
   onUploadClick: () => void;
   onDeleteDrawing: (drawingId: number, filename: string) => void;
-}> = ({ project, onUploadClick, onDeleteDrawing }) => {
+  onPreviewDrawing: (drawing: Drawing) => void;
+}> = ({ project, onUploadClick, onDeleteDrawing, onPreviewDrawing }) => {
   return (
     <motion.div
       key="drawings"
@@ -1245,7 +1268,11 @@ const DrawingsSection: React.FC<{
                     <p className="text-sm text-gray-500">版本 {drawing.version}</p>
                   </div>
                   <div className="flex items-center space-x-1 ml-2">
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onPreviewDrawing(drawing)}
+                    >
                       <EyeIcon className="w-4 h-4" />
                     </Button>
                     <Button 
@@ -1261,8 +1288,8 @@ const DrawingsSection: React.FC<{
                 </div>
                 
                 <div className="text-xs text-gray-500">
-                  <div>上传者: {drawing.uploadedBy.name}</div>
-                  <div>时间: {formatDate(drawing.uploadedAt)}</div>
+                  <div>上传者: {drawing.uploader?.name || '未知'}</div>
+                  <div>时间: {formatDate(drawing.uploadTime)}</div>
                 </div>
               </Card>
             </motion.div>

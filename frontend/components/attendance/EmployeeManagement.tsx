@@ -10,7 +10,6 @@ import {
   Input,
   Select,
   Button,
-  Avatar,
   ModernTable,
   SearchBar,
   IconButton,
@@ -19,6 +18,8 @@ import {
   Alert,
   useToast
 } from '@/components/ui';
+import { MobileEmployeeList, MobileStatsOverview } from '@/components/ui/MobileEmployeeCard';
+import { MobileFormWizard, EMPLOYEE_FORM_STEPS } from '@/components/ui/MobileFormWizard';
 import { 
   PlusIcon,
   PencilIcon,
@@ -87,15 +88,31 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     deleteEmployee
   } = useAttendanceStore();
 
-  // 搜索过滤
-  const filteredEmployees = employees.filter(emp => 
-    emp && 
-    emp.name && (
-      emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (emp.position && emp.position.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (emp.department && emp.department.toLowerCase().includes(searchTerm.toLowerCase()))
+  // 搜索过滤和排序
+  const filteredEmployees = employees
+    .filter(emp => 
+      emp && 
+      emp.name && (
+        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.position && emp.position.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (emp.department && emp.department.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
     )
-  );
+    .sort((a, b) => {
+      // 按工号排序，如果没有工号则按姓名排序
+      const employeeIdA = a.employeeId || '';
+      const employeeIdB = b.employeeId || '';
+      
+      if (employeeIdA && employeeIdB) {
+        return employeeIdA.localeCompare(employeeIdB);
+      } else if (employeeIdA && !employeeIdB) {
+        return -1;
+      } else if (!employeeIdA && employeeIdB) {
+        return 1;
+      } else {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+    });
 
   // 打开新建员工模态框
   const handleCreate = () => {
@@ -222,7 +239,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       };
     }
 
-    console.log('发送员工数据:', employeeData);
+    
 
     let success = false;
     if (editingEmployee) {
@@ -271,8 +288,15 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   return (
     <div className={`space-y-4 sm:space-y-6 ${className}`}>
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* 移动端统计概览 */}
+      <MobileStatsOverview 
+        totalEmployees={stats.total}
+        activeEmployees={stats.active}
+        inactiveEmployees={stats.total - stats.active}
+      />
+      
+      {/* 桌面端统计卡片 */}
+      <div className="hidden lg:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -330,8 +354,17 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         </Button>
       </div>
 
-      {/* 员工列表 */}
-      <ModernTable
+      {/* 移动端员工卡片列表 */}
+      <MobileEmployeeList
+        employees={filteredEmployees}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        loading={loading}
+      />
+
+      {/* 桌面端员工列表 */}
+      <div className="hidden lg:block">
+        <ModernTable
         data={filteredEmployees}
         loading={loading}
         columns={[
@@ -342,11 +375,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               if (!employee) return null;
               return (
                 <div className="flex items-center gap-3">
-                  <Avatar 
-                    name={employee.name || ''}
-                    src={employee.avatar}
-                    size="sm"
-                  />
                   <div>
                     <div className="font-medium text-text-primary">{employee.name || '未知员工'}</div>
                     <div className="text-sm text-text-secondary">
@@ -435,15 +463,38 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           }
         ]}
       />
+      </div>
 
-      {/* 员工表单模态框 */}
-      <Modal
-        isOpen={showEmployeeModal}
-        onClose={() => setShowEmployeeModal(false)}
-        title={editingEmployee ? '编辑员工' : '新增员工'}
-        size="lg"
-        className="mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto"
-      >
+      {/* 移动端分步表单向导 */}
+      <MobileFormWizard
+        steps={EMPLOYEE_FORM_STEPS}
+        initialData={formData}
+        onSubmit={async (data) => {
+          const employeeData: EmployeeFormData = {
+            name: data.name || '',
+            department: data.department || '东车间',
+            position: data.position || '',
+            phone: data.phone || '',
+            hireDate: data.hireDate || new Date().toISOString().split('T')[0],
+            status: data.status || 'active'
+          };
+          setFormData(employeeData);
+          await handleFormSubmit(new Event('submit') as any);
+        }}
+        onCancel={() => setShowEmployeeModal(false)}
+        loading={saving}
+        className={showEmployeeModal ? 'fixed inset-0 z-50 bg-white' : 'hidden'}
+      />
+
+      {/* 桌面端表单模态框 */}
+      <div className="hidden lg:block">
+        <Modal
+          isOpen={showEmployeeModal}
+          onClose={() => setShowEmployeeModal(false)}
+          title={editingEmployee ? '编辑员工' : '新增员工'}
+          size="lg"
+          className="mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto"
+        >
         <Form onSubmit={handleFormSubmit}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="员工姓名" required error={formErrors.name}>
@@ -520,6 +571,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           </FormActions>
         </Form>
       </Modal>
+      </div>
 
       {/* 删除确认模态框 */}
       <Modal

@@ -12,7 +12,6 @@ import {
   IconButton,
   Badge,
   StateChip,
-  Avatar,
   Alert,
   Timeline,
   ProgressBar,
@@ -411,11 +410,6 @@ export const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 const employee = employees.find(emp => emp.id === record.employeeId);
                 return (
                   <div className="flex items-center gap-3">
-                    <Avatar 
-                      name={employee?.name || ''}
-                      src={employee?.avatar}
-                      size="sm"
-                    />
                     <div>
                       <div className="font-medium text-text-primary">
                         {employee?.name}

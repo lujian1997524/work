@@ -210,8 +210,10 @@ function HomeContent() {
     const result = await createProject(projectData);
     if (result) {
       setShowProjectModal(false);
+      return result; // 返回创建的项目数据，包含项目ID
     } else {
       await alert('创建项目失败，请重试');
+      return null;
     }
   };
 
@@ -277,7 +279,7 @@ function HomeContent() {
         await alert(`恢复项目失败: ${errorData.error || '未知错误'}`);
       }
     } catch (error) {
-      console.error('恢复项目失败:', error);
+      
       await alert(`恢复项目失败: ${error instanceof Error ? error.message : '网络错误'}`);
     }
   };
@@ -292,7 +294,20 @@ function HomeContent() {
   };
 
   const openEditModal = (project: any) => {
-    setEditingProject(project);
+    // 如果传入的是projectId（数字），则根据ID查找项目
+    if (typeof project === 'number') {
+      const foundProject = projects.find(p => p.id === project);
+      if (foundProject) {
+        setEditingProject(foundProject);
+      } else {
+        // 如果在当前列表中没找到，可能是过往项目
+        
+        return;
+      }
+    } else {
+      // 如果传入的是完整的项目对象
+      setEditingProject(project);
+    }
     setShowProjectModal(true);
   };
 
@@ -373,6 +388,18 @@ function HomeContent() {
         // 清除工人筛选，显示所有工人的该厚度库存
         setWorkerIdFilter(null);
         setWorkerNameFilter('');
+        break;
+        
+      case 'employees':
+        // 跳转到考勤管理页面
+        setViewType('attendance');
+        // 可以在这里设置员工筛选，如果考勤组件支持的话
+        break;
+        
+      case 'attendanceExceptions':
+        // 跳转到考勤管理页面
+        setViewType('attendance');
+        // 可以在这里设置特定的考勤记录筛选
         break;
         
       default:
