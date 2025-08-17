@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { MaterialDimension, WorkerMaterial, Worker, ThicknessSpec, Department } = require('../models');
+const { MaterialDimension, WorkerMaterial, Worker, ThicknessSpec, Department, MaterialAllocation } = require('../models');
 const { authenticate } = require('../middleware/auth');
 
-// 搜索板材尺寸规格 (新增)
+// 搜索板材尺寸规格 (修复实时库存显示，计算可用量 = 总量 - 已分配量)
 router.post('/search', authenticate, async (req, res) => {
   try {
     const { materialType, thickness, searchQuery } = req.body;
@@ -20,13 +20,18 @@ router.post('/search', authenticate, async (req, res) => {
       return res.json({ dimensions: [] }); // 如果不是数字，返回空结果
     }
 
-    // 搜索匹配的尺寸记录
+    console.log(`搜索尺寸: ${searchQuery} (${searchNumber}), 材料: ${materialType}, 厚度: ${thickness}`);
+
+    // 搜索匹配的尺寸记录 - 按指定厚度过滤
     const dimensions = await MaterialDimension.findAll({
       include: [
         {
           model: WorkerMaterial,
           as: 'workerMaterial',
           required: true,
+          where: {
+            quantity: { [Op.gt]: 0 } // 只搜索有库存的工人材料
+          },
           include: [
             {
               model: ThicknessSpec,
@@ -34,7 +39,7 @@ router.post('/search', authenticate, async (req, res) => {
               required: true,
               where: {
                 materialType: materialType === '碳板' ? { [Op.or]: [null, '碳板'] } : materialType,
-                thickness: thickness
+                thickness: thickness // 严格按厚度过滤
               }
             },
             {
@@ -50,15 +55,21 @@ router.post('/search', authenticate, async (req, res) => {
                   required: false
                 }
               ]
+            },
+            {
+              model: MaterialAllocation,
+              as: 'allocations',
+              required: false,
+              where: {
+                status: 'allocated' // 只计算已分配未归还的
+              },
+              attributes: ['quantity']
             }
-          ],
-          where: {
-            quantity: { [Op.gt]: 0 } // 只搜索有库存的
-          }
+          ]
         }
       ],
       where: {
-        quantity: { [Op.gt]: 0 }, // 该尺寸有库存
+        quantity: { [Op.gt]: 0 }, // 该尺寸有库存（实时数据）
         [Op.or]: [
           { width: searchNumber },  // 宽度匹配
           { height: searchNumber }, // 或高度匹配
@@ -72,39 +83,52 @@ router.post('/search', authenticate, async (req, res) => {
       ]
     });
 
-    // 为添加需求聚合显示：按尺寸合并，只显示总库存，不显示具体工人
-    // 职责分离：添加需求时只关心总体可行性，分配时才关心具体来源
+    console.log(`找到 ${dimensions.length} 条指定厚度的尺寸记录`);
+
+    // 计算实际可用量：总量 - 已分配量
     const dimensionMap = new Map();
     
-    dimensions.forEach(dim => {
+    dimensions.forEach((dim, index) => {
+      // 计算已分配数量
+      const allocatedQuantity = dim.workerMaterial.allocations.reduce((sum, alloc) => sum + alloc.quantity, 0);
+      // 计算可用数量
+      const availableQuantity = dim.quantity - allocatedQuantity;
+      
+      console.log(`记录${index}: ${dim.width}x${dim.height}mm - 总量: ${dim.quantity} - 已分配: ${allocatedQuantity} - 可用: ${availableQuantity} - 厚度: ${dim.workerMaterial?.thicknessSpec?.thickness}mm - 工人: ${dim.workerMaterial?.worker?.name}`);
+      
+      // 只计算有可用库存的
+      if (availableQuantity <= 0) {
+        return;
+      }
+      
       const key = `${dim.width}x${dim.height}`;
       
       if (dimensionMap.has(key)) {
+        // 已存在这个尺寸，直接累加当前可用数量
         const existing = dimensionMap.get(key);
-        existing.totalQuantity += dim.quantity;
+        existing.totalQuantity += availableQuantity;
         existing.workerCount += 1;
-        // 收集所有工人信息（分配时可能需要）
         existing.workers.push({
           workerId: dim.workerMaterial.worker.id,
           workerName: dim.workerMaterial.worker.name,
           department: dim.workerMaterial.worker.departmentInfo?.name || '未分配',
-          quantity: dim.quantity
+          quantity: availableQuantity // 使用可用库存
         });
       } else {
+        // 新尺寸，创建记录
         dimensionMap.set(key, {
           width: parseFloat(dim.width),
           height: parseFloat(dim.height),
-          totalQuantity: dim.quantity,
+          totalQuantity: availableQuantity, // 直接使用可用库存数量
           workerCount: 1,
-          // 添加需求时不显示具体工人，只显示系统总库存
-          workerName: '系统库存', // 统一显示为系统库存
-          workerId: null, // 不指定具体工人
-          department: '多个工人', // 可能来自多个工人
+          workerName: '系统库存',
+          workerId: null,
+          department: '多个工人',
           workers: [{
             workerId: dim.workerMaterial.worker.id,
             workerName: dim.workerMaterial.worker.name,
             department: dim.workerMaterial.worker.departmentInfo?.name || '未分配',
-            quantity: dim.quantity
+            quantity: availableQuantity // 使用可用库存
           }]
         });
       }
@@ -125,6 +149,11 @@ router.post('/search', authenticate, async (req, res) => {
         return b.totalQuantity - a.totalQuantity;
       })
       .slice(0, 20); // 限制返回数量
+
+    console.log(`返回 ${searchResults.length} 个聚合结果`);
+    searchResults.forEach(result => {
+      console.log(`聚合结果: ${result.width}x${result.height}mm - 可用总量: ${result.totalQuantity}`);
+    });
 
     res.json({
       success: true,

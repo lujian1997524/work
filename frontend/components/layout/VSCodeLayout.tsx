@@ -309,7 +309,7 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
       </MobileDrawer>
 
       {/* Toast容器 - 确保Toast能正常显示 */}
-      <ToastContainer position="top-right" />
+      <ToastContainer />
     </div>
   );
 };

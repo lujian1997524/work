@@ -8,6 +8,7 @@ import type {
   AttendanceSettings 
 } from '@/types/attendance';
 import { apiRequest } from '@/utils/apiConfig';
+import { exportMonthlyAttendanceReport } from '@/utils/attendanceExporter';
 
 interface AttendanceState {
   // 基础数据
@@ -550,33 +551,31 @@ export const useAttendanceStore = create<AttendanceState>()(
 
     exportMonthlyReport: async (year, month, format) => {
       try {
-        const token = getAuthToken();
-        if (!token) throw new Error('未找到认证令牌');
-
-        const response = await apiRequest(
-          `/api/attendance/export?year=${year}&month=${month}&format=${format}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('导出报表失败');
-        }
-
-        // 处理文件下载
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `考勤报表_${year}年${month}月.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } catch (error) {
+        // 获取当前数据
+        const { employees, attendanceExceptions, monthlyStats } = get();
         
+        // 过滤当月数据
+        const monthlyExceptions = attendanceExceptions.filter(exc => {
+          const excDate = new Date(exc.date);
+          return excDate.getFullYear() === year && excDate.getMonth() + 1 === month;
+        });
+        
+        const currentMonthStats = monthlyStats.filter(stat => 
+          stat.year === year && stat.month === month
+        );
+        
+        // 使用美化的前端导出函数
+        await exportMonthlyAttendanceReport({
+          employees,
+          monthlyStats: currentMonthStats,
+          attendanceExceptions: monthlyExceptions,
+          year,
+          month
+        });
+        
+      } catch (error) {
+        console.error('导出月度报表失败:', error);
+        throw error;
       }
     },
 

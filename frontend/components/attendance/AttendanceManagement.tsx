@@ -32,7 +32,8 @@ import {
 } from '@/types/attendance';
 import { 
   EmployeeManagement,
-  AttendanceStatistics
+  AttendanceStatistics,
+  exportDailyAttendance
 } from '@/components/attendance';
 import { AttendanceGrid } from '@/components/ui/AttendanceGrid';
 import { apiRequest } from '@/utils/apiConfig';
@@ -394,42 +395,24 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
               size="sm"
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem('auth_token');
-                  if (!token) {
-                    toast.addToast({
-                      type: 'error',
-                      message: '未找到认证俤鼍'
-                    });
-                    return;
-                  }
+                  // 获取当日员工考勤异常数据
+                  const exceptionsData = attendanceExceptions.filter(exc => 
+                    exc.date === selectedDate
+                  );
                   
-                  const response = await apiRequest(`/api/attendance/daily-export?date=${selectedDate}&format=xlsx`, {
-                    method: 'GET',
-                    headers: {
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
-                  
-                  if (!response.ok) {
-                    throw new Error('导出失败');
-                  }
-                  
-                  const blob = await response.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `今日考勤_${selectedDate}.xlsx`;
-                  document.body.appendChild(a);
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-                  document.body.removeChild(a);
+                  // 使用美化的前端导出函数
+                  await exportDailyAttendance(
+                    employees, 
+                    exceptionsData, 
+                    selectedDate
+                  );
                   
                   toast.addToast({
                     type: 'success',
                     message: '导出成功'
                   });
                 } catch (error) {
-                  
+                  console.error('导出失败:', error);
                   toast.addToast({
                     type: 'error',
                     message: '导出失败，请重试'

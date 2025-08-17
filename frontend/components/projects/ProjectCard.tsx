@@ -75,35 +75,6 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
   const [showAllocationModal, setShowAllocationModal] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
-  // 计算碳板优先进度（95/5策略重点显示）
-  const getCarbonPriorityProgress = () => {
-    const carbonMaterials = sortedMaterials.filter(m => 
-      !m.thicknessSpec?.materialType || m.thicknessSpec.materialType === '碳板'
-    );
-    const specialMaterials = sortedMaterials.filter(m => 
-      m.thicknessSpec?.materialType && m.thicknessSpec.materialType !== '碳板'
-    );
-    
-    const carbonCompleted = carbonMaterials.filter(m => m.status === 'completed').length;
-    const carbonInProgress = carbonMaterials.filter(m => m.status === 'in_progress').length;
-    const specialCompleted = specialMaterials.filter(m => m.status === 'completed').length;
-    const specialInProgress = specialMaterials.filter(m => m.status === 'in_progress').length;
-    
-    return {
-      carbon: {
-        total: carbonMaterials.length,
-        completed: carbonCompleted,
-        inProgress: carbonInProgress,
-        rate: carbonMaterials.length > 0 ? Math.round((carbonCompleted / carbonMaterials.length) * 100) : 0
-      },
-      special: {
-        total: specialMaterials.length,
-        completed: specialCompleted,
-        inProgress: specialInProgress,
-        rate: specialMaterials.length > 0 ? Math.round((specialCompleted / specialMaterials.length) * 100) : 0
-      }
-    };
-  };
 
   // 转换材料数据为MaterialStatusManager格式
   const convertMaterialsToManagerFormat = (): MaterialInfo[] => {
@@ -210,7 +181,6 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
   };
 
   const timeInfo = getProjectTimeInfo();
-  const carbonProgress = getCarbonPriorityProgress();
 
   // 处理板材分配
   const handleMaterialAllocation = (material: Material) => {
@@ -321,47 +291,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
         </div>
       </div>
 
-      {/* 项目描述/备注 - 如果有的话 */}
-      {(project as any).description && (
-        <div className="text-xs text-gray-600 mb-3 bg-gray-50 rounded p-2">
-          <span className="font-medium">备注：</span>
-          {(project as any).description}
-        </div>
-      )}
 
-      {/* 碳板优先进度显示区域 - 新增重点区域 */}
-      {carbonProgress.carbon.total > 0 && (
-        <div className="mb-3 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-          <div className="text-xs font-semibold text-blue-800 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
-            碳板进度
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 text-xs">
-                <span className="text-blue-700 font-medium">{carbonProgress.carbon.rate}%</span>
-                <span className="text-blue-600">({carbonProgress.carbon.completed}/{carbonProgress.carbon.total})</span>
-                {carbonProgress.carbon.inProgress > 0 && (
-                  <span className="text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
-                    {carbonProgress.carbon.inProgress}进行中
-                  </span>
-                )}
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-1.5 mt-1">
-                <div 
-                  className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${carbonProgress.carbon.rate}%` }}
-                />
-              </div>
-            </div>
-            {carbonProgress.special.total > 0 && (
-              <div className="ml-3 text-xs text-gray-600">
-                特殊: {carbonProgress.special.rate}%
-              </div>
-            )}
-          </div>
-        </div>
-      )}
       
       {/* 厚度网格 */}
       <div className="flex-1">
@@ -387,9 +317,20 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
           <span>开始: {formatDate(timeInfo.actualStartDate)}</span>
           <span>完成: {formatDate(timeInfo.actualCompletedDate)}</span>
         </div>
-        {/* 进度统计 */}
-        <div className="text-xs text-gray-500 text-center font-medium">
-          {getCompletionStats()} 已完成
+        {/* 备注和进度统计 */}
+        <div className="flex justify-between items-center text-xs">
+          <div className="text-gray-600 flex-1 mr-2">
+            {(project as any).description && (
+              <span>
+                备注: {(project as any).description.length > 10 
+                  ? `${(project as any).description.substring(0, 10)}...` 
+                  : (project as any).description}
+              </span>
+            )}
+          </div>
+          <div className="text-gray-500 font-medium flex-shrink-0">
+            {getCompletionStats()} 已完成
+          </div>
         </div>
       </div>
       

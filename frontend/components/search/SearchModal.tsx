@@ -587,10 +587,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         
       case 'employees':
         // 新增：员工考勤元信息
-        const empDepartment = item.department || '未分配部门';
-        const empPosition = item.position || '未分配岗位';
+        const empDepartment = (item as any).department || '未分配部门';
+        const empPosition = (item as any).position || '未分配岗位';
         const empWorkHours = (item as any).dailyWorkHours || 9;
-        const empId = item.employeeId || '无工号';
+        const empId = (item as any).employeeId || '无工号';
         
         return `工号: ${empId} • ${empDepartment} • ${empPosition} • ${empWorkHours}小时工作制`;
         

@@ -24,6 +24,68 @@ import {
   Select
 } from '@/components/ui';
 import type { TimelineItem, StatusType } from '@/components/ui';
+
+// 类型定义
+interface Project {
+  id: number;
+  name: string;
+  description?: string;
+  status: string;
+  priority: string;
+  assignedWorker?: { id: number; name: string };
+  materials: Material[];
+  drawings: Drawing[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ThicknessSpec {
+  id: number;
+  thickness: string;
+  unit: string;
+  materialType: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface Material {
+  id: number;
+  projectId: number;
+  thicknessSpecId: number;
+  status: StatusType;
+  quantity?: number;
+  notes?: string;
+  startDate?: string;
+  completedDate?: string;
+  completedByUser?: { id: number; name: string };
+  thicknessSpec?: ThicknessSpec;
+}
+
+interface Drawing {
+  id: number;
+  projectId: number;
+  filename: string;
+  originalName: string;
+  originalFilename?: string;
+  filePath: string;
+  version: string;
+  createdAt: string;
+  uploadTime?: string;
+  uploader?: { id: number; name: string };
+}
+
+interface OperationHistory {
+  id: number;
+  action: string;
+  operationType: string;
+  operationDescription: string;
+  description: string;
+  created_at: string;
+  createdAt: string;
+  user?: { name: string };
+  operator: { id: number; name: string };
+  details?: Record<string, any>;
+}
 import { 
   ArrowLeftIcon, 
   PencilIcon, 
@@ -425,8 +487,12 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   const getCarbonProgress = () => {
     if (!project || !project.materials) return { carbon: { total: 0, completed: 0 }, special: { total: 0, completed: 0 } };
 
-    const carbonMaterials = project.materials.filter(m => !m.thicknessSpec.materialType || m.thicknessSpec.materialType === '碳板');
-    const specialMaterials = project.materials.filter(m => m.thicknessSpec.materialType && m.thicknessSpec.materialType !== '碳板');
+    const carbonMaterials = project.materials.filter(m => 
+      m.thicknessSpec && (!m.thicknessSpec.materialType || m.thicknessSpec.materialType === '碳板')
+    );
+    const specialMaterials = project.materials.filter(m => 
+      m.thicknessSpec && m.thicknessSpec.materialType && m.thicknessSpec.materialType !== '碳板'
+    );
 
     return {
       carbon: {

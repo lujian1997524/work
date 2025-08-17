@@ -17,8 +17,8 @@ export type {
 // 导出状态管理
 export { useAttendanceStore } from '../../stores/attendanceStore';
 
-// 导出工具函数
+// 导出工具函数 (ExcelJS版本)
 export { 
-  exportMonthlyAttendanceReport, 
-  exportAttendanceCSV 
+  exportMonthlyAttendanceReport,
+  exportDailyAttendance
 } from '../../utils/attendanceExporter';

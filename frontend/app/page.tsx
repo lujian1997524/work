@@ -10,7 +10,7 @@ import { ActiveProjectsCardView } from '@/components/projects/ActiveProjectsCard
 import { MaterialInventoryManagerNew as MaterialInventoryManager } from '@/components/materials/MaterialInventoryManagerNew';
 import { MaterialsSidebar } from '@/components/materials/MaterialsSidebar';
 import { ProjectDetailModern } from '@/components/projects/ProjectDetailModern';
-import { ProjectModal } from '@/components/materials/ProjectModal';
+import { ProjectWizardModal } from '@/components/materials/ProjectWizardModal';
 import { DrawingLibrary, DrawingsSidebar } from '@/components/drawings';
 import { SearchModal } from '@/components/search/SearchModal';
 import { SettingsPage } from '@/components/settings/SettingsPage';
@@ -700,7 +700,7 @@ function HomeContent() {
       </AnimatePresence>
 
       {/* 模态框 */}
-      <ProjectModal
+      <ProjectWizardModal
         isOpen={showProjectModal}
         onClose={() => {
           setShowProjectModal(false);

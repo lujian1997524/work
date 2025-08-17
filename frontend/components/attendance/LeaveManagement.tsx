@@ -15,7 +15,8 @@ import {
   Alert,
   Timeline,
   ProgressBar,
-  useToast
+  useToast,
+  useDialog
 } from '@/components/ui';
 import { 
   CalendarDaysIcon,
@@ -76,6 +77,7 @@ export const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   
   const toast = useToast();
+  const { confirm } = useDialog();
 
   const {
     employees,
@@ -178,27 +180,21 @@ export const LeaveManagement: React.FC<LeaveManagementProps> = ({
   // 删除请假记录
   const handleDeleteLeave = async (record: AttendanceException) => {
     const employee = employees.find(emp => emp.id === record.employeeId);
-    toast.addToast({
-      type: 'warning',
-      message: `确定要删除 ${employee?.name} 的请假记录吗？`,
-      actions: [{
-        label: '确认删除',
-        onClick: async () => {
-          const success = await deleteAttendanceException(record.id);
-          if (success) {
-            toast.addToast({
-              type: 'success',
-              message: '请假记录删除成功'
-            });
-          } else {
-            toast.addToast({
-              type: 'error',
-              message: '删除请假记录失败'
-            });
-          }
-        }
-      }]
-    });
+    const confirmed = await confirm(`确定要删除 ${employee?.name} 的请假记录吗？`);
+    if (!confirmed) return;
+    
+    const success = await deleteAttendanceException(record.id);
+    if (success) {
+      toast.addToast({
+        type: 'success',
+        message: '请假记录删除成功'
+      });
+    } else {
+      toast.addToast({
+        type: 'error',
+        message: '删除请假记录失败'
+      });
+    }
   };
 
   // 获取请假类型标签

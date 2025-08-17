@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Alert, Loading, EmptyData, Modal, Input, Dropdown, Button, useDialog, DxfPreviewModal } from '@/components/ui';
 import { DrawingGrid } from './DrawingGrid';
 import { DrawingList } from './DrawingList';
+import { DrawingTableView } from './DrawingTableView';
 import { DrawingUpload } from './DrawingUpload';
 import { DrawingActionButton, DrawingAdvancedActions } from './DrawingActionButton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +13,7 @@ import { apiRequest } from '@/utils/api';
 import { useToast } from '@/components/ui/Toast';
 import { useDrawingToastListener, drawingToastHelper } from '@/utils/drawingToastHelper';
 import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
+import { sseManager } from '@/utils/sseManager';
 
 export interface Drawing {
   id: number;
@@ -88,7 +90,214 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
   const { createTracker } = useBatchOperationTracker();
 
   // 监听图纸Toast事件
-  useDrawingToastListener(toast);
+  useDrawingToastListener();
+
+  // 项目状态变更时的图纸自动归档处理
+  const handleProjectDeleted = async (data: any) => {
+    const { projectId, projectName } = data;
+    console.log(`项目 ${projectName} 已删除，开始归档相关图纸...`);
+    
+    try {
+      const response = await apiRequest(`/api/drawings/archive-project/${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        toast.addToast({
+          type: 'info',
+          message: `项目删除：已自动归档 ${responseData.archivedCount || 0} 个相关图纸`
+        });
+        // 刷新图纸列表
+        await fetchDrawings();
+      }
+    } catch (error) {
+      console.error('自动归档图纸失败:', error);
+      toast.addToast({
+        type: 'warning',
+        message: `项目删除后的图纸归档失败，请手动处理`
+      });
+    }
+  };
+
+  const handleProjectMovedToPast = async (data: any) => {
+    const { project } = data;
+    console.log(`项目 ${project.name} 已移动到过往项目，开始归档相关图纸...`);
+    
+    try {
+      // 先获取该项目的所有图纸，检查多项目关联的情况
+      const drawingsResponse = await apiRequest(`/api/drawings/project/${project.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (drawingsResponse.ok) {
+        const drawingsData = await drawingsResponse.json();
+        const projectDrawings = drawingsData.drawings || [];
+        
+        let archivedCount = 0;
+        let skipCount = 0;
+
+        // 逐个检查图纸是否应该归档（考虑多项目关联）
+        for (const drawing of projectDrawings) {
+          if (drawing.status === '已归档') continue; // 已归档的跳过
+          
+          const shouldArchive = await shouldArchiveDrawing(drawing, project.id);
+          
+          if (shouldArchive) {
+            try {
+              const archiveResponse = await apiRequest(`/api/drawings/${drawing.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: '已归档' })
+              });
+              
+              if (archiveResponse.ok) {
+                archivedCount++;
+              }
+            } catch (error) {
+              console.error(`归档图纸 ${drawing.id} 失败:`, error);
+            }
+          } else {
+            skipCount++;
+            console.log(`图纸 ${drawing.originalFilename || drawing.filename} 存在其他活跃项目关联，暂不归档`);
+          }
+        }
+
+        if (archivedCount > 0 || skipCount > 0) {
+          toast.addToast({
+            type: 'info',
+            message: `项目转入过往：已归档 ${archivedCount} 个图纸${skipCount > 0 ? `，${skipCount} 个图纸因存在其他活跃项目而保持可用` : ''}`
+          });
+        } else {
+          toast.addToast({
+            type: 'info',
+            message: `项目转入过往：该项目没有可归档的图纸`
+          });
+        }
+        
+        // 刷新图纸列表
+        await fetchDrawings();
+      }
+    } catch (error) {
+      console.error('自动归档图纸失败:', error);
+      toast.addToast({
+        type: 'warning',
+        message: `项目转入过往后的图纸归档失败，请手动处理`
+      });
+    }
+  };
+
+  // 判断图纸是否应该被归档（考虑多项目关联）
+  const shouldArchiveDrawing = async (drawing: any, excludeProjectId: number): Promise<boolean> => {
+    try {
+      // 如果图纸没有projectIds信息，或者只关联了当前项目，直接归档
+      if (!drawing.projectIds || drawing.projectIds.length <= 1) {
+        return true;
+      }
+
+      // 检查除当前项目外的其他关联项目状态
+      const otherProjectIds = drawing.projectIds.filter((id: number) => id !== excludeProjectId);
+      
+      if (otherProjectIds.length === 0) {
+        return true; // 只关联当前项目，可以归档
+      }
+
+      // 检查其他关联项目的状态
+      const projectStatusPromises = otherProjectIds.map(async (projectId: number) => {
+        try {
+          const response = await apiRequest(`/api/projects/${projectId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const projectData = await response.json();
+            return projectData.project;
+          }
+          return null;
+        } catch (error) {
+          console.error(`获取项目 ${projectId} 状态失败:`, error);
+          return null; // 获取失败时保守处理，不归档
+        }
+      });
+
+      const projects = await Promise.all(projectStatusPromises);
+      const validProjects = projects.filter(p => p !== null);
+
+      // 只有当所有其他关联项目都是过往项目时才归档
+      const allOthersArePast = validProjects.every(p => p.isPastProject === true);
+      
+      return allOthersArePast;
+    } catch (error) {
+      console.error('检查图纸归档条件失败:', error);
+      return false; // 发生错误时保守处理，不归档
+    }
+  };
+
+  const handleProjectRestoredFromPast = async (data: any) => {
+    const { project } = data;
+    console.log(`项目 ${project.name} 已从过往项目恢复，开始恢复相关图纸...`);
+    
+    try {
+      // 获取该项目的归档图纸
+      const drawingsResponse = await apiRequest(`/api/drawings/project/${project.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (drawingsResponse.ok) {
+        const drawingsData = await drawingsResponse.json();
+        const archivedDrawings = drawingsData.drawings?.filter((d: any) => d.status === '已归档') || [];
+        
+        if (archivedDrawings.length > 0) {
+          // 批量恢复图纸状态为可用
+          const restorePromises = archivedDrawings.map((drawing: any) => 
+            apiRequest(`/api/drawings/${drawing.id}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ status: '可用' })
+            })
+          );
+
+          const results = await Promise.allSettled(restorePromises);
+          const successCount = results.filter(r => r.status === 'fulfilled').length;
+          
+          toast.addToast({
+            type: 'success',
+            message: `项目恢复：已自动恢复 ${successCount} 个相关图纸`
+          });
+          
+          // 刷新图纸列表
+          await fetchDrawings();
+        } else {
+          toast.addToast({
+            type: 'info',
+            message: `项目恢复：该项目没有需要恢复的归档图纸`
+          });
+        }
+      }
+    } catch (error) {
+      console.error('自动恢复图纸失败:', error);
+      toast.addToast({
+        type: 'warning',
+        message: `项目恢复后的图纸恢复失败，请手动处理`
+      });
+    }
+  };
 
   // 获取图纸列表
   const fetchDrawings = async () => {
@@ -449,6 +658,23 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     fetchDrawings();
   }, [token, selectedCategory]);
 
+  // 注册项目状态变更事件监听器
+  useEffect(() => {
+    if (!token) return;
+
+    // 注册 SSE 事件监听器
+    sseManager.addEventListener('project-deleted', handleProjectDeleted);
+    sseManager.addEventListener('project-moved-to-past', handleProjectMovedToPast);
+    sseManager.addEventListener('project-restored-from-past', handleProjectRestoredFromPast);
+
+    // 清理函数：移除事件监听器
+    return () => {
+      sseManager.removeEventListener('project-deleted', handleProjectDeleted);
+      sseManager.removeEventListener('project-moved-to-past', handleProjectMovedToPast);
+      sseManager.removeEventListener('project-restored-from-past', handleProjectRestoredFromPast);
+    };
+  }, [token]); // 依赖token，确保在用户变更时重新注册
+
   // 当分类改变时，通知父组件
   useEffect(() => {
     if (onCategoryChange && selectedCategory !== 'all') {
@@ -558,11 +784,11 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* 内容区域 - 移除所有工具栏 */}
-      <div className="flex-1 overflow-hidden p-4">
+      {/* 内容区域 */}
+      <div className="flex-1 overflow-hidden">
         {selectedCategory === 'archived' && archivedGroups.length > 0 ? (
-          // 归档图纸按月份分组显示
-          <div className="h-full overflow-auto">
+          // 归档图纸按月份分组显示 - 使用表格视图
+          <div className="h-full overflow-auto p-4">
             {archivedGroups.map((group) => (
               <div key={group.key} className="mb-6">
                 {/* 月份标题 */}
@@ -578,28 +804,31 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
                   </h3>
                 </div>
                 
-                {/* 该月份的图纸 */}
-                <DrawingGrid
+                {/* 该月份的图纸 - 使用表格视图 */}
+                <DrawingTableView
                   drawings={group.drawings}
                   onPreview={handlePreview}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onOpen={handleOpen}
-                  className="px-4"
+                  className="mb-4"
                 />
               </div>
             ))}
           </div>
         ) : drawings.length === 0 ? (
-          <EmptyData
-            description="还没有上传任何图纸"
-          >
-            <Button variant="primary" onClick={() => onUploadModalChange?.(true)}>
-              上传第一个图纸
-            </Button>
-          </EmptyData>
+          <div className="p-4">
+            <EmptyData
+              description="还没有上传任何图纸"
+            >
+              <Button variant="primary" onClick={() => onUploadModalChange?.(true)}>
+                上传第一个图纸
+              </Button>
+            </EmptyData>
+          </div>
         ) : (
-          <DrawingGrid
+          // 统一使用表格视图
+          <DrawingTableView
             drawings={drawings}
             onPreview={handlePreview}
             onEdit={handleEdit}

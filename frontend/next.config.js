@@ -6,6 +6,13 @@ const nextConfig = {
   // 标准的Next.js开发配置
   reactStrictMode: true,
   
+  // 允许的开发源地址 - 解决跨域警告
+  allowedDevOrigins: [
+    '192.168.31.137',
+    'localhost',
+    '127.0.0.1'
+  ],
+  
   // Webpack配置
   webpack: (config) => {
     config.resolve.alias = {

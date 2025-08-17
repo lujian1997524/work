@@ -82,6 +82,7 @@ curl http://localhost:4000     # 前端服务（本地）
 - **后端**: Node.js + Express + Sequelize ORM + MySQL（远程部署）
 - **前端**: Next.js 15.4.3 + React 18 + TypeScript + Zustand状态管理
 - **UI系统**: Tailwind CSS + @heroicons/react + iOS 18设计规范  
+- **文件导出**: ExcelJS 4.4.0 - 专业级Excel文件生成（支持多工作表、样式、条件格式）
 - **实时通信**: Server-Sent Events (SSE) + 音频通知
 - **桌面应用**: Tauri多平台打包 (Rust + Web技术)
 - **移动端适配**: 专用移动端组件 + 响应式设计
@@ -515,6 +516,10 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/utils/*ToastHelper.ts` - 专业化Toast助手集合 (新增)
 - `frontend/utils/toastAnimationOptimizer.ts` - Toast性能优化 (新增)
 
+### Excel导出工具 (ExcelJS版本)
+- `frontend/utils/projectReportExporter.ts` - 项目报表导出（多工作表、专业样式）
+- `frontend/utils/attendanceExporter.ts` - 考勤报表导出（彩色条件格式、部门汇总）
+
 ### 核心配置文件
 - `frontend/.env.local` - 前端环境配置（远程后端URL配置）
 - `frontend/next.config.js` - Next.js开发配置（标准模式，非export）
@@ -529,15 +534,41 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.4.1 (2025-08-15)
-- **更新内容**: 修复SSE实时推送功能，恢复项目和材料状态变更通知
+- **当前版本**: v2.4.12 (2025-08-17) - 项目编辑板材添加功能修复
+- **v2.4.12 主要更新**:
+  - **项目编辑功能修复**: 完全修复项目编辑时无法添加新板材厚度的问题
+    - 后端API支持：更新项目API现在正确处理 `requiredThickness` 字段
+    - 动态材料创建：为新选择的厚度规格自动创建项目材料记录
+    - 工人库存管理：确保工人拥有对应厚度的材料库存记录
+    - 前端验证优化：编辑模式下放宽验证限制，提升用户体验
+  - **数据完整性保障**: 新添加的板材会正确关联到项目和工人
+  - **错误修复**: 解决了500内部服务器错误，修复了模型导入问题
+  - **用户体验提升**: 侧边栏和卡片编辑按钮现在都能正常工作
+- **v2.4.11** (2025-08-16) - Excel表头背景色无限延伸问题修复
+- **重大更新内容**: 
+  - **企业级报表美化标准**: 完全重写考勤和项目导出功能，达到专业商务报表水准
+    - 考勤报表：6个专业工作表（封面页、执行摘要、详细汇总、趋势分析、请假详情、部门对比）
+    - 项目报表：7个专业工作表（封面页、执行摘要、项目概览、进度分析、材料详情、时间线分析、资源统计）
+    - 企业级配色方案：蓝色主题（考勤）+ 绿色主题（项目），渐变背景和专业配色
+    - 专业图标系统：Unicode图标 + 智能色彩编码 + 条件格式化
+  - **信息完整性大幅提升**: 
+    - 项目报表新增：项目复杂度评估、风险等级分析、时间线预测、资源利用率统计
+    - 考勤报表新增：执行摘要分析、趋势预测、部门绩效对比、智能建议系统
+    - 详细的数据分析和管理建议，为决策层提供洞察支持
+  - **视觉美化专业级提升**:
+    - 多级标题和分组布局、专业边框和阴影效果
+    - 数据可视化元素：进度条、状态指示器、绩效等级色彩编码
+    - A4页面布局优化、打印友好的企业级设计标准
+- **v2.4.4** (2025-08-16) - Excel导出库升级与UI优化
+- **v2.4.3** (2025-08-16) - 项目创建/编辑向导模态框优化
 - **架构变更**: 远程后端分离式部署、移动端专用组件系统
-- **更新日志**: 详见 `/更新日志.txt` 和 `frontend/CHANGELOG.md`
+- **更新日志**: 详见 `/更新日志.txt`
 
 ## 版本管理原则
 
 ### 语义化版本控制
 本项目采用语义化版本控制（Semantic Versioning），版本号格式为：`MAJOR.MINOR.PATCH`
+更新日志文件路径：根目录/更新日志.txt
 
 #### 版本号更新规则
 1. **PATCH版本（2.4.0 → 2.4.1）**
@@ -587,9 +618,6 @@ SELECT * FROM v_monthly_attendance_stats;
 
 详细描述（可选）
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **常用类型**:

@@ -1,7 +1,7 @@
 {
   "name": "laser-cutting-manager-frontend",
-  "version": "2.4.1",
-  "description": "激光切割生产管理系统 - 修复SSE实时推送功能，恢复项目和材料状态变更通知",
+  "version": "2.4.12",
+  "description": "激光切割生产管理系统 - 修复项目编辑板材添加功能，支持动态添加厚度规格",
   "author": "LaserCut Team",
   "private": true,
   "scripts": {
@@ -18,6 +18,7 @@
     "axios": "^1.7.9",
     "dxf-parser": "^1.1.2",
     "dxf-viewer": "^1.0.43",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "framer-motion": "^11.16.0",
     "next": "15.4.3",
@@ -25,10 +26,10 @@
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
     "three": "^0.178.0",
-    "xlsx": "^0.18.5",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/exceljs": "^0.5.3",
     "@types/node": "^22.10.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

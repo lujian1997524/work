@@ -202,6 +202,13 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         setShowAddForm(false);
         fetchRequirements();
         onUpdate();
+        
+        // 刷新搜索结果以显示最新库存
+        if (newRequirement.searchQuery.trim()) {
+          setTimeout(() => {
+            searchDimensions(newRequirement.searchQuery);
+          }, 500);
+        }
       } else {
         const error = await response.json();
         await alert(`添加失败: ${error.message}`);
@@ -316,6 +323,13 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
         setAllocations([]);
         fetchRequirements();
         onUpdate();
+        
+        // 刷新搜索结果以反映最新的库存状态
+        if (newRequirement.searchQuery.trim()) {
+          setTimeout(() => {
+            searchDimensions(newRequirement.searchQuery);
+          }, 300);
+        }
       } else {
         const error = await response.json();
         await alert(`分配失败: ${error.message}`);
@@ -341,6 +355,13 @@ export const MaterialRequirementManager: React.FC<MaterialRequirementManagerProp
       if (response.ok) {
         fetchRequirements();
         onUpdate();
+        
+        // 如果当前有搜索查询，刷新搜索结果
+        if (newRequirement.searchQuery.trim()) {
+          setTimeout(() => {
+            searchDimensions(newRequirement.searchQuery);
+          }, 300);
+        }
       } else {
         const error = await response.json();
         await alert(`删除失败: ${error.message}`);

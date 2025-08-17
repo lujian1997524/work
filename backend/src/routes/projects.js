@@ -1,5 +1,5 @@
 const express = require('express');
-const { Project, Material, Drawing, ThicknessSpec, Worker, User, OperationHistory } = require('../models');
+const { Project, Material, Drawing, ThicknessSpec, Worker, User, OperationHistory, WorkerMaterial } = require('../models');
 const { Op } = require('sequelize');
 const { authenticate, requireOperator, requireAdmin } = require('../middleware/auth');
 const sseManager = require('../utils/sseManager');
@@ -525,7 +525,6 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
     }
 
     // 验证工人是否存在
-    const { Worker, WorkerMaterial } = require('../models');
     const assignedWorker = await Worker.findByPk(assignedWorkerId);
     if (!assignedWorker) {
       return res.status(400).json({
@@ -665,9 +664,16 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
 router.put('/:id', authenticate, requireOperator, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, status, priority, startDate, endDate, assignedWorkerId } = req.body;
+    const { name, description, status, priority, startDate, endDate, assignedWorkerId, requiredThickness } = req.body;
 
-    const project = await Project.findByPk(id);
+    const project = await Project.findByPk(id, {
+      include: [{
+        association: 'materials',
+        include: [{
+          association: 'thicknessSpec'
+        }]
+      }]
+    });
 
     if (!project) {
       return res.status(404).json({
@@ -702,6 +708,69 @@ router.put('/:id', authenticate, requireOperator, async (req, res) => {
 
     await project.update(updateData);
 
+    // 处理厚度规格变更（如果提供了requiredThickness）
+    if (requiredThickness && Array.isArray(requiredThickness)) {
+      // 获取当前项目已有的厚度规格
+      const existingThicknessIds = project.materials.map(m => m.thicknessSpecId);
+      
+      // 找出需要新增的厚度规格
+      const newThicknessIds = requiredThickness.filter(id => !existingThicknessIds.includes(id));
+      
+      if (newThicknessIds.length > 0) {
+        // 验证新厚度规格是否有效
+        const validThicknessSpecs = await ThicknessSpec.findAll({
+          where: {
+            id: newThicknessIds,
+            isActive: true
+          }
+        });
+
+        if (validThicknessSpecs.length !== newThicknessIds.length) {
+          return res.status(400).json({
+            error: '部分厚度规格无效或已停用'
+          });
+        }
+
+        // 获取工人信息
+        const targetWorkerId = assignedWorkerId !== undefined ? assignedWorkerId : project.assignedWorkerId;
+        if (!targetWorkerId) {
+          return res.status(400).json({
+            error: '项目未分配工人，无法添加板材'
+          });
+        }
+
+        // 为每个新的厚度规格创建材料记录
+        for (const thicknessSpec of validThicknessSpecs) {
+          // 检查工人是否已有此厚度的材料记录
+          let workerMaterial = await WorkerMaterial.findOne({
+            where: {
+              workerId: targetWorkerId,
+              thicknessSpecId: thicknessSpec.id
+            }
+          });
+
+          // 如果工人没有此厚度的材料记录，创建一个
+          if (!workerMaterial) {
+            workerMaterial = await WorkerMaterial.create({
+              workerId: targetWorkerId,
+              thicknessSpecId: thicknessSpec.id,
+              quantity: 0 // 初始数量为0
+            });
+          }
+
+          // 为项目创建材料记录
+          await Material.create({
+            projectId: parseInt(id),
+            thicknessSpecId: thicknessSpec.id,
+            status: 'pending',
+            createdBy: req.user.id
+          });
+        }
+
+        console.log(`项目 ${project.name} 新增了 ${newThicknessIds.length} 种厚度规格`);
+      }
+    }
+
     // 获取更新后的完整信息
     const updatedProject = await Project.findByPk(id, {
       include: [
@@ -712,6 +781,15 @@ router.put('/:id', authenticate, requireOperator, async (req, res) => {
         {
           association: 'assignedWorker',
           attributes: ['id', 'name']
+        },
+        {
+          association: 'materials',
+          include: [{
+            association: 'thicknessSpec'
+          }, {
+            association: 'completedByUser',
+            attributes: ['id', 'name']
+          }]
         }
       ]
     });

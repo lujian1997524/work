@@ -81,7 +81,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [isUploadingDrawings, setIsUploadingDrawings] = useState(false);
   
   const { token } = useAuth();
-  const { projectCreated, projectUpdated, smartSuggestion } = useToast();
+  const toast = useToast();
 
   // 获取工人列表和厚度规格
   useEffect(() => {

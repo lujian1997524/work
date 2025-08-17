@@ -207,9 +207,9 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       // 加载到查看器
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfContent)}`,
-        // 使用简化的字体配置 - 只使用URL数组格式
+        // 使用原版字体，确保稳定性
         fonts: [
-          '/fonts/NotoSansSC-Thin.ttf'
+          '/fonts/NotoSansSC-Thin.ttf'                      // 原版 10MB，稳定可靠
         ],
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
           // 进度回调 - 可以在这里添加进度显示

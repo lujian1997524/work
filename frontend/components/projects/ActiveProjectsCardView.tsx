@@ -11,7 +11,8 @@ import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/bat
 import { ActiveProjectCard } from '@/components/projects/ProjectCard';
 import { StatusType } from '@/components/ui';
 import { Material } from '@/types/project';
-import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon, FolderIcon, CubeIcon, CheckIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon, FolderIcon, CubeIcon, CheckIcon, ChartBarIcon, MagnifyingGlassIcon, DocumentArrowDownIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { exportProjectsToExcel } from '@/utils/projectReportExporter';
 
 interface ActiveProject {
   id: number;
@@ -71,7 +72,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   const { createTracker } = useBatchOperationTracker();
   
   // 监听项目Toast事件
-  useProjectToastListener(toast);
+  useProjectToastListener();
   
   const { 
     projects, 
@@ -134,7 +135,10 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
       const success = await moveToPastProject(projectId);
       if (success) {
         // 显示项目归档成功Toast
-        toast.projectArchived(projectName);
+        toast.addToast({
+          type: 'success',
+          message: `项目 "${projectName}" 已归档`
+        });
         
         onProjectMoveToPast?.(projectId);
         // 刷新项目列表
@@ -243,6 +247,22 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
       tracker.fail(`批量分配工人失败: ${error}`);
     } finally {
       setBatchLoading(false);
+    }
+  };
+
+  // 导出报表处理函数
+  const handleExportToExcel = () => {
+    try {
+      exportProjectsToExcel(projects as ActiveProject[], `活跃项目详细报表_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.addToast({
+        type: 'success',
+        message: '活跃项目详细报表已导出为Excel格式'
+      });
+    } catch (error) {
+      toast.addToast({
+        type: 'error',
+        message: '导出Excel报表失败，请重试'
+      });
     }
   };
 
@@ -360,6 +380,38 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
     <div className={`h-full flex flex-col p-4 ${className}`}>
       {/* 现代化统计面板 */}
       <div className="bg-white rounded-lg shadow-sm border p-3 md:p-4 mb-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-700">项目统计概览</h3>
+          
+          {/* 导出按钮组 */}
+          <div className="flex items-center space-x-2">
+            {onRefresh && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onRefresh}
+                className="px-3 py-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="hidden sm:inline ml-2">刷新</span>
+              </Button>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportToExcel}
+              disabled={projects.length === 0}
+              className="flex items-center space-x-2 px-3 py-2"
+            >
+              <DocumentArrowDownIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">导出Excel</span>
+            </Button>
+          </div>
+        </div>
+        
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="flex items-center space-x-2 md:space-x-3 p-2 md:p-3 bg-gray-50 rounded-lg">
             <div className="flex-shrink-0">
