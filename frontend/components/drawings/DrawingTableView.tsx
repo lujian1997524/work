@@ -28,7 +28,7 @@ export interface DrawingTableViewProps {
   showProjectColumn?: boolean;
 }
 
-type SortField = 'originalName' | 'status' | 'version' | 'fileSize' | 'createdAt' | 'uploadedBy';
+type SortField = 'originalName' | 'createdAt' | 'uploadedBy' | 'category';
 
 export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
   drawings,
@@ -42,7 +42,7 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
   showProjectColumn = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -73,32 +73,42 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
     }
   };
 
-  // 格式化文件大小
-  const formatFileSize = (bytes: number) => {
-    if (!bytes) return '-';
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  // 格式化日期
+  // 格式化日期 - 只显示年月日
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return '-';
+    try {
+      return new Date(dateString).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (error) {
+      return '-';
+    }
   };
 
-  // 获取状态颜色
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case '可用': return 'bg-green-100 text-green-800';
-      case '已废弃': return 'bg-red-100 text-red-800';
-      case '已归档': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-blue-100 text-blue-800';
+  // 获取图纸归属分类
+  const getDrawingCategory = (drawing: Drawing) => {
+    if (drawing.isCommonPart) {
+      return '常用零件';
+    } else if (drawing.project || (drawing.projectIds && drawing.projectIds.length > 0)) {
+      return '已关联项目';
+    } else {
+      return '未关联项目';
+    }
+  };
+
+  // 获取归属分类的颜色
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case '常用零件':
+        return 'bg-purple-100 text-purple-800';
+      case '已关联项目':
+        return 'bg-green-100 text-green-800';
+      case '未关联项目':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-blue-100 text-blue-800';
     }
   };
 
@@ -110,13 +120,21 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
         drawing.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (drawing.description && drawing.description.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const matchesStatus = filterStatus === 'all' || drawing.status === filterStatus;
+      const matchesCategory = filterCategory === 'all' || getDrawingCategory(drawing) === filterCategory;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+      let aValue: any;
+      let bValue: any;
+      
+      if (sortField === 'category') {
+        aValue = getDrawingCategory(a);
+        bValue = getDrawingCategory(b);
+      } else {
+        aValue = a[sortField];
+        bValue = b[sortField];
+      }
       
       if (aValue === undefined || bValue === undefined) return 0;
       
@@ -132,7 +150,7 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
       return sortDirection === 'asc' ? result : -result;
     });
 
-  const statuses = ['可用', '已废弃', '已归档'];
+  const categories = ['常用零件', '已关联项目', '未关联项目'];
 
   // 桌面端表格视图
   const renderTableView = () => (
@@ -152,30 +170,10 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
             
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               <button
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort('category')}
                 className="flex items-center space-x-1 hover:text-gray-700"
               >
-                <span>状态</span>
-                <ArrowsUpDownIcon className="w-4 h-4" />
-              </button>
-            </th>
-            
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <button
-                onClick={() => handleSort('version')}
-                className="flex items-center space-x-1 hover:text-gray-700"
-              >
-                <span>版本</span>
-                <ArrowsUpDownIcon className="w-4 h-4" />
-              </button>
-            </th>
-            
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <button
-                onClick={() => handleSort('fileSize')}
-                className="flex items-center space-x-1 hover:text-gray-700"
-              >
-                <span>文件大小</span>
+                <span>归属</span>
                 <ArrowsUpDownIcon className="w-4 h-4" />
               </button>
             </th>
@@ -199,12 +197,14 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {filteredAndSortedDrawings.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-6 py-12 text-center">
-                <div className="text-gray-400">
-                  <DocumentIcon className="w-12 h-12 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    {searchTerm || filterStatus !== 'all' ? '没有找到匹配的图纸' : '暂无图纸'}
-                  </p>
+              <td colSpan={4} className="px-6 py-12 text-center">
+                <div className="text-center py-12">
+                  <div className="text-gray-400">
+                    <DocumentIcon className="w-12 h-12 mx-auto mb-4" />
+                    <p className="text-gray-500">
+                      {searchTerm || filterCategory !== 'all' ? '没有找到匹配的图纸' : '暂无图纸'}
+                    </p>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -236,19 +236,16 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(drawing.status)}`}>
-                    {drawing.status}
-                  </span>
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    v{drawing.version}
-                  </span>
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatFileSize(drawing.fileSize)}
+                  <div className="flex items-center">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(getDrawingCategory(drawing))}`}>
+                      {getDrawingCategory(drawing)}
+                    </span>
+                    {drawing.project && (
+                      <span className="ml-2 text-xs text-gray-500 truncate max-w-24" title={drawing.project.name}>
+                        {drawing.project.name}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -303,7 +300,7 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
           <div className="text-gray-400">
             <DocumentIcon className="w-12 h-12 mx-auto mb-4" />
             <p className="text-gray-500">
-              {searchTerm || filterStatus !== 'all' ? '没有找到匹配的图纸' : '暂无图纸'}
+              {searchTerm || filterCategory !== 'all' ? '没有找到匹配的图纸' : '暂无图纸'}
             </p>
           </div>
         </div>
@@ -326,16 +323,18 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
                   <div className="text-sm font-medium text-gray-900 truncate">
                     {drawing.originalName}
                   </div>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(drawing.status)}`}>
-                      {drawing.status}
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      v{drawing.version}
+                  <div className="flex items-center space-x-2 mt-1 flex-wrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(getDrawingCategory(drawing))}`}>
+                      {getDrawingCategory(drawing)}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {formatFileSize(drawing.fileSize)} • {formatDate(drawing.createdAt)}
+                    {formatDate(drawing.createdAt)}
+                    {drawing.project && (
+                      <span className="block mt-1 text-blue-600" title="关联项目">
+                        项目: {drawing.project.name}
+                      </span>
+                    )}
                   </div>
                   {drawing.description && (
                     <div className="text-xs text-gray-400 mt-1 truncate">
@@ -412,17 +411,17 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
               />
             </div>
             
-            {/* 状态筛选 */}
+            {/* 归属筛选 */}
             <div className="relative">
               <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Select
                 options={[
-                  { label: '全部状态', value: 'all' },
-                  ...statuses.map(status => ({ label: status, value: status }))
+                  { label: '全部归属', value: 'all' },
+                  ...categories.map(category => ({ label: category, value: category }))
                 ]}
-                value={filterStatus}
-                onChange={(value) => setFilterStatus(value as string)}
-                className="pl-10 w-full sm:w-32"
+                value={filterCategory}
+                onChange={(value) => setFilterCategory(value as string)}
+                className="pl-10 w-full sm:w-36"
               />
             </div>
           </div>

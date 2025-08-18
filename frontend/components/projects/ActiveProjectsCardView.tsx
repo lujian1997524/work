@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectStore } from '@/stores';
-import { Loading, Empty, EmptyData, Button } from '@/components/ui';
+import { Loading, Empty, EmptyData, Button, SearchableSelect } from '@/components/ui';
 import { useToast } from '@/components/ui/Toast';
 import { useProjectToastListener } from '@/utils/projectToastHelper';
 import { batchOperationToastHelper, useBatchOperationTracker } from '@/utils/batchOperationToastHelper';
@@ -62,6 +62,10 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['pending', 'in_progress']));
   const [movingToPastIds, setMovingToPastIds] = useState<Set<number>>(new Set());
   
+  // 筛选相关状态
+  const [selectedWorker, setSelectedWorker] = useState<string>('');
+  const [selectedThickness, setSelectedThickness] = useState<string>('');
+  
   // 批量操作相关状态
   const [batchMode, setBatchMode] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(new Set());
@@ -94,6 +98,72 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
       completed: projects.filter(p => p.status === 'completed')
     };
     return groups;
+  };
+
+  // 获取所有工人选项
+  const getWorkerOptions = useMemo(() => {
+    const workers = new Set<string>();
+    projects.forEach(project => {
+      if (project.assignedWorker?.name) {
+        workers.add(project.assignedWorker.name);
+      }
+    });
+    return Array.from(workers).sort();
+  }, [projects]);
+
+  // 获取所有厚度选项
+  const getThicknessOptions = useMemo(() => {
+    const thicknesses = new Set<string>();
+    projects.forEach(project => {
+      project.materials?.forEach(material => {
+        if (material.thicknessSpec?.thickness) {
+          thicknesses.add(material.thicknessSpec.thickness);
+        }
+      });
+    });
+    return Array.from(thicknesses).sort((a, b) => parseFloat(a) - parseFloat(b));
+  }, [projects]);
+
+  // 筛选项目
+  const filterProjects = (projectsToFilter: ActiveProject[]) => {
+    return projectsToFilter.filter(project => {
+      // 工人筛选
+      if (selectedWorker && selectedWorker !== 'all') {
+        if (selectedWorker === 'unassigned') {
+          // 筛选未分配的项目
+          if (project.assignedWorker?.name) {
+            return false;
+          }
+        } else {
+          // 筛选特定工人的项目
+          if (!project.assignedWorker?.name || project.assignedWorker.name !== selectedWorker) {
+            return false;
+          }
+        }
+      }
+
+      // 厚度筛选
+      if (selectedThickness && selectedThickness !== 'all') {
+        const hasThickness = project.materials?.some(material => 
+          material.thicknessSpec?.thickness === selectedThickness
+        );
+        if (!hasThickness) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  // 应用筛选后按状态分组项目
+  const getFilteredGroupedProjects = () => {
+    const allGroups = groupProjectsByStatus();
+    return {
+      pending: filterProjects(allGroups.pending),
+      in_progress: filterProjects(allGroups.in_progress),
+      completed: filterProjects(allGroups.completed)
+    };
   };
 
   // 切换分组展开状态
@@ -373,7 +443,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
     );
   }
 
-  const groupedProjects = groupProjectsByStatus();
+  const groupedProjects = getFilteredGroupedProjects();
   const stats = getOverallStats();
 
   return (
@@ -452,11 +522,70 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
         </div>
       </div>
 
+      {/* 筛选组件 */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 md:p-4 mb-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-700">筛选条件</h3>
+          {(selectedWorker && selectedWorker !== 'all') || (selectedThickness && selectedThickness !== 'all') ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedWorker('');
+                setSelectedThickness('');
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              清空筛选
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* 工人筛选 */}
+          <div className="flex-1">
+            <label className="block text-xs text-gray-600 mb-1">按工人筛选</label>
+            <SearchableSelect
+              value={selectedWorker}
+              onChange={setSelectedWorker}
+              placeholder="输入名字搜索..."
+              options={[
+                { label: '未分配', value: 'unassigned' },
+                ...getWorkerOptions.map(worker => ({
+                  label: worker,
+                  value: worker
+                }))
+              ]}
+              clearable={true}
+              className="w-full"
+            />
+          </div>
+
+          {/* 厚度筛选 */}
+          <div className="flex-1">
+            <label className="block text-xs text-gray-600 mb-1">按厚度筛选</label>
+            <SearchableSelect
+              value={selectedThickness}
+              onChange={setSelectedThickness}
+              placeholder="输入厚度搜索..."
+              options={getThicknessOptions.map(thickness => ({
+                label: `${thickness}mm`,
+                value: thickness
+              }))}
+              clearable={true}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* 按状态分组显示项目 */}
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-4 pb-4">
-          {Object.entries(groupedProjects).map(([status, statusProjects]) => {
-            if (statusProjects.length === 0) return null;
+          {/* 按照指定顺序显示：进行中项目 → 待处理项目 → 已完成项目 */}
+          {['in_progress', 'pending', 'completed'].map((status) => {
+            const statusProjects = groupedProjects[status];
+            if (!statusProjects || statusProjects.length === 0) return null;
             
             const config = getStatusConfig(status);
             

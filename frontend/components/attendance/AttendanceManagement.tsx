@@ -475,7 +475,7 @@ export const AttendanceManagement: React.FC<AttendanceManagementProps> = ({
         }))}
         activeTab={activeTab}
         onChange={setActiveTab}
-        variant="pills"
+        variant="modern"
         className="border-b border-macos15-separator"
       />
 

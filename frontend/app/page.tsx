@@ -43,7 +43,7 @@ export default function Home() {
 
 function HomeContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'settings' | 'attendance'>('active');
+  const [viewType, setViewType] = useState<'active' | 'completed' | 'drawings' | 'materials' | 'workers' | 'public-inventory' | 'attendance'>('active');
   const [workerNameFilter, setWorkerNameFilter] = useState('');
   const [thicknessFilter, setThicknessFilter] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -448,6 +448,7 @@ function HomeContent() {
   const handleSystemSettingsClick = () => {
     setShowSettingsPage(true);
   };
+
 
   // 渲染侧边栏
   const renderSidebar = () => {

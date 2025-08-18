@@ -41,6 +41,14 @@ export const apiRequest = async (
     headers['Content-Type'] = 'application/json';
   }
   
+  // 自动添加认证token
+  if (isLocalStorageAvailable()) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  
   // 合并用户提供的headers，但对于FormData请求，删除任何Content-Type
   if (fetchOptions.headers) {
     const userHeaders = fetchOptions.headers as Record<string, string>;

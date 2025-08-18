@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
+import { useResponsive } from '@/hooks/useResponsive'
 
 export interface TabItem {
   id: string
@@ -16,7 +17,7 @@ export interface TabBarProps {
   tabs: TabItem[]
   activeTab: string
   onChange: (tabId: string) => void
-  variant?: 'default' | 'pills' | 'underline' | 'cards'
+  variant?: 'default' | 'pills' | 'underline' | 'cards' | 'modern' | 'mobile'
   size?: 'sm' | 'md' | 'lg'
   centered?: boolean
   fullWidth?: boolean
@@ -33,6 +34,11 @@ export const TabBar: React.FC<TabBarProps> = ({
   fullWidth = false,
   className = ''
 }) => {
+  const { isMobile } = useResponsive();
+  
+  // 自动选择变体：移动端用mobile，桌面端用desktop
+  const effectiveVariant = variant === 'modern' ? (isMobile ? 'mobile' : 'desktop') : variant;
+
   const sizeClasses = {
     sm: 'px-3 py-2 text-sm',
     md: 'px-4 py-3 text-base',
@@ -48,7 +54,81 @@ export const TabBar: React.FC<TabBarProps> = ({
       }
     }
 
-    // 默认样式
+    // 新方案3: 桌面端卡片阴影风格
+    if (effectiveVariant === 'desktop') {
+      return (
+        <motion.button
+          key={tab.id}
+          onClick={handleClick}
+          className={`
+            relative px-4 py-3 rounded-lg font-medium text-sm transition-all duration-300
+            ${fullWidth ? 'flex-1' : ''}
+            ${isActive 
+              ? 'text-blue-600 bg-white shadow-lg border border-blue-100' 
+              : tab.disabled
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }
+          `}
+          whileHover={tab.disabled ? {} : { scale: 1.02 }}
+          whileTap={tab.disabled ? {} : { scale: 0.98 }}
+          disabled={tab.disabled}
+        >
+          <div className="flex items-center space-x-2">
+            {tab.icon && (
+              <span className={`${isActive ? 'text-blue-600' : 'text-current'}`}>
+                {tab.icon}
+              </span>
+            )}
+            <span>{tab.label}</span>
+            {tab.badge && tab.badge > 0 && (
+              <span className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full font-semibold">
+                {tab.badge > 99 ? '99+' : tab.badge}
+              </span>
+            )}
+          </div>
+        </motion.button>
+      );
+    }
+
+    // 新方案4: 移动端苹果风格
+    if (effectiveVariant === 'mobile') {
+      return (
+        <motion.button
+          key={tab.id}
+          onClick={handleClick}
+          className={`
+            relative px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200
+            ${fullWidth ? 'flex-1' : ''}
+            ${isActive 
+              ? 'text-blue-600 bg-blue-50' 
+              : tab.disabled
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }
+          `}
+          whileHover={tab.disabled ? {} : { scale: 1.02 }}
+          whileTap={tab.disabled ? {} : { scale: 0.98 }}
+          disabled={tab.disabled}
+        >
+          <div className="flex flex-col items-center space-y-1">
+            {tab.icon && (
+              <span className={`${isActive ? 'text-blue-600' : 'text-current'}`}>
+                {tab.icon}
+              </span>
+            )}
+            <span className="text-xs">{tab.label}</span>
+            {tab.badge && tab.badge > 0 && (
+              <span className="absolute -top-1 -right-1 px-1 py-0.5 text-xs bg-red-500 text-white rounded-full font-semibold min-w-[16px] h-4 flex items-center justify-center">
+                {tab.badge > 99 ? '99+' : tab.badge}
+              </span>
+            )}
+          </div>
+        </motion.button>
+      );
+    }
+
+    // 默认样式（保持兼容性）
     if (variant === 'default') {
       return (
         <motion.button
@@ -67,6 +147,7 @@ export const TabBar: React.FC<TabBarProps> = ({
           `}
           whileHover={tab.disabled ? {} : { scale: 1.02 }}
           whileTap={tab.disabled ? {} : { scale: 0.98 }}
+          disabled={tab.disabled}
         >
           <div className="flex items-center justify-center space-x-2">
             {tab.icon && (
@@ -94,7 +175,7 @@ export const TabBar: React.FC<TabBarProps> = ({
       )
     }
 
-    // 药丸样式
+    // 药丸样式（保持兼容性）
     if (variant === 'pills') {
       return (
         <motion.button
@@ -113,6 +194,7 @@ export const TabBar: React.FC<TabBarProps> = ({
           `}
           whileHover={tab.disabled ? {} : { scale: 1.02 }}
           whileTap={tab.disabled ? {} : { scale: 0.98 }}
+          disabled={tab.disabled}
         >
           <div className="flex items-center justify-center space-x-2">
             {tab.icon && <span>{tab.icon}</span>}
@@ -129,7 +211,7 @@ export const TabBar: React.FC<TabBarProps> = ({
       )
     }
 
-    // 下划线样式
+    // 下划线样式（保持兼容性）
     if (variant === 'underline') {
       return (
         <motion.button
@@ -149,6 +231,7 @@ export const TabBar: React.FC<TabBarProps> = ({
           `}
           whileHover={tab.disabled ? {} : { y: -1 }}
           whileTap={tab.disabled ? {} : { y: 0 }}
+          disabled={tab.disabled}
         >
           <div className="flex items-center justify-center space-x-2">
             {tab.icon && <span>{tab.icon}</span>}
@@ -163,7 +246,7 @@ export const TabBar: React.FC<TabBarProps> = ({
       )
     }
 
-    // 卡片样式
+    // 卡片样式（保持兼容性）
     if (variant === 'cards') {
       return (
         <motion.button
@@ -183,6 +266,7 @@ export const TabBar: React.FC<TabBarProps> = ({
           `}
           whileHover={tab.disabled ? {} : { scale: 1.02 }}
           whileTap={tab.disabled ? {} : { scale: 0.98 }}
+          disabled={tab.disabled}
         >
           <div className="flex items-center justify-center space-x-2">
             {tab.icon && <span>{tab.icon}</span>}
@@ -200,15 +284,26 @@ export const TabBar: React.FC<TabBarProps> = ({
     return null
   }
 
+  // 容器样式根据变体调整
+  const getContainerClass = () => {
+    if (effectiveVariant === 'desktop') {
+      return 'flex bg-gray-50 p-1 rounded-xl gap-1';
+    }
+    if (effectiveVariant === 'mobile') {
+      return 'flex bg-gray-100 p-1 rounded-xl gap-1';
+    }
+    return `
+      flex border-b border-gray-200
+      ${centered ? 'justify-center' : ''}
+      ${fullWidth ? 'w-full' : ''}
+      ${variant === 'pills' || variant === 'cards' ? 'space-x-2 border-b-0 p-1 bg-gray-100 rounded-ios-xl' : ''}
+    `;
+  };
+
   return (
     <div className={className}>
       {/* 标签栏 */}
-      <div className={`
-        flex border-b border-gray-200
-        ${centered ? 'justify-center' : ''}
-        ${fullWidth ? 'w-full' : ''}
-        ${variant === 'pills' || variant === 'cards' ? 'space-x-2 border-b-0 p-1 bg-gray-100 rounded-ios-xl' : ''}
-      `}>
+      <div className={getContainerClass()}>
         {tabs.map(renderTab)}
       </div>
     </div>

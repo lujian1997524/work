@@ -1,6 +1,6 @@
 {
   "name": "laser-cutting-manager-frontend",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "激光切割生产管理系统 - 板材分配系统架构重构与移动端体验升级",
   "author": "LaserCut Team",
   "private": true,
