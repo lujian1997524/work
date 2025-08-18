@@ -770,15 +770,53 @@ router.post('/allocate',
           notes: dimension.notes
         };
       } else {
-        // 通用分配：从工人材料总量中扣减
-        if (workerMaterial.quantity < allocateQuantity) {
-          throw new Error(`工人材料库存不足，可用数量: ${workerMaterial.quantity}`);
+        // 通用分配：从MaterialDimension计算总量并扣减
+        const dimensions = await MaterialDimension.findAll({
+          where: { workerMaterialId: workerMaterialId },
+          transaction
+        });
+        
+        const totalAvailableQuantity = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+        if (totalAvailableQuantity < allocateQuantity) {
+          throw new Error(`工人材料库存不足，可用数量: ${totalAvailableQuantity}`);
         }
 
-        // 扣减工人材料总量
-        await workerMaterial.update({
-          quantity: workerMaterial.quantity - allocateQuantity
-        }, { transaction });
+        // 按比例从各个尺寸中扣减数量
+        if (dimensions.length > 0) {
+          // 计算总尺寸库存
+          const totalDimensionQuantity = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+          
+          if (totalDimensionQuantity > 0) {
+            // 按比例分配扣减量到各个尺寸
+            let remainingToAllocate = allocateQuantity;
+            
+            for (let i = 0; i < dimensions.length; i++) {
+              const dim = dimensions[i];
+              let dimensionAllocation;
+              
+              if (i === dimensions.length - 1) {
+                // 最后一个尺寸分配剩余的所有数量，避免舍入误差
+                dimensionAllocation = remainingToAllocate;
+              } else {
+                // 按比例分配
+                dimensionAllocation = Math.floor((dim.quantity / totalDimensionQuantity) * allocateQuantity);
+              }
+              
+              if (dimensionAllocation > 0 && dimensionAllocation <= dim.quantity) {
+                await dim.update({
+                  quantity: dim.quantity - dimensionAllocation
+                }, { transaction });
+                
+                remainingToAllocate -= dimensionAllocation;
+                
+                // 如果尺寸数量为0，删除该尺寸记录
+                if (dim.quantity - dimensionAllocation === 0) {
+                  await dim.destroy({ transaction });
+                }
+              }
+            }
+          }
+        }
       }
 
       // 5. 更新项目Material记录
@@ -790,13 +828,13 @@ router.post('/allocate',
         startDate: projectMaterial.startDate || new Date()
       }, { transaction });
 
-      // 6. 如果工人材料总量为0且没有尺寸记录，删除工人材料记录
+      // 6. 如果没有尺寸记录，删除工人材料记录
       const remainingDimensions = await MaterialDimension.count({
         where: { workerMaterialId: workerMaterialId },
         transaction
       });
 
-      if (workerMaterial.quantity === 0 && remainingDimensions === 0) {
+      if (remainingDimensions === 0) {
         await workerMaterial.destroy({ transaction });
       }
 
@@ -863,6 +901,298 @@ router.post('/allocate',
     res.status(500).json({
       success: false,
       error: '板材分配失败',
+      message: error.message
+    });
+  }
+});
+
+// 批量分配API - 为多个项目分配共用板材（支持上海博创cypnext排版软件）
+router.post('/batch-allocation', authenticate, requireOperator, async (req, res) => {
+  try {
+    const {
+      sharedPlateId, // 共用板材ID
+      totalQuantity, // 物理板材总数量
+      allocations // 分配详情数组：[{projectId, thicknessSpecId, quantity, usageNote}]
+    } = req.body;
+
+    // 验证必填字段
+    if (!sharedPlateId || !totalQuantity || !allocations || !Array.isArray(allocations) || allocations.length === 0) {
+      return res.status(400).json({
+        error: '缺少必填字段：共用板材ID、总数量或分配详情'
+      });
+    }
+
+    // 验证总需求数量不超过物理数量
+    const totalDemand = allocations.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    if (totalDemand > totalQuantity) {
+      return res.status(400).json({
+        error: `总需求数量 ${totalDemand} 超过物理板材数量 ${totalQuantity}`
+      });
+    }
+
+    // 验证所有项目使用相同规格
+    const uniqueSpecs = [...new Set(allocations.map(item => item.thicknessSpecId))];
+    if (uniqueSpecs.length > 1) {
+      return res.status(400).json({
+        error: '批量分配要求所有项目使用相同的板材规格'
+      });
+    }
+
+    const thicknessSpecId = uniqueSpecs[0];
+
+    // 使用事务确保数据一致性
+    const result = await sequelize.transaction(async (transaction) => {
+      const results = [];
+
+      // 验证厚度规格存在
+      const thicknessSpec = await ThicknessSpec.findByPk(thicknessSpecId, { transaction });
+      if (!thicknessSpec) {
+        throw new Error('厚度规格不存在');
+      }
+
+      // 处理每个项目的分配
+      for (const allocation of allocations) {
+        const { projectId, quantity, usageNote } = allocation;
+
+        // 验证项目存在
+        const project = await Project.findByPk(projectId, { transaction });
+        if (!project) {
+          throw new Error(`项目 ID ${projectId} 不存在`);
+        }
+
+        // 查找或创建项目的材料记录
+        let material = await Material.findOne({
+          where: { projectId, thicknessSpecId },
+          transaction
+        });
+
+        if (material) {
+          // 更新现有材料记录
+          await material.update({
+            quantity: material.quantity + quantity,
+            notes: usageNote || material.notes
+          }, { transaction });
+        } else {
+          // 创建新的材料记录
+          material = await Material.create({
+            projectId,
+            thicknessSpecId,
+            quantity,
+            status: 'pending',
+            notes: usageNote
+          }, { transaction });
+        }
+
+        results.push({
+          projectId,
+          projectName: project.name,
+          materialId: material.id,
+          allocatedQuantity: quantity,
+          thicknessSpec: thicknessSpec.thickness + thicknessSpec.unit,
+          materialType: thicknessSpec.materialType || '碳板'
+        });
+      }
+
+      return results;
+    });
+
+    // 记录批量分配历史
+    try {
+      const projectNames = result.map(r => r.projectName).join('、');
+      await recordMaterialAllocate(
+        result[0].projectId, // 使用第一个项目ID作为主项目
+        {
+          materialType: result[0].materialType,
+          thickness: result[0].thicknessSpec,
+          quantity: totalQuantity,
+          sources: 'cypnext排版系统',
+          allocatedTo: projectNames,
+          projectName: `批量分配：${projectNames}`,
+          sharedPlateId,
+          batchAllocation: true
+        },
+        req.user.id,
+        req.user.name
+      );
+    } catch (historyError) {
+      console.error('记录批量分配历史失败:', historyError);
+    }
+
+    res.json({
+      success: true,
+      message: `成功为 ${result.length} 个项目分配共用板材`,
+      sharedPlateId,
+      totalQuantity,
+      totalDemand,
+      allocations: result
+    });
+
+    // 发送SSE事件通知
+    try {
+      sseManager.broadcast('material-batch-allocated', {
+        sharedPlateId,
+        totalQuantity,
+        totalDemand,
+        allocations: result,
+        userName: req.user.name,
+        userId: req.user.id
+      }, req.user.id);
+
+      console.log(`批量分配完成: 共用板材ID ${sharedPlateId}, 涉及项目: ${result.map(r => r.projectName).join('、')}`);
+    } catch (sseError) {
+      console.error('发送批量分配SSE事件失败:', sseError);
+    }
+
+  } catch (error) {
+    console.error('批量分配失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '批量分配失败',
+      message: error.message
+    });
+  }
+});
+
+// 撤销板材分配API - 恢复工人库存并清除分配记录
+router.post('/:id/undo-allocation', authenticate, requireOperator, async (req, res) => {
+  try {
+    const { id: materialId } = req.params;
+
+    // 使用事务确保数据一致性
+    const result = await sequelize.transaction(async (transaction) => {
+      // 1. 获取项目材料记录
+      const projectMaterial = await Material.findByPk(materialId, {
+        include: [
+          { association: 'project' },
+          { association: 'thicknessSpec' }
+        ],
+        transaction
+      });
+
+      if (!projectMaterial) {
+        throw new Error('材料记录不存在');
+      }
+
+      if (!projectMaterial.assignedFromWorkerMaterialId) {
+        throw new Error('该材料尚未分配，无需撤销');
+      }
+
+      // 2. 查找原始工人材料记录
+      const originalWorkerMaterial = await WorkerMaterial.findByPk(
+        projectMaterial.assignedFromWorkerMaterialId,
+        {
+          include: [
+            { association: 'worker' },
+            { association: 'thicknessSpec' }
+          ],
+          transaction
+        }
+      );
+
+      // 3. 恢复工人材料库存 - 不再操作WorkerMaterial.quantity
+      // 直接在MaterialDimension中恢复库存
+      if (originalWorkerMaterial && projectMaterial.allocatedDimension) {
+        // 恢复到原始尺寸
+        const { width, height, quantity: restoredQuantity } = projectMaterial.allocatedDimension;
+        
+        // 查找是否已有相同尺寸的记录
+        const existingDimension = await MaterialDimension.findOne({
+          where: {
+            workerMaterialId: originalWorkerMaterial.id,
+            width: width,
+            height: height
+          },
+          transaction
+        });
+        
+        if (existingDimension) {
+          // 累加到现有尺寸
+          await existingDimension.update({
+            quantity: existingDimension.quantity + restoredQuantity
+          }, { transaction });
+        } else {
+          // 创建新的尺寸记录
+          await MaterialDimension.create({
+            workerMaterialId: originalWorkerMaterial.id,
+            width: width,
+            height: height,
+            quantity: restoredQuantity,
+            notes: '撤销分配恢复'
+          }, { transaction });
+        }
+      } else {
+        console.warn(`原工人材料记录 ${projectMaterial.assignedFromWorkerMaterialId} 不存在或缺少尺寸信息，无法完全恢复库存`);
+      }
+
+      // 4. 清除项目材料的分配信息
+      await projectMaterial.update({
+        assignedFromWorkerMaterialId: null,
+        quantity: 0, // 重置为0，表示未分配状态
+        notes: projectMaterial.notes ? `${projectMaterial.notes} [分配已撤销]` : '分配已撤销'
+      }, { transaction });
+
+      return {
+        projectMaterial,
+        originalWorkerMaterial,
+        restoredQuantity: projectMaterial.quantity || 1
+      };
+    });
+
+    // 记录撤销分配历史
+    try {
+      await recordMaterialUpdate(
+        result.projectMaterial.projectId,
+        {
+          id: result.projectMaterial.id,
+          thicknessSpecId: result.projectMaterial.thicknessSpecId,
+          thicknessSpec: result.projectMaterial.thicknessSpec
+        },
+        'allocated', // 从已分配状态
+        'pending',   // 回到待分配状态
+        req.user.id,
+        req.user.name,
+        `撤销分配：恢复 ${result.restoredQuantity} 张到工人库存`
+      );
+    } catch (historyError) {
+      console.error('记录撤销分配历史失败:', historyError);
+    }
+
+    res.json({
+      success: true,
+      message: `成功撤销分配，已恢复 ${result.restoredQuantity} 张板材到工人库存`,
+      undoAllocation: {
+        materialId: result.projectMaterial.id,
+        projectName: result.projectMaterial.project?.name,
+        workerName: result.originalWorkerMaterial?.worker?.name,
+        materialSpec: `${result.projectMaterial.thicknessSpec?.materialType || '碳板'} ${result.projectMaterial.thicknessSpec?.thickness}${result.projectMaterial.thicknessSpec?.unit}`,
+        restoredQuantity: result.restoredQuantity
+      }
+    });
+
+    // 发送SSE事件通知
+    try {
+      sseManager.broadcast('material-allocation-undone', {
+        materialId: result.projectMaterial.id,
+        projectId: result.projectMaterial.projectId,
+        projectName: result.projectMaterial.project?.name,
+        workerName: result.originalWorkerMaterial?.worker?.name,
+        materialType: result.projectMaterial.thicknessSpec?.materialType || '碳板',
+        thickness: result.projectMaterial.thicknessSpec?.thickness,
+        restoredQuantity: result.restoredQuantity,
+        userName: req.user.name,
+        userId: req.user.id
+      }, req.user.id);
+
+      console.log(`撤销分配完成: 项目 ${result.projectMaterial.project?.name}, 恢复数量: ${result.restoredQuantity} 张`);
+    } catch (sseError) {
+      console.error('发送撤销分配SSE事件失败:', sseError);
+    }
+
+  } catch (error) {
+    console.error('撤销分配失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '撤销分配失败',
       message: error.message
     });
   }

@@ -7,43 +7,15 @@ const { WorkerMaterial, Material, MaterialDimension, ThicknessSpec } = require('
 
 /**
  * 验证工人材料数据一致性
- * 检查工人材料的总数量是否与其尺寸记录的总数量一致
+ * 现在WorkerMaterial不再有quantity字段，这个验证不再需要
  */
 const validateWorkerMaterialConsistency = async (req, res, next) => {
   try {
-    const { workerMaterialId } = req.params;
-    const { id: bodyWorkerMaterialId } = req.body;
-    
-    const targetWorkerMaterialId = workerMaterialId || bodyWorkerMaterialId;
-    
-    if (targetWorkerMaterialId) {
-      const workerMaterial = await WorkerMaterial.findByPk(targetWorkerMaterialId, {
-        include: [{
-          model: MaterialDimension,
-          as: 'dimensions',
-          attributes: ['quantity']
-        }]
-      });
-      
-      if (workerMaterial && workerMaterial.dimensions && workerMaterial.dimensions.length > 0) {
-        // 计算所有尺寸的总数量
-        const dimensionsTotalQuantity = workerMaterial.dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
-        
-        // 验证总数量一致性（允许工人材料总量大于等于尺寸总量，因为可能有未分类的库存）
-        if (workerMaterial.quantity < dimensionsTotalQuantity) {
-          console.warn(`数据一致性警告: 工人材料 ${workerMaterialId} 总量 ${workerMaterial.quantity} 小于尺寸总量 ${dimensionsTotalQuantity}`);
-          
-          // 自动修复：更新工人材料总量为尺寸总量
-          await workerMaterial.update({ quantity: dimensionsTotalQuantity });
-          console.log(`自动修复: 工人材料 ${workerMaterialId} 总量已更新为 ${dimensionsTotalQuantity}`);
-        }
-      }
-    }
-    
+    // WorkerMaterial表已经不再有quantity字段，跳过验证
+    console.log('数据一致性验证: WorkerMaterial不再维护quantity字段，跳过验证');
     next();
   } catch (error) {
     console.error('数据一致性验证失败:', error);
-    // 不阻止正常流程，只记录错误
     next();
   }
 };
@@ -130,10 +102,11 @@ const validateAllocationQuantity = async (req, res, next) => {
           });
         }
       } else {
-        // 从总库存分配
-        if (workerMaterial.quantity < allocateQuantity) {
+        // 从总库存分配 - 从MaterialDimension计算总量
+        const totalAvailable = workerMaterial.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0;
+        if (totalAvailable < allocateQuantity) {
           return res.status(400).json({
-            error: `工人材料库存不足，可用数量: ${workerMaterial.quantity}，请求数量: ${allocateQuantity}`
+            error: `工人材料库存不足，可用数量: ${totalAvailable}，请求数量: ${allocateQuantity}`
           });
         }
       }
@@ -151,13 +124,12 @@ const validateAllocationQuantity = async (req, res, next) => {
 
 /**
  * 清理无效数据
- * 删除数量为0且无尺寸记录的工人材料记录
+ * 删除无尺寸记录的工人材料记录
  */
 const cleanupEmptyWorkerMaterials = async (req, res, next) => {
   try {
-    // 查找数量为0且无尺寸记录的工人材料
+    // 查找无尺寸记录的工人材料
     const emptyWorkerMaterials = await WorkerMaterial.findAll({
-      where: { quantity: 0 },
       include: [{
         model: MaterialDimension,
         as: 'dimensions',
@@ -229,30 +201,8 @@ const performConsistencyCheck = async () => {
   try {
     console.log('开始执行数据一致性检查...');
     
-    // 1. 检查工人材料总量与尺寸总量的一致性
-    const workerMaterials = await WorkerMaterial.findAll({
-      include: [{
-        model: MaterialDimension,
-        as: 'dimensions'
-      }]
-    });
-    
-    let fixedCount = 0;
-    for (const workerMaterial of workerMaterials) {
-      if (workerMaterial.dimensions && workerMaterial.dimensions.length > 0) {
-        const dimensionsTotalQuantity = workerMaterial.dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
-        
-        if (workerMaterial.quantity < dimensionsTotalQuantity) {
-          await workerMaterial.update({ quantity: dimensionsTotalQuantity });
-          fixedCount++;
-          console.log(`修复工人材料 ${workerMaterial.id}: ${workerMaterial.quantity} → ${dimensionsTotalQuantity}`);
-        }
-      }
-    }
-    
-    // 2. 清理空记录
+    // WorkerMaterial不再有quantity字段，只需清理无尺寸记录的材料记录
     const emptyWorkerMaterials = await WorkerMaterial.findAll({
-      where: { quantity: 0 },
       include: [{
         model: MaterialDimension,
         as: 'dimensions',
@@ -265,13 +215,14 @@ const performConsistencyCheck = async () => {
       if (!workerMaterial.dimensions || workerMaterial.dimensions.length === 0) {
         await workerMaterial.destroy();
         deletedCount++;
+        console.log(`删除空的工人材料记录: ID ${workerMaterial.id}`);
       }
     }
     
-    console.log(`数据一致性检查完成: 修复了 ${fixedCount} 个记录，删除了 ${deletedCount} 个空记录`);
+    console.log(`数据一致性检查完成: 删除了 ${deletedCount} 个空记录`);
     
     return {
-      fixed: fixedCount,
+      fixed: 0, // 不再需要修复quantity字段
       deleted: deletedCount,
       timestamp: new Date()
     };

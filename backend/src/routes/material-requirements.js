@@ -240,7 +240,7 @@ router.get('/check-inventory', authenticate, async (req, res) => {
         workerId: wm.workerId,
         workerName: wm.worker.name,
         department: wm.worker.departmentInfo?.name || '未分配',
-        quantity: wm.quantity,
+        quantity: wm.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0,
         isProjectWorker: projectWorkerId && wm.workerId == projectWorkerId,
         isPublicInventory: wm.worker.name === '公共库存'
       }))
@@ -356,13 +356,33 @@ router.post('/:id/allocate', authenticate, async (req, res) => {
           transaction
         });
 
-        if (!workerMaterial || workerMaterial.quantity < quantity) {
-          throw new Error(`工人${fromWorkerId}库存不足`);
+        // 检查库存是否充足（从MaterialDimension计算）
+        const dimensions = await MaterialDimension.findAll({
+          where: { workerMaterialId: workerMaterial.id },
+          transaction
+        });
+        
+        const totalAvailable = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+        if (!workerMaterial || totalAvailable < quantity) {
+          throw new Error(`工人${fromWorkerId}库存不足，可用：${totalAvailable}，需要：${quantity}`);
         }
 
-        // 扣减库存
-        workerMaterial.quantity -= quantity;
-        await workerMaterial.save({ transaction });
+        // 按比例从各个尺寸扣减库存
+        let remainingToDeduct = quantity;
+        for (let i = 0; i < dimensions.length && remainingToDeduct > 0; i++) {
+          const dim = dimensions[i];
+          const deductFromThisDim = Math.min(dim.quantity, remainingToDeduct);
+          
+          if (deductFromThisDim > 0) {
+            const newQuantity = dim.quantity - deductFromThisDim;
+            if (newQuantity === 0) {
+              await dim.destroy({ transaction });
+            } else {
+              await dim.update({ quantity: newQuantity }, { transaction });
+            }
+            remainingToDeduct -= deductFromThisDim;
+          }
+        }
 
         // 创建分配记录
         const allocationRecord = await MaterialAllocation.create({
@@ -450,11 +470,18 @@ router.delete('/:id', authenticate, async (req, res) => {
         transaction
       });
 
-      // 归还库存
+      // 归还库存 - 创建MaterialDimension记录而不是修改WorkerMaterial.quantity
       for (const allocation of allocations) {
         const workerMaterial = allocation.workerMaterial;
-        workerMaterial.quantity += allocation.quantity;
-        await workerMaterial.save({ transaction });
+        
+        // 在MaterialDimension中创建归还的库存记录
+        await MaterialDimension.create({
+          workerMaterialId: workerMaterial.id,
+          width: 1200, // 默认尺寸，实际应该从分配记录中获取
+          height: 2400,
+          quantity: allocation.quantity,
+          notes: `需求归还: ${requirement.description || ''}`
+        }, { transaction });
 
         // 标记分配为已归还
         allocation.status = 'returned';
@@ -488,68 +515,93 @@ router.delete('/:id', authenticate, async (req, res) => {
 });
 
 /**
- * 获取项目的借用详情
+ * 获取项目的借用详情 - 使用新的分配系统
  * GET /api/material-requirements/project/:projectId/borrowing-details
  */
 router.get('/project/:projectId/borrowing-details', authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const allocations = await MaterialAllocation.findAll({
+    // 使用新分配系统：查找真正有分配的材料记录
+    const allocatedMaterials = await Material.findAll({
+      where: { 
+        projectId,
+        assignedFromWorkerMaterialId: {
+          [Op.ne]: null // 不为空，表示已分配
+        },
+        quantity: {
+          [Op.gt]: 0 // 数量大于0，表示真正有分配库存
+        }
+      },
       include: [
         {
-          model: MaterialRequirement,
-          as: 'requirement',
-          where: { projectId },
-          include: [
-            {
-              model: Material,
-              as: 'material',
-              include: [
-                {
-                  model: ThicknessSpec,
-                  as: 'thicknessSpec'
-                }
-              ]
-            }
-          ]
-        },
-        {
-          model: Worker,
-          as: 'fromWorker',
-          attributes: ['id', 'name', 'department']
-        },
-        {
-          model: Worker,
-          as: 'toWorker',
-          attributes: ['id', 'name', 'department']
+          model: ThicknessSpec,
+          as: 'thicknessSpec',
+          attributes: ['materialType', 'thickness', 'unit']
         }
       ],
-      where: { status: 'allocated' },
-      order: [['allocatedAt', 'DESC']]
+      order: [['startDate', 'DESC']]
+    });
+
+    if (allocatedMaterials.length === 0) {
+      return res.json({
+        success: true,
+        borrowingDetails: []
+      });
+    }
+
+    // 获取所有相关的工人材料记录
+    const workerMaterialIds = allocatedMaterials
+      .map(m => m.assignedFromWorkerMaterialId)
+      .filter(id => id);
+
+    const workerMaterials = await WorkerMaterial.findAll({
+      where: {
+        id: workerMaterialIds
+      },
+      include: [
+        {
+          model: Worker,
+          as: 'worker',
+          attributes: ['id', 'name', 'department']
+        },
+        {
+          model: ThicknessSpec,
+          as: 'thicknessSpec',
+          attributes: ['materialType', 'thickness', 'unit']
+        }
+      ]
     });
 
     // 按出借人分组
     const borrowingByWorker = {};
-    allocations.forEach(allocation => {
-      const fromWorkerId = allocation.fromWorkerId;
+    
+    allocatedMaterials.forEach(material => {
+      const workerMaterial = workerMaterials.find(wm => wm.id === material.assignedFromWorkerMaterialId);
+      if (!workerMaterial || !workerMaterial.worker) return;
+
+      const fromWorkerId = workerMaterial.worker.id;
       if (!borrowingByWorker[fromWorkerId]) {
         borrowingByWorker[fromWorkerId] = {
-          worker: allocation.fromWorker,
+          worker: {
+            id: workerMaterial.worker.id,
+            name: workerMaterial.worker.name,
+            department: workerMaterial.worker.department
+          },
           items: [],
           totalQuantity: 0
         };
       }
       
       borrowingByWorker[fromWorkerId].items.push({
-        materialType: allocation.requirement.material.thicknessSpec.materialType,
-        thickness: allocation.requirement.material.thicknessSpec.thickness,
-        dimensions: `${allocation.requirement.width}×${allocation.requirement.height}mm`,
-        quantity: allocation.quantity,
-        allocatedAt: allocation.allocatedAt
+        materialType: material.thicknessSpec?.materialType || '碳板',
+        thickness: material.thicknessSpec?.thickness || '未知',
+        dimensions: '项目材料', // 新系统中项目材料没有具体尺寸信息
+        quantity: material.quantity || 1,
+        allocatedAt: material.startDate || material.createdAt
       });
       
-      borrowingByWorker[fromWorkerId].totalQuantity += allocation.quantity;
+      borrowingByWorker[fromWorkerId].totalQuantity += (material.quantity || 1);
     });
 
     res.json({

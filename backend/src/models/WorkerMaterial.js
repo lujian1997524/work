@@ -26,12 +26,6 @@ const WorkerMaterial = sequelize.define('WorkerMaterial', {
       key: 'id'
     }
   },
-  quantity: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
-    comment: '数量（张）'
-  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

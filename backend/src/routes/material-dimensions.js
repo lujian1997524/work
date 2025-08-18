@@ -194,7 +194,7 @@ router.get('/worker-materials/:workerMaterialId/dimensions', authenticate, async
         workerName: workerMaterial.worker.name,
         materialType: workerMaterial.thicknessSpec.materialType,
         thickness: workerMaterial.thicknessSpec.thickness,
-        totalQuantity: workerMaterial.quantity
+        totalQuantity: dimensions.reduce((sum, dim) => sum + dim.quantity, 0) // 从dimensions计算总量
       },
       dimensions: dimensions.map(dim => ({
         id: dim.id,

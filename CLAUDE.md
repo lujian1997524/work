@@ -534,7 +534,25 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.4.12 (2025-08-17) - 项目编辑板材添加功能修复
+- **当前版本**: v2.5.0 (2025-01-18) - 板材分配系统架构重构与移动端体验升级
+- **v2.5.0 重大更新**:
+  - **🔧 架构重构 (BREAKING ARCHITECTURE)**:
+    - 数据模型现代化：完全移除WorkerMaterial.quantity字段，改用MaterialDimension动态计算
+    - API接口重构：worker-materials、materials、material-requirements等核心接口全面升级
+    - 系统集成简化：统一使用Material.assignedFromWorkerMaterialId字段管理分配关系
+  - **📱 移动端体验重构**:
+    - 响应式设计全面重构：项目详情页面、板材分配界面完全适配移动端
+    - 界面布局现代化：表格式布局替代卡片式，大幅提升空间利用率
+    - 交互一致性：状态切换按钮统一设计规范，提升用户体验
+  - **🗄️ 数据系统升级**:
+    - 借用详情系统重构：使用新分配系统替代废弃的MaterialRequirement架构  
+    - 数据一致性优化：简化验证逻辑，移除冗余数据同步机制
+    - 数据库清理：移除7个废弃迁移文件，优化项目结构
+  - **🚀 性能与稳定性**:
+    - 库存计算优化：实时从MaterialDimension计算，确保数据准确性
+    - API响应改进：减少数据冗余，提升接口性能
+    - 错误处理增强：完善异常捕获和用户反馈机制
+- **v2.4.12** (2025-08-17) - 项目编辑板材添加功能修复
 - **v2.4.12 主要更新**:
   - **项目编辑功能修复**: 完全修复项目编辑时无法添加新板材厚度的问题
     - 后端API支持：更新项目API现在正确处理 `requiredThickness` 字段

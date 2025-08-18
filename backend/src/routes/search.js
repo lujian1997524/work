@@ -444,11 +444,15 @@ router.get('/', authenticate, async (req, res) => {
         status: project.status
       })) || [],
       // 库存信息
-      materials: worker.materials?.map(material => ({
-        id: material.id,
-        quantity: material.quantity,
-        thicknessSpec: material.thicknessSpec
-      })) || []
+      materials: worker.materials?.map(material => {
+        // 从MaterialDimension计算实际总量
+        const totalQuantity = material.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0;
+        return {
+          id: material.id,
+          quantity: totalQuantity,
+          thicknessSpec: material.thicknessSpec
+        };
+      }) || []
     }));
 
     const formatDepartments = await Promise.all(
@@ -518,9 +522,12 @@ router.get('/', authenticate, async (req, res) => {
     const formatWorkerMaterials = filterWorkerMaterials(workerMaterials).map(workerMaterial => {
       const department = workerMaterial.worker.departmentInfo?.name || workerMaterial.worker.department || '未分配部门';
       
+      // 从MaterialDimension计算实际总量
+      const totalQuantity = workerMaterial.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0;
+      
       return {
         id: workerMaterial.id,
-        quantity: workerMaterial.quantity,
+        quantity: totalQuantity,
         worker: {
           id: workerMaterial.worker.id,
           name: workerMaterial.worker.name,
@@ -535,7 +542,7 @@ router.get('/', authenticate, async (req, res) => {
         // 用于搜索结果显示的名称
         name: `${workerMaterial.thicknessSpec.thickness}${workerMaterial.thicknessSpec.unit} ${workerMaterial.thicknessSpec.materialType || '碳板'}`,
         // 用于搜索结果显示的描述
-        description: `库存 ${workerMaterial.quantity} 张 • ${workerMaterial.worker.name}`,
+        description: `库存 ${totalQuantity} 张 • ${workerMaterial.worker.name}`,
         department: department
       };
     });

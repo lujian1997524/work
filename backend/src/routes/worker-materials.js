@@ -22,8 +22,7 @@ router.get('/', authenticate, async (req, res) => {
     if (workerId) {
       const workerMaterials = await WorkerMaterial.findAll({
         where: { 
-          workerId: parseInt(workerId),
-          quantity: { [Op.gt]: 0 } // 只返回有库存的材料
+          workerId: parseInt(workerId)
         },
         include: [
           {
@@ -42,7 +41,19 @@ router.get('/', authenticate, async (req, res) => {
 
       return res.json({
         success: true,
-        materials: workerMaterials
+        materials: await Promise.all(workerMaterials.map(async (wm) => {
+          // 从MaterialDimension计算实际总量
+          const dimensions = await MaterialDimension.findAll({
+            where: { workerMaterialId: wm.id }
+          });
+          const totalQuantity = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+          
+          return {
+            ...wm.toJSON(),
+            quantity: totalQuantity,
+            dimensions
+          };
+        }))
       });
     }
 
@@ -83,7 +94,7 @@ router.get('/', authenticate, async (req, res) => {
     });
 
     // 格式化数据为表格结构
-    const tableData = workers.map(worker => {
+    const tableData = await Promise.all(workers.map(async (worker) => {
       const row = {
         workerId: worker.id,
         workerName: worker.name,
@@ -93,29 +104,44 @@ router.get('/', authenticate, async (req, res) => {
       };
 
       // 为每种厚度规格创建列
-      thicknessSpecs.forEach(spec => {
+      for (const spec of thicknessSpecs) {
         const key = `${spec.materialType || '碳板'}_${spec.thickness}mm`;
         const workerMaterial = worker.materials.find(
           m => m.thicknessSpecId === spec.id
         );
         
-        row.materials[key] = {
-          quantity: workerMaterial ? workerMaterial.quantity : 0,
-          id: workerMaterial ? workerMaterial.id : null,
-          notes: workerMaterial ? workerMaterial.notes : null,
-          dimensions: workerMaterial ? (workerMaterial.dimensions || []).map(dim => ({
-            id: dim.id,
-            width: parseFloat(dim.width),
-            height: parseFloat(dim.height),
-            quantity: dim.quantity,
-            notes: dim.notes,
-            dimensionLabel: dim.getDimensionLabel()
-          })) : []
-        };
-      });
+        if (workerMaterial) {
+          // 从MaterialDimension计算实际总量
+          const dimensions = await MaterialDimension.findAll({
+            where: { workerMaterialId: workerMaterial.id }
+          });
+          const totalQuantity = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+          
+          row.materials[key] = {
+            quantity: totalQuantity,
+            id: workerMaterial.id,
+            notes: workerMaterial.notes,
+            dimensions: dimensions.map(dim => ({
+              id: dim.id,
+              width: parseFloat(dim.width),
+              height: parseFloat(dim.height),
+              quantity: dim.quantity,
+              notes: dim.notes,
+              dimensionLabel: `${dim.width}×${dim.height}mm`
+            }))
+          };
+        } else {
+          row.materials[key] = {
+            quantity: 0,
+            id: null,
+            notes: null,
+            dimensions: []
+          };
+        }
+      }
 
       return row;
-    });
+    }));
 
     // 生成材质编码
     const getMaterialCode = (materialType, thickness) => {
@@ -300,17 +326,15 @@ router.post('/',
 
     let material;
     if (existingMaterial) {
-      // 更新现有记录
-      existingMaterial.quantity = parseInt(quantity);
+      // 更新现有记录 - 不再使用quantity字段
       existingMaterial.notes = notes;
       await existingMaterial.save();
       material = existingMaterial;
     } else {
-      // 创建新记录
+      // 创建新记录 - 不再使用quantity字段
       material = await WorkerMaterial.create({
         workerId,
         thicknessSpecId: finalThicknessSpecId,
-        quantity: parseInt(quantity),
         notes
       });
     }
@@ -333,7 +357,7 @@ router.post('/',
 
     res.json({
       success: true,
-      message: existingMaterial ? '板材数量已更新' : '板材已添加',
+      message: existingMaterial ? '板材关系已更新' : '板材关系已添加',
       material: materialWithAssociations
     });
 
@@ -348,13 +372,13 @@ router.post('/',
 });
 
 /**
- * 更新板材数量
+ * 更新板材关系信息（不再操作数量）
  * PUT /api/worker-materials/:id
  */
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { quantity, notes } = req.body;
+    const { notes } = req.body;
 
     const material = await WorkerMaterial.findByPk(id);
     if (!material) {
@@ -364,9 +388,6 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
 
-    if (quantity !== undefined) {
-      material.quantity = parseInt(quantity);
-    }
     if (notes !== undefined) {
       material.notes = notes;
     }
@@ -468,7 +489,7 @@ router.post('/transfer', authenticate, async (req, res) => {
       }]
     });
 
-    console.log('🔍 源板材查询结果:', sourceMaterial ? `找到，当前数量: ${sourceMaterial.quantity}` : '未找到');
+    console.log('🔍 源板材查询结果:', sourceMaterial ? '找到' : '未找到');
 
     if (!sourceMaterial) {
       return res.status(404).json({
@@ -477,11 +498,19 @@ router.post('/transfer', authenticate, async (req, res) => {
       });
     }
 
+    // 获取源工人该厚度的所有尺寸库存
+    const sourceDimensions = await MaterialDimension.findAll({
+      where: { workerMaterialId: sourceMaterial.id }
+    });
+
+    const totalSourceQuantity = sourceDimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+    console.log(`📦 源工人库存: ${totalSourceQuantity}张`);
+
     const transferQty = parseInt(transferQuantity);
-    if (sourceMaterial.quantity < transferQty) {
+    if (totalSourceQuantity < transferQty) {
       return res.status(400).json({
         success: false,
-        message: `转移数量 ${transferQty} 超过可用库存 ${sourceMaterial.quantity}`
+        message: `转移数量 ${transferQty} 超过可用库存 ${totalSourceQuantity}`
       });
     }
 
@@ -494,10 +523,47 @@ router.post('/transfer', authenticate, async (req, res) => {
       });
     }
 
-    // 扣减源工人的板材
-    sourceMaterial.quantity -= transferQty;
-    await sourceMaterial.save();
-    console.log(`📤 源工人板材更新: 剩余 ${sourceMaterial.quantity}`);
+    // 按比例从各个尺寸中扣减库存
+    let transferredDimensions = [];
+    let remainingToTransfer = transferQty;
+    
+    for (let i = 0; i < sourceDimensions.length && remainingToTransfer > 0; i++) {
+      const dim = sourceDimensions[i];
+      let dimensionTransfer;
+      
+      if (i === sourceDimensions.length - 1) {
+        // 最后一个尺寸转移剩余的所有数量
+        dimensionTransfer = remainingToTransfer;
+      } else {
+        // 按比例分配
+        dimensionTransfer = Math.min(
+          Math.floor((dim.quantity / totalSourceQuantity) * transferQty),
+          dim.quantity,
+          remainingToTransfer
+        );
+      }
+      
+      if (dimensionTransfer > 0) {
+        // 更新源尺寸数量
+        const newQuantity = dim.quantity - dimensionTransfer;
+        if (newQuantity === 0) {
+          await dim.destroy();
+        } else {
+          await dim.update({ quantity: newQuantity });
+        }
+        
+        // 记录转移的尺寸信息
+        transferredDimensions.push({
+          width: dim.width,
+          height: dim.height,
+          quantity: dimensionTransfer,
+          notes: dim.notes
+        });
+        
+        remainingToTransfer -= dimensionTransfer;
+        console.log(`📤 从尺寸 ${dim.width}×${dim.height} 转移 ${dimensionTransfer}张`);
+      }
+    }
 
     // 查找或创建目标工人的板材记录
     let targetMaterial = await WorkerMaterial.findOne({
@@ -508,44 +574,76 @@ router.post('/transfer', authenticate, async (req, res) => {
     });
 
     if (targetMaterial) {
-      targetMaterial.quantity += transferQty;
+      // 目标工人已有该厚度规格，更新备注
       if (notes) {
         targetMaterial.notes = notes;
+        await targetMaterial.save();
       }
-      await targetMaterial.save();
-      console.log(`📥 目标工人板材更新: 现有 ${targetMaterial.quantity}`);
+      console.log(`📥 目标工人已有该厚度规格的板材记录`);
     } else {
+      // 创建新的板材记录
       targetMaterial = await WorkerMaterial.create({
         workerId: toWorkerId,
         thicknessSpecId: thicknessSpecId,
-        quantity: transferQty,
         notes: notes || null
       });
-      console.log(`📥 目标工人板材创建: 新建 ${targetMaterial.quantity}`);
+      console.log(`📥 为目标工人创建新的板材记录`);
     }
 
-    // 如果源工人的板材数量为0，删除记录
-    if (sourceMaterial.quantity === 0) {
+    // 为目标工人创建对应的MaterialDimension记录
+    if (transferredDimensions.length > 0) {
+      for (const dimInfo of transferredDimensions) {
+        // 查找目标工人是否已有相同尺寸的记录
+        const existingTargetDimension = await MaterialDimension.findOne({
+          where: {
+            workerMaterialId: targetMaterial.id,
+            width: dimInfo.width,
+            height: dimInfo.height
+          }
+        });
+
+        if (existingTargetDimension) {
+          // 如果已存在，累加数量
+          await existingTargetDimension.update({
+            quantity: existingTargetDimension.quantity + dimInfo.quantity
+          });
+        } else {
+          // 如果不存在，创建新记录
+          await MaterialDimension.create({
+            workerMaterialId: targetMaterial.id,
+            width: dimInfo.width,
+            height: dimInfo.height,
+            quantity: dimInfo.quantity,
+            notes: dimInfo.notes
+          });
+        }
+      }
+    }
+
+    // 检查源工人是否还有该厚度的库存，如果没有则删除WorkerMaterial记录
+    const remainingSourceDimensions = await MaterialDimension.findAll({
+      where: { workerMaterialId: sourceMaterial.id }
+    });
+    const remainingSourceQuantity = remainingSourceDimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+    
+    if (remainingSourceQuantity === 0) {
       await sourceMaterial.destroy();
-      console.log('🗑️ 源工人板材记录已删除（数量为0）');
+      console.log('🗑️ 源工人板材记录已删除（无剩余库存）');
     }
 
     // 同时处理MaterialDimension的转移（如果存在详细尺寸记录）
-    const dimensionsTransferred = await this.transferMaterialDimensions(
-      sourceMaterial.id, 
-      targetMaterial.id, 
-      transferQty
-    );
+    const dimensionsTransferred = transferredDimensions.length;
 
     res.json({
       success: true,
-      message: `成功转移 ${transferQty} 张 ${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit} 板材`,
+      message: `成功转移 ${transferQty} 张 ${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit} 板材${dimensionsTransferred > 0 ? `，包含 ${dimensionsTransferred} 个尺寸规格` : ''}`,
       transfer: {
         fromWorker: sourceMaterial.worker.name,
         toWorker: targetWorker.name,
         materialSpec: `${thicknessSpec.materialType || '碳板'} ${thicknessSpec.thickness}${thicknessSpec.unit}`,
         quantity: transferQty,
-        dimensionsTransferred
+        dimensionsTransferred,
+        transferredDimensions: transferredDimensions
       }
     });
 
