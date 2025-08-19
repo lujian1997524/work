@@ -108,7 +108,10 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
       }
     } catch (error) {
       console.error('获取项目列表失败:', error);
-      toast('获取项目列表失败', 'error');
+      toast.addToast({
+        type: 'error',
+        message: '获取项目列表失败'
+      });
     } finally {
       setLoadingProjects(false);
     }
@@ -124,7 +127,7 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
   // 添加项目到批量分配
   const addProjectToAllocation = (selectedProject: Project) => {
     if (!selectedThickness) {
-      toast('请先选择板材厚度', 'warning');
+      toast.addToast({ type: 'warning', message: '请先选择板材厚度' });
       return;
     }
 
@@ -134,7 +137,7 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
     // 检查项目是否已经添加
     const exists = allocationItems.find(item => item.projectId === selectedProject.id);
     if (exists) {
-      toast('该项目已经在分配列表中', 'warning');
+      toast.addToast({ type: 'warning', message: '该项目已经在分配列表中' });
       return;
     }
 
@@ -145,7 +148,7 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
     );
 
     if (!targetMaterial) {
-      toast(`项目 ${selectedProject.name} 没有 ${materialType} ${thickness}mm 规格的材料`, 'warning');
+      toast.addToast({ type: 'warning', message: `项目 ${selectedProject.name} 没有 ${materialType} ${thickness}mm 规格的材料` });
       return;
     }
 
@@ -183,13 +186,13 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
   // 执行批量分配
   const handleBatchAllocation = async () => {
     if (allocationItems.length === 0) {
-      toast('请至少添加一个项目', 'warning');
+      toast.addToast({ type: 'warning', message: '请至少添加一个项目' });
       return;
     }
 
     const totalDemand = calculateTotalDemand();
     if (totalQuantity < totalDemand) {
-      toast(`物理板材数量 ${totalQuantity} 小于总需求 ${totalDemand}`, 'error');
+      toast.addToast({ type: 'error', message: `物理板材数量 ${totalQuantity} 小于总需求 ${totalDemand}` });
       return;
     }
 
@@ -219,15 +222,15 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
 
       if (response.ok) {
         const result = await response.json();
-        toast(`成功为 ${allocationItems.length} 个项目分配共用板材`, 'success');
+        toast.addToast({ type: 'success', message: `成功为 ${allocationItems.length} 个项目分配共用板材` });
         onAllocationComplete(result);
       } else {
         const error = await response.json();
-        toast(error.message || '批量分配失败', 'error');
+        toast.addToast({ type: 'error', message: error.message || '批量分配失败' });
       }
     } catch (error) {
       console.error('批量分配失败:', error);
-      toast('批量分配操作失败', 'error');
+      toast.addToast({ type: 'error', message: '批量分配操作失败' });
     } finally {
       setLoading(false);
     }
@@ -289,15 +292,10 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
             </label>
             <Select
               value={selectedThickness}
-              onValueChange={setSelectedThickness}
+              onChange={(value) => setSelectedThickness(value as string)}
+              options={getThicknessOptions()}
               placeholder="选择厚度规格"
-            >
-              {getThicknessOptions().map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
 
           <div>
@@ -343,22 +341,20 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
           </label>
           <Select
             placeholder="选择要添加的项目"
-            onValueChange={(value) => {
+            onChange={(value) => {
               const selectedProject = availableProjects.find(p => p.id.toString() === value);
               if (selectedProject) {
                 addProjectToAllocation(selectedProject);
               }
             }}
-            disabled={!selectedThickness || loadingProjects}
-          >
-            {availableProjects
+            options={availableProjects
               .filter(p => !allocationItems.find(item => item.projectId === p.id))
-              .map(project => (
-                <option key={project.id} value={project.id.toString()}>
-                  {project.name}
-                </option>
-              ))}
-          </Select>
+              .map(project => ({
+                value: project.id.toString(),
+                label: project.name
+              }))}
+            disabled={!selectedThickness || loadingProjects}
+          />
         </div>
 
         {/* 分配列表 */}
@@ -373,7 +369,7 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
                 物理数量: <span className="font-medium text-green-600">{totalQuantity}</span>
               </span>
               {calculateTotalDemand() > totalQuantity && (
-                <Badge variant="error" size="sm">
+                <Badge variant="danger" size="sm">
                   <ExclamationTriangleIcon className="w-3 h-3 mr-1" />
                   数量不足
                 </Badge>
@@ -423,7 +419,6 @@ const BatchAllocationModal: React.FC<BatchAllocationModalProps> = ({
                           value={item.quantity}
                           onChange={(e) => updateQuantity(item.projectId, parseInt(e.target.value) || 1)}
                           className="w-20"
-                          size="sm"
                         />
                       </div>
                       

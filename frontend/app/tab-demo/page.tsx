@@ -24,8 +24,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 // 新设计方案的TabBar组件
-const ModernTabBar = ({ tabs, activeTab, onChange, variant = 'design1', className = '' }) => {
-  const renderTab = (tab, index) => {
+const ModernTabBar = ({ tabs, activeTab, onChange, variant = 'design1', className = '' }: {
+  tabs: any[];
+  activeTab: string;
+  onChange: (id: string) => void;
+  variant?: string;
+  className?: string;
+}) => {
+  const renderTab = (tab: any, index: number) => {
     const isActive = tab.id === activeTab;
     
     if (variant === 'design1') {
@@ -218,7 +224,7 @@ const ModernTabBar = ({ tabs, activeTab, onChange, variant = 'design1', classNam
   };
   
   return (
-    <div className={`${containerClasses[variant]} ${className}`}>
+    <div className={`${containerClasses[variant as keyof typeof containerClasses]} ${className}`}>
       {tabs.map(renderTab)}
     </div>
   );

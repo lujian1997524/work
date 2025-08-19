@@ -547,7 +547,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
             <label className="block text-xs text-gray-600 mb-1">按工人筛选</label>
             <SearchableSelect
               value={selectedWorker}
-              onChange={setSelectedWorker}
+              onChange={(value) => setSelectedWorker(value as string)}
               placeholder="输入名字搜索..."
               options={[
                 { label: '未分配', value: 'unassigned' },
@@ -566,7 +566,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
             <label className="block text-xs text-gray-600 mb-1">按厚度筛选</label>
             <SearchableSelect
               value={selectedThickness}
-              onChange={setSelectedThickness}
+              onChange={(value) => setSelectedThickness(value as string)}
               placeholder="输入厚度搜索..."
               options={getThicknessOptions.map(thickness => ({
                 label: `${thickness}mm`,
@@ -584,7 +584,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
         <div className="space-y-4 pb-4">
           {/* 按照指定顺序显示：进行中项目 → 待处理项目 → 已完成项目 */}
           {['in_progress', 'pending', 'completed'].map((status) => {
-            const statusProjects = groupedProjects[status];
+            const statusProjects = groupedProjects[status as keyof typeof groupedProjects];
             if (!statusProjects || statusProjects.length === 0) return null;
             
             const config = getStatusConfig(status);

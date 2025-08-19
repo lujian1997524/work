@@ -541,7 +541,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   return (
     <ResponsiveContainer className={`h-full bg-gray-50 ${className}`} desktopClassName="flex flex-col">
       {/* 统一的项目头部区域 */}
-      <Card padding="none" className="bg-white shadow-sm" style={{flexShrink: 0}}>
+      <Card padding="none" className="bg-white shadow-sm flex-shrink-0">
         {/* 返回按钮区域 */}
         <div className={`${isMobile ? 'px-4 py-3' : 'px-6 py-4'} border-b border-gray-100`}>
           <Button
@@ -587,10 +587,10 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
                     {project.assignedWorker.name}
                   </span>
                 )}
-                {project.creator && (
+                {(project as any).creator && (
                   <span className="flex items-center gap-1">
                     <DocumentIcon className="w-4 h-4" />
-                    {project.creator.name}
+                    {(project as any).creator.name}
                   </span>
                 )}
               </div>
@@ -655,7 +655,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
 
       {/* 主内容区 - 移动端适配 */}
       <ResponsiveContainer 
-        className="overflow-auto mt-4" style={{flex: 1}}
+        className="overflow-auto mt-4 flex-1"
         mobileClassName="pb-20"
       >
         <AnimatePresence mode="wait">
@@ -1717,14 +1717,14 @@ const DirectAllocationSection: React.FC<{
     const { dimensions, quantity: currentStock } = workerMaterial;
     
     // 计算所有尺寸的总量
-    const totalDimensionQuantity = dimensions.reduce((sum, dim) => sum + dim.quantity, 0);
+    const totalDimensionQuantity = dimensions.reduce((sum: number, dim: any) => sum + dim.quantity, 0);
     
     // 数据一致性检查
     const isConsistent = totalDimensionQuantity === currentStock;
     
     // 如果数据一致，直接返回尺寸数据
     if (isConsistent) {
-      return dimensions.filter(dim => dim.quantity > 0);
+      return dimensions.filter((dim: any) => dim.quantity > 0);
     }
     
     // 如果数据不一致，使用比例计算作为兜底
@@ -1732,7 +1732,7 @@ const DirectAllocationSection: React.FC<{
     
     const ratio = currentStock / totalDimensionQuantity;
     
-    return dimensions.map(dim => {
+    return dimensions.map((dim: any) => {
       const actualAvailable = Math.floor(dim.quantity * ratio);
       
       return {
@@ -1741,7 +1741,7 @@ const DirectAllocationSection: React.FC<{
         originalQuantity: dim.quantity,
         isAdjusted: true
       };
-    }).filter(dim => dim.quantity > 0);
+    }).filter((dim: any) => dim.quantity > 0);
   };
 
   // 更新分配状态
@@ -1989,12 +1989,11 @@ const DirectAllocationSection: React.FC<{
                             type="number"
                             min="1"
                             max={state.availableQuantity || 999}
-                            value={state.quantity || 1}
+                            value={(state.quantity || 1).toString()}
                             onChange={(e) => updateAllocationState(material.thicknessSpecId, {
                               quantity: parseInt(e.target.value) || 1
                             })}
                             className="w-20"
-                            size="sm"
                           />
                         </td>
 
@@ -2002,7 +2001,7 @@ const DirectAllocationSection: React.FC<{
                         <td className="px-4 py-4 whitespace-nowrap">
                           <Select
                             value={state.selectedWorkerId?.toString() || ''}
-                            onChange={(value) => handleWorkerChange(material.thicknessSpecId, parseInt(value))}
+                            onChange={(value) => handleWorkerChange(material.thicknessSpecId, parseInt(value as string))}
                             options={[
                               { value: '', label: '选择工人' },
                               ...workers
@@ -2021,7 +2020,7 @@ const DirectAllocationSection: React.FC<{
                         <td className="px-4 py-4 whitespace-nowrap">
                           <Select
                             value={state.selectedWorkerMaterialId?.toString() || ''}
-                            onChange={(value) => handleWorkerMaterialChange(material.thicknessSpecId, parseInt(value))}
+                            onChange={(value) => handleWorkerMaterialChange(material.thicknessSpecId, parseInt(value as string))}
                             disabled={!state.selectedWorkerId}
                             options={[
                               { value: '', label: '选择批次' },
@@ -2040,12 +2039,12 @@ const DirectAllocationSection: React.FC<{
                           <Select
                             value={state.selectedDimensionId?.toString() || ''}
                             onChange={(value) => updateAllocationState(material.thicknessSpecId, {
-                              selectedDimensionId: value ? parseInt(value) : null
+                              selectedDimensionId: value ? parseInt(value as string) : null
                             })}
                             disabled={!state.selectedWorkerMaterialId}
                             options={[
                               { value: '', label: '通用分配' },
-                              ...availableDimensions.map(dim => ({
+                              ...availableDimensions.map((dim: any) => ({
                                 value: dim.id.toString(),
                                 label: `${dim.width}×${dim.height}mm (${dim.quantity}张)`
                               }))
@@ -2157,9 +2156,9 @@ const AllocationTabsSection: React.FC<{
         
         // 后端返回的数据结构是 { success: true, workers: [...], thicknessSpecs: [...] }
         // 我们需要展开workers数组中每个工人的materials，组成一个扁平的工人材料数组
-        const allWorkerMaterials = [];
+        const allWorkerMaterials: any[] = [];
         if (data.workers && Array.isArray(data.workers)) {
-          data.workers.forEach(workerData => {
+          data.workers.forEach((workerData: any) => {
             // 遵循后端返回的数据结构
             const workerId = workerData.workerId;
             const workerName = workerData.workerName;
@@ -2174,7 +2173,7 @@ const AllocationTabsSection: React.FC<{
                   const thickness = thicknessStr.replace('mm', '');
                   
                   // 查找对应的 thicknessSpec
-                  const thicknessSpec = data.thicknessSpecs?.find(spec => 
+                  const thicknessSpec = data.thicknessSpecs?.find((spec: any) => 
                     (spec.materialType || '碳板') === materialType && 
                     spec.thickness === thickness
                   );
@@ -2331,9 +2330,9 @@ const MaterialSourceSection: React.FC<{
         
         // 后端返回的数据结构是 { success: true, workers: [...], thicknessSpecs: [...] }
         // 我们需要展开workers数组中每个工人的materials，组成一个扁平的工人材料数组
-        const allWorkerMaterials = [];
+        const allWorkerMaterials: any[] = [];
         if (data.workers && Array.isArray(data.workers)) {
-          data.workers.forEach(workerData => {
+          data.workers.forEach((workerData: any) => {
             const workerId = workerData.workerId;
             const workerName = workerData.workerName;
             
@@ -2673,7 +2672,7 @@ const MultiProjectAllocationSection: React.FC<{
       .reduce((unique, spec) => {
         // 去重
         if (!unique.find(s => s!.id === spec!.id)) {
-          unique.push(spec);
+          unique.push(spec!);
         }
         return unique;
       }, [] as ThicknessSpec[]);
@@ -2955,7 +2954,7 @@ const MultiProjectAllocationSection: React.FC<{
                 <td className="px-4 py-4 whitespace-nowrap">
                   <Select
                     value={selectedThicknessSpecId?.toString() || ''}
-                    onChange={(value) => handleThicknessSpecChange(parseInt(value))}
+                    onChange={(value) => handleThicknessSpecChange(parseInt(value as string))}
                     options={[
                       { value: '', label: '请选择板材规格' },
                       ...thicknessOptions.map(opt => ({ 
@@ -2975,7 +2974,7 @@ const MultiProjectAllocationSection: React.FC<{
                       value=""
                       onChange={(value) => {
                         if (value) {
-                          const projectToAdd = availableProjects.find(p => p.id === parseInt(value));
+                          const projectToAdd = availableProjects.find(p => p.id === parseInt(value as string));
                           if (projectToAdd) {
                             addProjectToSelection(projectToAdd);
                           }
@@ -3029,11 +3028,10 @@ const MultiProjectAllocationSection: React.FC<{
                     type="number"
                     min="1"
                     max={totalAvailable}
-                    value={totalQuantity}
+                    value={totalQuantity.toString()}
                     onChange={(e) => setTotalQuantity(parseInt(e.target.value) || 1)}
                     placeholder={`最多${totalAvailable}张`}
                     className="w-24"
-                    size="sm"
                     disabled={!selectedThicknessSpecId}
                   />
                   <div className="text-xs text-gray-500 mt-1">
@@ -3045,7 +3043,7 @@ const MultiProjectAllocationSection: React.FC<{
                 <td className="px-4 py-4 whitespace-nowrap">
                   <Select
                     value={selectedDimensionId?.toString() || ''}
-                    onChange={(value) => setSelectedDimensionId(value ? parseInt(value) : null)}
+                    onChange={(value) => setSelectedDimensionId(value ? parseInt(value as string) : null)}
                     options={[
                       { value: '', label: '通用分配' },
                       ...availableDimensions.map(dim => ({
