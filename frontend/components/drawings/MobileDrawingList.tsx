@@ -16,7 +16,7 @@ import {
   UserIcon,
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
-import { DxfPreviewModal } from '@/components/ui/DxfPreviewModal';
+import AdvancedDxfModal from '@/components/ui/advanced-dxf/AdvancedDxfModal';
 import { Loading, Button } from '@/components/ui';
 import { downloadDrawingWeb } from '@/utils/drawingHandlersPure';
 
@@ -55,7 +55,7 @@ export const MobileDrawingList: React.FC<MobileDrawingListProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [advancedPreviewOpen, setAdvancedPreviewOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterVersion, setFilterVersion] = useState<string>('all');
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
@@ -97,7 +97,7 @@ export const MobileDrawingList: React.FC<MobileDrawingListProps> = ({
 
   const handlePreview = (drawing: Drawing) => {
     setSelectedDrawing(drawing);
-    setPreviewOpen(true);
+    setAdvancedPreviewOpen(true);
   };
 
   const handleDownload = async (drawing: Drawing) => {
@@ -330,6 +330,17 @@ export const MobileDrawingList: React.FC<MobileDrawingListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleAdvancedPreview(drawing);
+                      }}
+                      className="flex items-center space-x-1 px-3 py-2 text-orange-600 bg-orange-50 rounded-lg text-sm font-medium hover:bg-orange-100"
+                    >
+                      <FireIcon className="w-4 h-4" />
+                      <span>高级</span>
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleDownload(drawing);
                       }}
                       className="flex items-center space-x-1 px-3 py-2 text-green-600 bg-green-50 rounded-lg text-sm font-medium hover:bg-green-100"
@@ -356,12 +367,12 @@ export const MobileDrawingList: React.FC<MobileDrawingListProps> = ({
         )}
       </div>
 
-      {/* DXF预览模态框 */}
-      <DxfPreviewModal
+      {/* 高级DXF预览模态框 */}
+      <AdvancedDxfModal
         drawing={selectedDrawing}
-        isOpen={previewOpen}
+        isOpen={advancedPreviewOpen}
         onClose={() => {
-          setPreviewOpen(false);
+          setAdvancedPreviewOpen(false);
           setSelectedDrawing(null);
         }}
       />

@@ -12,6 +12,7 @@ export interface DrawingGridProps {
   onDelete: (drawing: Drawing) => void;
   onEdit: (drawing: Drawing) => void;
   onPreview: (drawing: Drawing) => void;
+  onAdvancedPreview?: (drawing: Drawing) => void;
   onOpen?: (drawing: Drawing) => void;
   className?: string;
 }
@@ -23,6 +24,7 @@ export const DrawingGrid: React.FC<DrawingGridProps> = ({
   onDelete,
   onEdit,
   onPreview,
+  onAdvancedPreview,
   onOpen,
   className = ''
 }) => {
@@ -89,6 +91,7 @@ export const DrawingGrid: React.FC<DrawingGridProps> = ({
                 onDelete={() => onDelete(drawing)}
                 onEdit={() => onEdit(drawing)}
                 onPreview={() => onPreview(drawing)}
+                onAdvancedPreview={onAdvancedPreview ? () => onAdvancedPreview(drawing) : undefined}
                 onOpen={onOpen ? () => onOpen(drawing) : undefined}
                 className="h-full"
               />

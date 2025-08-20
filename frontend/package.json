@@ -1,7 +1,7 @@
 {
   "name": "laser-cutting-manager-frontend",
-  "version": "2.5.5",
-  "description": "激光切割生产管理系统 - 清理废弃DXF组件与代码优化",
+  "version": "2.6.0",
+  "description": "激光切割生产管理系统 - 统一DXF预览组件重构完成",
   "author": "LaserCut Team",
   "private": true,
   "scripts": {

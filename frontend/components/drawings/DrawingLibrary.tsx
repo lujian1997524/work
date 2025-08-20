@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Alert, Loading, EmptyData, Modal, Input, Dropdown, Button, useDialog, DxfPreviewModal } from '@/components/ui';
+import { Alert, Loading, EmptyData, Modal, Input, Dropdown, Button, useDialog } from '@/components/ui';
+import AdvancedDxfModal from '@/components/ui/advanced-dxf/AdvancedDxfModal';
 import { DrawingGrid } from './DrawingGrid';
 import { DrawingList } from './DrawingList';
 import { DrawingTableView } from './DrawingTableView';
@@ -71,7 +72,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showAdvancedPreview, setShowAdvancedPreview] = useState(false);
   const [previewDrawing, setPreviewDrawing] = useState<Drawing | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingDrawing, setEditingDrawing] = useState<Drawing | null>(null);
@@ -342,19 +343,8 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
 
   // 处理预览
   const handlePreview = (drawing: Drawing) => {
-    // 转换Drawing为DxfPreviewModal所需格式
-    const dxfDrawing = {
-      id: drawing.id,
-      projectId: 0, // 图纸库中的图纸没有关联项目
-      filename: drawing.filename,
-      originalFilename: drawing.originalName,
-      filePath: drawing.filePath,
-      version: drawing.version,
-      createdAt: drawing.createdAt,
-      uploader: drawing.uploadedBy ? { id: drawing.uploadedBy, name: '未知用户' } : undefined
-    };
-    setPreviewDrawing(dxfDrawing as any);
-    setShowPreview(true);
+    setPreviewDrawing(drawing as any);
+    setShowAdvancedPreview(true);
   };
 
   // 处理编辑
@@ -858,12 +848,12 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
         />
       )}
 
-      {/* DXF预览模态框 */}
-      <DxfPreviewModal
+      {/* 高级DXF预览模态框 */}
+      <AdvancedDxfModal
         drawing={previewDrawing as any}
-        isOpen={showPreview}
+        isOpen={showAdvancedPreview}
         onClose={() => {
-          setShowPreview(false);
+          setShowAdvancedPreview(false);
           setPreviewDrawing(null);
         }}
       />

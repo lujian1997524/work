@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, Button, Badge, Tooltip } from '@/components/ui';
+import { FireIcon } from '@heroicons/react/24/outline';
 import { Drawing } from './DrawingLibrary';
 import { DrawingActionButton, DrawingAdvancedActions } from './DrawingActionButton';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -14,6 +15,7 @@ export interface DrawingCardProps {
   onDelete?: () => void;
   onEdit?: () => void;
   onPreview?: () => void;
+  onAdvancedPreview?: () => void;
   onOpen?: () => void;
   className?: string;
 }
@@ -25,6 +27,7 @@ export const DrawingCard: React.FC<DrawingCardProps> = ({
   onDelete,
   onEdit,
   onPreview,
+  onAdvancedPreview,
   onOpen,
   className = ''
 }) => {
@@ -32,6 +35,7 @@ export const DrawingCard: React.FC<DrawingCardProps> = ({
   
   // 防抖处理，避免重复点击
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isAdvancedProcessing, setIsAdvancedProcessing] = React.useState(false);
   
   // 异步处理预览点击
   const handlePreviewClick = async () => {
@@ -45,6 +49,19 @@ export const DrawingCard: React.FC<DrawingCardProps> = ({
     } finally {
       // 短暂延迟后重置状态，避免连续点击
       setTimeout(() => setIsProcessing(false), 500);
+    }
+  };
+
+  // 异步处理高级预览点击
+  const handleAdvancedPreviewClick = async () => {
+    if (isAdvancedProcessing) return;
+    
+    setIsAdvancedProcessing(true);
+    try {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      onAdvancedPreview?.();
+    } finally {
+      setTimeout(() => setIsAdvancedProcessing(false), 500);
     }
   };
   // 获取文件类型图标 - 只支持DXF
@@ -172,6 +189,25 @@ export const DrawingCard: React.FC<DrawingCardProps> = ({
           } flex items-center justify-center gap-2`}
           onClick={(e) => e.stopPropagation()} // 防止触发卡片选择
         >
+          {/* 高级预览按钮 */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleAdvancedPreviewClick}
+            disabled={isAdvancedProcessing}
+            className={
+              isMobile
+                ? `bg-orange-50 shadow-lg border border-orange-200 text-orange-600 hover:bg-orange-100 ${isAdvancedProcessing ? 'opacity-50' : ''}`
+                : `bg-orange-50/90 hover:bg-orange-100 text-orange-600 border border-orange-200 ${isAdvancedProcessing ? 'opacity-50' : ''}`
+            }
+          >
+            {isAdvancedProcessing ? (
+              <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FireIcon className="w-4 h-4" />
+            )}
+          </Button>
+
           {/* 预览按钮 */}
           <Button
             variant="secondary"

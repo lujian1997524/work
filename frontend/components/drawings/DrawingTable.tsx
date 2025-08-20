@@ -13,7 +13,7 @@ import {
   FunnelIcon,
   ArrowsUpDownIcon
 } from '@heroicons/react/24/outline';
-import { DxfPreviewModal } from '@/components/ui/DxfPreviewModal';
+import AdvancedDxfModal from '@/components/ui/advanced-dxf/AdvancedDxfModal';
 import { Loading, Button } from '@/components/ui';
 import { downloadDrawingWeb } from '@/utils/drawingHandlersPure';
 
@@ -52,7 +52,7 @@ export const DrawingTable: React.FC<DrawingTableProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [advancedPreviewOpen, setAdvancedPreviewOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<keyof Drawing>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -95,7 +95,7 @@ export const DrawingTable: React.FC<DrawingTableProps> = ({
 
   const handlePreview = (drawing: Drawing) => {
     setSelectedDrawing(drawing);
-    setPreviewOpen(true);
+    setAdvancedPreviewOpen(true);
   };
 
   const handleDownload = async (drawing: Drawing) => {
@@ -417,14 +417,14 @@ export const DrawingTable: React.FC<DrawingTableProps> = ({
         </table>
       </div>
 
-      {/* DXF预览模态框 */}
-      <DxfPreviewModal
-        drawing={selectedDrawing}
-        isOpen={previewOpen}
+      {/* 高级DXF预览模态框 */}
+      <AdvancedDxfModal
+        isOpen={advancedPreviewOpen}
         onClose={() => {
-          setPreviewOpen(false);
+          setAdvancedPreviewOpen(false);
           setSelectedDrawing(null);
         }}
+        drawing={selectedDrawing}
       />
     </div>
   );

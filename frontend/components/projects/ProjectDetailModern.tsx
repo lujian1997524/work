@@ -126,7 +126,8 @@ import {
   TagIcon,
   ArrowRightIcon,
   ExclamationCircleIcon,
-  RectangleStackIcon
+  RectangleStackIcon,
+  FireIcon
 } from '@heroicons/react/24/outline';
 import { updateMaterialStatusShared, getProjectMaterialStatus } from '@/utils/materialStatusManager';
 import { formatDate, formatDateTime } from '@/utils/dateFormatter';
@@ -134,7 +135,7 @@ import { apiRequest } from '@/utils/api';
 import { useResponsive } from '@/hooks/useResponsive';
 import { DrawingUpload } from '@/components/drawings/DrawingUpload';
 import { ProjectBorrowingDetails } from '@/components/materials/ProjectBorrowingDetails';
-import { DxfPreviewModal } from '@/components/ui/DxfPreviewModal';
+import AdvancedDxfModal from '@/components/ui/advanced-dxf/AdvancedDxfModal';
 
 interface ProjectDetailModernProps {
   projectId: number;
@@ -187,7 +188,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   const [savingNotes, setSavingNotes] = useState(false);
   const [operationHistory, setOperationHistory] = useState<OperationHistory[]>([]);
   // 图纸预览相关状态
-  const [showDxfPreview, setShowDxfPreview] = useState(false);
+  const [showAdvancedDxfPreview, setShowAdvancedDxfPreview] = useState(false);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
 
   // 材料编辑相关状态
@@ -425,7 +426,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
   // 预览图纸
   const handlePreviewDrawing = (drawing: Drawing) => {
     setSelectedDrawing(drawing);
-    setShowDxfPreview(true);
+    setShowAdvancedDxfPreview(true);
   };
 
 
@@ -747,12 +748,12 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
       />
 
       
-      {/* DXF预览模态框 */}
-      <DxfPreviewModal
+      {/* 高级DXF预览模态框 */}
+      <AdvancedDxfModal
         drawing={selectedDrawing}
-        isOpen={showDxfPreview}
+        isOpen={showAdvancedDxfPreview}
         onClose={() => {
-          setShowDxfPreview(false);
+          setShowAdvancedDxfPreview(false);
           setSelectedDrawing(null);
         }}
       />
@@ -1267,7 +1268,8 @@ const DrawingsSection: React.FC<{
   onUploadClick: () => void;
   onDeleteDrawing: (drawingId: number, filename: string) => void;
   onPreviewDrawing: (drawing: Drawing) => void;
-}> = ({ project, onUploadClick, onDeleteDrawing, onPreviewDrawing }) => {
+  onAdvancedPreviewDrawing: (drawing: Drawing) => void;
+}> = ({ project, onUploadClick, onDeleteDrawing, onPreviewDrawing, onAdvancedPreviewDrawing }) => {
   return (
     <motion.div
       key="drawings"
@@ -1311,6 +1313,14 @@ const DrawingsSection: React.FC<{
                       onClick={() => onPreviewDrawing(drawing)}
                     >
                       <EyeIcon className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onAdvancedPreviewDrawing(drawing)}
+                      className="text-orange-600 hover:text-orange-700"
+                    >
+                      <FireIcon className="w-4 h-4" />
                     </Button>
                     <Button 
                       variant="ghost" 
