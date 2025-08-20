@@ -305,11 +305,19 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        category: selectedCategory || 'all'
-      });
       
-      const response = await apiRequest(`/api/drawings?${params}`, {
+      // 构建查询参数 - 当分类为'all'时不添加category参数，获取所有可用图纸
+      const params = new URLSearchParams();
+      if (selectedCategory && selectedCategory !== 'all') {
+        params.append('category', selectedCategory);
+      }
+      // 添加 limit 参数确保获取所有图纸
+      params.append('limit', '1000');
+      
+      const queryString = params.toString();
+      const url = `/api/drawings?${queryString}`;
+      
+      const response = await apiRequest(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -317,7 +325,9 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
       
       if (response.ok) {
         const data = await response.json();
-        setDrawings(data.drawings || data);
+        const fetchedDrawings = data.drawings || data;
+        
+        setDrawings(fetchedDrawings);
         setError(null);
       } else {
         throw new Error('获取图纸列表失败');

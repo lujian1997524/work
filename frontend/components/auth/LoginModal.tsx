@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input, Alert } from '@/components/ui';
 import { UserIcon } from '@heroicons/react/24/outline';
+import { DEFAULT_CONFIG } from '@/config/default';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -106,7 +107,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen }) => {
               {/* 底部信息 */}
               <div className="mt-6 text-center">
                 <p className="text-xs text-gray-500">
-                  激光切割生产管理系统 v1.0
+                  {DEFAULT_CONFIG.appName} v{DEFAULT_CONFIG.version}
                 </p>
               </div>
             </div>

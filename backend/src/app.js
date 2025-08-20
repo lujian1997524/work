@@ -23,7 +23,7 @@ const drawingsRoutes = require('./routes/drawings');
 const workerMaterialsRoutes = require('./routes/worker-materials');
 const materialDimensionsRoutes = require('./routes/material-dimensions');
 const materialRequirementsRoutes = require('./routes/material-requirements');
-const dxfRoutes = require('./routes/dxf');
+const dxfPreviewRoutes = require('./routes/dxf-preview');
 const searchRoutes = require('./routes/search');
 const sseRoutes = require('./routes/sse');
 // 考勤系统路由
@@ -116,7 +116,7 @@ app.get('/api', (req, res) => {
       thicknessSpecs: '/api/thickness-specs',
       workerMaterials: '/api/worker-materials',
       drawings: '/api/drawings',
-      dxf: '/api/dxf',
+      dxfPreview: '/api/dxf-preview',
       search: '/api/search',
       sse: '/api/sse',
       // 考勤系统端点
@@ -138,7 +138,7 @@ app.use('/api/material-requirements', materialRequirementsRoutes);
 app.use('/api/material-dimensions', materialDimensionsRoutes);
 app.use('/api/thickness-specs', thicknessSpecsRoutes);
 // drawings路由已在上面提前注册
-app.use('/api/dxf', dxfRoutes);
+app.use('/api/dxf-preview', dxfPreviewRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/sse', sseRoutes);
 // 考勤系统路由

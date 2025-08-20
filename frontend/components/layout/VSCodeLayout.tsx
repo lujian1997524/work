@@ -299,13 +299,13 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
         
         position="left"
       >
-        {sidebar && React.cloneElement(sidebar as React.ReactElement, {
+        {sidebar && React.cloneElement(sidebar as React.ReactElement<any>, {
           onMobileItemClick: () => {
             setShowMobileSidebar(false);
             onMobileSidebarAutoClose?.();
           },
           inMobileDrawer: true
-        })}
+        } as any)}
       </MobileDrawer>
 
       {/* Toast容器 - 确保Toast能正常显示 */}

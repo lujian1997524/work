@@ -24,8 +24,10 @@ export const getFrontendConfig = (): FrontendConfig => {
     // 如果配置了完整URL，直接使用（用于分离部署）
     BACKEND_URL = backendFullUrl.replace(/\/$/, ''); // 移除末尾斜杠
   } else {
-    // 否则使用生产服务器默认配置
-    BACKEND_URL = 'https://api.gei5.com';
+    // 否则使用主机+端口配置（用于本地开发）
+    const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost';
+    const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '35001';
+    BACKEND_URL = `http://${backendHost}:${backendPort}`;
   }
   
   return {

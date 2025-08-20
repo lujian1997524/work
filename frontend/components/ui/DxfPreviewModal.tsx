@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/utils/api';
 import { Modal, Button, Loading } from '@/components/ui';
 import { XMarkIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import DxfFontCache from '@/utils/dxfFontCache';
 interface Drawing {
   id: number;
   projectId: number;
@@ -207,12 +208,13 @@ export const DxfPreviewModal: React.FC<DxfPreviewModalProps> = ({
       // 加载到查看器
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfContent)}`,
-        // 使用原版字体，确保稳定性
-        fonts: [
-          '/fonts/NotoSansSC-Thin.ttf'                      // 原版 10MB，稳定可靠
-        ],
+        // 使用字体缓存获取字体URLs
+        fonts: DxfFontCache.getInstance().getFontUrls(),
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
-          // 进度回调 - 可以在这里添加进度显示
+          // 进度回调 - 字体已预加载，这里主要是DXF解析进度
+          if (phase === 'font') {
+            console.log(`📦 字体加载阶段: ${receivedBytes}/${totalBytes}`);
+          }
         },
         workerFactory: undefined
       } as any);

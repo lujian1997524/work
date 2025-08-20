@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { GlobalSyncInitializer } from '@/components/common/SyncManager'
+import { DxfFontPreloader } from '@/components/common/DxfFontPreloader'
 
 export const metadata: Metadata = {
   title: '激光切割生产管理系统',
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <GlobalSyncInitializer />
+          <DxfFontPreloader />
           {children}
         </AuthProvider>
       </body>

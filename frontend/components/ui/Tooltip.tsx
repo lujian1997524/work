@@ -32,7 +32,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const [isMounted, setIsMounted] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // 确保只在客户端挂载后才添加交互属性
   useEffect(() => {

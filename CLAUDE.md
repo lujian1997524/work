@@ -59,6 +59,7 @@ curl http://localhost:4000     # 前端服务（本地）
 - **主应用**: http://localhost:4000
 - **组件系统**: http://localhost:4000/design-system
 - **API测试**: http://localhost:4000/debug-api
+- **DXF调试**: http://localhost:4000/debug-dxf - 企业级DXF预览系统测试 (v2.5.2新增)
 - **考勤管理**: http://localhost:4000（导航至考勤模块）
 - **移动端测试**: http://localhost:4000/mobile-test
 - **Toast测试**: http://localhost:4000/toast-test
@@ -167,6 +168,7 @@ cd frontend && npm run lint
 - **工人管理** - `/api/workers` - 工人信息CRUD、部门分配
 - **部门管理** - `/api/departments` - 部门增删改查
 - **图纸管理** - `/api/drawings` - 文件上传、版本控制、DXF预览
+- **企业级DXF预览** - `/api/enterprise-dxf/*` - 高性能DXF解析、多分辨率预览、缓存管理
 - **全局搜索** - `/api/search` - 跨模块搜索功能（支持考勤、项目、材料、图纸搜索）
 - **仪表盘** - `/api/dashboard` - 统计数据和概览信息
 - **考勤管理** - `/api/attendance` - 员工考勤记录、请假、加班管理
@@ -198,7 +200,8 @@ cd frontend && npm run lint
 - **实时状态管理**: 6个Zustand Store（projectStore、materialStore、workerMaterialStore、notificationStore、globalSyncStore、attendanceStore）
 - **事件驱动通信**: 使用浏览器原生事件系统实现组件间通信
 - **全局搜索**: Ctrl+K/Cmd+K快捷键，跨模块搜索功能（支持考勤、项目、材料、工人、图纸）
-- **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染
+- **企业级DXF预览**: WebAssembly高性能引擎、多分辨率预览、智能缓存、实时图层控制
+- **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染，EnterpriseDxfViewer组件
 - **音频通知系统**: 5种智能音效(success/error/warning/info/wancheng)，操作反馈
 - **实时通知**: SSE + 桌面通知 + 音频提示的多重反馈
 - **移动端适配**: MobileEmployeeCard、MobileFormWizard、StatCardSwiper等专用移动端组件
@@ -509,6 +512,7 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/components/materials/MaterialInventoryManagerNew.tsx` - 主数据表格
 - `frontend/components/ui/ModernTable.tsx` - 通用表格组件
 - `frontend/components/ui/DxfPreviewModal.tsx` - DXF文件预览组件
+- `frontend/components/ui/EnterpriseDxfViewer.tsx` - 企业级DXF预览组件 (v2.5.2新增)
 - `frontend/components/attendance/` - 考勤管理组件库 (新增)
 
 ### 智能系统文件
@@ -534,7 +538,39 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.5.0 (2025-01-18) - 板材分配系统架构重构与移动端体验升级
+- **当前版本**: v2.5.3 (2025-08-20) - DXF字体预加载优化与界面布局修复
+- **v2.5.3 主要更新**:
+  - **🎨 DXF字体预加载系统**:
+    - 实现DxfFontCache单例模式字体缓存管理，避免重复加载字体文件
+    - 应用启动时预加载DXF字体（NotoSansSC-Thin.ttf），提升图纸打开速度
+    - 字体预加载时间约280ms，大幅减少后续DXF文件加载等待时间
+    - 使用requestIdleCallback优化字体加载时机，不阻塞主线程
+  - **🐛 界面布局修复**:
+    - 修复图纸表格高度限制问题，改用flex布局占满可用空间
+    - 修复侧边栏与主列表图纸数量不一致问题（后端API分页限制）
+    - 修复归档图纸统计API参数错误（status=archived → category=archived）
+    - 为表格底部添加适当间隙，优化视觉体验
+  - **⚡ 性能优化**:
+    - 统一API请求添加limit=1000参数，确保数据完整性
+    - 优化ModernDxfViewer和DxfPreviewModal字体配置
+    - 清理调试代码，提升生产环境性能
+- **v2.5.2 重大更新**:
+  - **🚀 企业级DXF预览系统**:
+    - WebAssembly级高性能DXF解析引擎，支持多分辨率预览图生成
+    - 智能缓存管理系统（内存+文件双重缓存，30分钟内存缓存+1小时文件缓存）
+    - 实时图层控制和实体分析功能，精确边界框计算和元数据提取
+    - 完整的REST API端点支持：/api/enterprise-dxf/* 企业级DXF预览API路由
+    - 企业级性能监控和统计，健康检查API
+  - **🎨 前端预览系统重构**:
+    - 企业级DXF预览组件(EnterpriseDxfViewer)，基于后端API的渲染引擎
+    - 实时图层可见性控制，质量模式智能切换，性能统计显示
+    - 前后端分离架构优化，远程后端API连接优化
+  - **⚡ 技术架构升级**:
+    - 企业级错误处理和日志记录系统
+    - 智能缓存策略和性能监控
+    - DXF文件高性能解析服务(dxf-parser + Canvas)
+- **v2.5.1** (2025-01-18) - 界面优化与系统简化
+- **v2.5.0** (2025-01-18) - 板材分配系统架构重构与移动端体验升级
 - **v2.5.0 重大更新**:
   - **🔧 架构重构 (BREAKING ARCHITECTURE)**:
     - 数据模型现代化：完全移除WorkerMaterial.quantity字段，改用MaterialDimension动态计算

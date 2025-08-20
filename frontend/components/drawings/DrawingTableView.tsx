@@ -386,9 +386,9 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
   );
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${className}`}>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full ${className}`}>
       {/* 工具栏 */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-gray-200 flex-shrink-0">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center space-x-4">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -428,8 +428,8 @@ export const DrawingTableView: React.FC<DrawingTableViewProps> = ({
         </div>
       </div>
 
-      {/* 内容区域 */}
-      <div className="p-6">
+      {/* 内容区域 - 使用 flex-1 占用剩余空间，底部留间隙 */}
+      <div className="flex-1 overflow-auto p-6 pb-8">
         {/* 桌面端显示表格，移动端显示列表 */}
         <div className="hidden md:block">
           {renderTableView()}

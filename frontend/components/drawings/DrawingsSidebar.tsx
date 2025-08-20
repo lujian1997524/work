@@ -63,8 +63,8 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
     
     setLoading(true);
     try {
-      // 获取所有图纸（包括归档）进行统计
-      const response = await apiRequest('/api/drawings?limit=1000&includeArchived=true', {
+      // 获取所有图纸进行统计（可用图纸为主，归档图纸单独统计）
+      const response = await apiRequest('/api/drawings?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -74,13 +74,32 @@ export const DrawingsSidebar: React.FC<DrawingsSidebarProps> = ({
         const data = await response.json();
         const drawings = data.drawings || [];
         
+        // 获取归档图纸数量
+        let archivedCount = 0;
+        
+        const archivedResponse = await apiRequest('/api/drawings?limit=1000&category=archived', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (archivedResponse.ok) {
+          const archivedData = await archivedResponse.json();
+          archivedCount = (archivedData.drawings || []).length;
+        }
+        
+        // 按分类统计可用图纸
+        const commonParts = drawings.filter((d: any) => d.isCommonPart).length;
+        const associated = drawings.filter((d: any) => !d.isCommonPart && d.project && d.project.id).length;
+        const unassociated = drawings.filter((d: any) => !d.isCommonPart && (!d.project || !d.project.id)).length;
+        
         const newStats: DrawingStats = {
-          'all': drawings.length,
-          'common-parts': drawings.filter((d: any) => d.isCommonPart).length,
-          'associated': drawings.filter((d: any) => !d.isCommonPart && d.project && d.project.id).length,
-          'unassociated': drawings.filter((d: any) => !d.isCommonPart && (!d.project || !d.project.id)).length,
-          'available': drawings.filter((d: any) => d.status === '可用').length,
-          'archived': drawings.filter((d: any) => d.status === '已归档').length
+          'all': commonParts + associated + unassociated, // 全部图纸 = 常用零件 + 已关联 + 未关联
+          'common-parts': commonParts,
+          'associated': associated,
+          'unassociated': unassociated,
+          'available': drawings.length, // 可用图纸数量
+          'archived': archivedCount // 归档图纸数量
         };
         
         setStats(newStats);

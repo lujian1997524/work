@@ -12,6 +12,7 @@ export interface ButtonProps {
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
   className?: string
   type?: 'button' | 'submit' | 'reset'
+  title?: string
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -22,7 +23,8 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   onClick,
   className = '',
-  type = 'button'
+  type = 'button',
+  title
 }) => {
   const baseClasses = `
     inline-flex items-center justify-center font-medium rounded-ios-lg
@@ -76,6 +78,7 @@ export const Button: React.FC<ButtonProps> = ({
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       onClick={onClick}
       disabled={disabled || loading}
+      title={title}
       whileTap={disabled || loading ? {} : { scale: 0.95 }}
       whileHover={disabled || loading ? {} : { scale: 1.02 }}
     >
