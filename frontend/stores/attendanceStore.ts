@@ -8,7 +8,7 @@ import type {
   AttendanceSettings 
 } from '@/types/attendance';
 import { apiRequest } from '@/utils/apiConfig';
-import { exportMonthlyAttendanceReport } from '@/utils/attendanceExporter';
+import { exportMonthlyAttendanceReportWithData } from '@/utils/attendanceExporter';
 
 interface AttendanceState {
   // 基础数据
@@ -564,14 +564,8 @@ export const useAttendanceStore = create<AttendanceState>()(
           stat.year === year && stat.month === month
         );
         
-        // 使用美化的前端导出函数
-        await exportMonthlyAttendanceReport({
-          employees,
-          monthlyStats: currentMonthStats,
-          attendanceExceptions: monthlyExceptions,
-          year,
-          month
-        });
+        // 使用完整的前端导出函数
+        await exportMonthlyAttendanceReportWithData(year, month, employees, attendanceExceptions);
         
       } catch (error) {
         console.error('导出月度报表失败:', error);

@@ -6,6 +6,7 @@
 class DxfFontCache {
   private static instance: DxfFontCache;
   private fontCache = new Map<string, ArrayBuffer>();
+  private fontUrlCache = new Map<string, string>(); // 缓存Blob URL
   private loadingPromises = new Map<string, Promise<ArrayBuffer>>();
   private isInitialized = false;
 
@@ -63,8 +64,14 @@ class DxfFontCache {
     try {
       const fontBuffer = await loadingPromise;
       this.fontCache.set(fontPath, fontBuffer);
+      
+      // 创建Blob URL用于DXF查看器
+      const blob = new Blob([fontBuffer], { type: 'font/ttf' });
+      const blobUrl = URL.createObjectURL(blob);
+      this.fontUrlCache.set(fontPath, blobUrl);
+      
       this.loadingPromises.delete(fontPath);
-      console.log(`✅ 字体加载完成: ${fontPath}`);
+      console.log(`✅ 字体加载完成: ${fontPath} -> ${blobUrl}`);
       return fontBuffer;
     } catch (error) {
       this.loadingPromises.delete(fontPath);
@@ -90,7 +97,18 @@ class DxfFontCache {
   public getFontUrls(): string[] {
     if (!this.isInitialized) {
       console.warn('⚠️ 字体未预加载，可能影响显示效果');
+      return ['/fonts/NotoSansSC-Thin.ttf']; // 降级到原始URL
     }
+    
+    // 返回缓存的Blob URL
+    const cachedUrl = this.fontUrlCache.get('/fonts/NotoSansSC-Thin.ttf');
+    if (cachedUrl) {
+      console.log(`🎯 使用缓存的字体URL: ${cachedUrl}`);
+      return [cachedUrl];
+    }
+    
+    // 如果没有缓存，降级到原始URL
+    console.warn('⚠️ 字体缓存的Blob URL不存在，使用原始URL');
     return ['/fonts/NotoSansSC-Thin.ttf'];
   }
 
@@ -127,7 +145,13 @@ class DxfFontCache {
    * 清理缓存
    */
   public clearCache(): void {
+    // 清理Blob URLs，避免内存泄漏
+    this.fontUrlCache.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    
     this.fontCache.clear();
+    this.fontUrlCache.clear();
     this.loadingPromises.clear();
     this.isInitialized = false;
     console.log('🗑️ DXF 字体缓存已清理');

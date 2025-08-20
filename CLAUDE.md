@@ -79,19 +79,39 @@ curl http://localhost:4000     # 前端服务（本地）
 
 这是一个激光切割生产管理系统，采用VS Code风格的界面布局，支持项目管理、板材状态追踪、图纸管理和工人资源管理。
 
-### 技术架构
-- **后端**: Node.js + Express + Sequelize ORM + MySQL（远程部署）
-- **前端**: Next.js 15.4.3 + React 18 + TypeScript + Zustand状态管理
-- **UI系统**: Tailwind CSS + @heroicons/react + iOS 18设计规范  
-- **文件导出**: ExcelJS 4.4.0 - 专业级Excel文件生成（支持多工作表、样式、条件格式）
-- **实时通信**: Server-Sent Events (SSE) + 音频通知
-- **桌面应用**: Tauri多平台打包 (Rust + Web技术)
-- **移动端适配**: 专用移动端组件 + 响应式设计
+## 核心技术栈和架构模式
+
+### 前端技术栈
+- **Next.js 15.4.7**: App Router模式，静态渲染和SSG
+- **React 19.1.1**: 最新Hooks API和并发特性
+- **TypeScript 5.7.2**: 严格类型检查，确保代码质量
+- **Zustand 5.0.3**: 轻量级状态管理，替代Redux
+- **Tailwind CSS 3.4.16**: 原子类CSS框架，iOS 18设计系统
+- **Framer Motion 11.16.0**: 动画和手势库
+- **ExcelJS 4.4.0**: 企业级Excel文件生成
+- **@heroicons/react 2.2.0**: 官方图标库
+- **three.js + dxf-viewer**: 3D CAD文件预览
+
+### 后端技术栈
+- **Node.js + Express 4.21.2**: RESTful API服务
+- **Sequelize 6.37.7**: MySQL ORM，数据模型管理
+- **MySQL2 3.14.2**: 数据库驱动
+- **JWT + bcryptjs**: 认证和密码安全
+- **Multer 2.0.2**: 文件上传处理
+- **Sharp 0.34.3**: 图像处理优化
+- **Canvas 3.1.2**: DXF文件渲染服务
+
+### 关键架构模式
+- **远程后端分离**: 前端localhost:4000，后端https://api.gei5.com
+- **事件驱动状态**: 原生CustomEvent实现跨组件通信
+- **四状态材料循环**: empty→pending→in_progress→completed→empty
+- **VS Code风格UI**: ActivityBar + Sidebar + MainContent布局
+- **SSE实时通信**: Server-Sent Events替代WebSocket
 
 ### 端口和服务
-- 前端开发服务器: http://localhost:4000
-- 后端API服务: https://api.gei5.com（远程云服务器）
-- MySQL数据库: 远程云数据库（通过API访问）
+- **前端开发服务器**: http://localhost:4000 (Next.js dev server)
+- **后端API服务**: https://api.gei5.com（远程云服务器）
+- **MySQL数据库**: 远程云数据库（通过API访问）
 
 ### 默认用户
 - **高春强** (admin) - 管理员权限
@@ -143,6 +163,22 @@ cd frontend && npm run start       # 前端生产服务器
 # Tauri桌面应用开发
 cd frontend && npm run tauri dev   # 开发模式启动桌面应用
 cd frontend && npm run tauri build # 构建桌面应用(Windows/macOS/Linux)
+```
+
+### 后端开发（仅供参考，远程部署）
+```bash
+# 后端安装依赖
+cd backend && npm install
+
+# 后端本地开发（仅测试用）
+cd backend && npm run dev          # 使用nodemon热重载
+cd backend && npm run start        # 生产模式启动
+
+# 数据库操作（远程管理）
+cd backend && npm run init:db      # 初始化数据库结构
+cd backend && npm run create:sample # 创建测试数据
+
+# 注意：本地不运行后端，仅修改代码供远程部署使用
 ```
 
 ### 代码检查命令（用户手动运行）
@@ -201,7 +237,7 @@ cd frontend && npm run lint
 - **事件驱动通信**: 使用浏览器原生事件系统实现组件间通信
 - **全局搜索**: Ctrl+K/Cmd+K快捷键，跨模块搜索功能（支持考勤、项目、材料、工人、图纸）
 - **企业级DXF预览**: WebAssembly高性能引擎、多分辨率预览、智能缓存、实时图层控制
-- **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染，EnterpriseDxfViewer组件
+- **CAD文件处理**: DXF解析和dxf-viewer 3D预览，支持Canvas渲染
 - **音频通知系统**: 5种智能音效(success/error/warning/info/wancheng)，操作反馈
 - **实时通知**: SSE + 桌面通知 + 音频提示的多重反馈
 - **移动端适配**: MobileEmployeeCard、MobileFormWizard、StatCardSwiper等专用移动端组件
@@ -512,7 +548,6 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/components/materials/MaterialInventoryManagerNew.tsx` - 主数据表格
 - `frontend/components/ui/ModernTable.tsx` - 通用表格组件
 - `frontend/components/ui/DxfPreviewModal.tsx` - DXF文件预览组件
-- `frontend/components/ui/EnterpriseDxfViewer.tsx` - 企业级DXF预览组件 (v2.5.2新增)
 - `frontend/components/attendance/` - 考勤管理组件库 (新增)
 
 ### 智能系统文件
@@ -538,7 +573,31 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.5.3 (2025-08-20) - DXF字体预加载优化与界面布局修复
+- **当前版本**: v2.5.5 (2025-08-20) - 清理废弃DXF组件与代码优化
+- **v2.5.5 主要更新**:
+  - **🧹 代码清理**:
+    - 删除废弃的EnterpriseDxfViewer和ModernDxfViewer组件
+    - 统一DXF预览功能到DxfPreviewModal组件
+    - 清理CLAUDE.md文档中的过时组件引用
+    - 简化DXF预览系统架构
+  - **📊 报表系统优化**:
+    - 优化项目报表导出功能，修复函数调用
+    - 改进考勤表格布局，使用CSS实现员工列固定
+    - 提升移动端表格体验
+  - **⚡ 性能提升**:
+    - 减少代码冗余，降低维护成本
+    - 优化字体缓存系统性能
+    - 清理无用的dxf-parser依赖引用
+- **v2.5.4 关键修复**:
+  - **🔧 字体预加载机制修复**:
+    - 修复字体缓存逻辑错误：之前只缓存ArrayBuffer但仍使用原始URL
+    - 实现Blob URL机制：将缓存的ArrayBuffer转为可用的Blob URL
+    - DXF查看器现在真正使用内存缓存的字体，避免重复网络请求
+    - 添加内存管理：清理时释放Blob URL防止内存泄漏
+  - **⚡ 性能提升**:
+    - 首次预加载后，后续DXF文件打开0网络字体请求
+    - 真正实现字体缓存，大幅提升图纸加载速度
+    - 添加降级策略：缓存失败时自动回退到原始URL
 - **v2.5.3 主要更新**:
   - **🎨 DXF字体预加载系统**:
     - 实现DxfFontCache单例模式字体缓存管理，避免重复加载字体文件
@@ -562,7 +621,7 @@ SELECT * FROM v_monthly_attendance_stats;
     - 完整的REST API端点支持：/api/enterprise-dxf/* 企业级DXF预览API路由
     - 企业级性能监控和统计，健康检查API
   - **🎨 前端预览系统重构**:
-    - 企业级DXF预览组件(EnterpriseDxfViewer)，基于后端API的渲染引擎
+    - DXF预览组件(DxfPreviewModal)，基于dxf-viewer的渲染引擎
     - 实时图层可见性控制，质量模式智能切换，性能统计显示
     - 前后端分离架构优化，远程后端API连接优化
   - **⚡ 技术架构升级**:

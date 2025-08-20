@@ -551,86 +551,20 @@ export const AttendanceGrid: React.FC<AttendanceGridProps> = ({
         </p>
       </div>
       
-      {/* 统一的滚动容器 - 表头和内容一起滚动 */}
-      <div className="overflow-x-auto">
-        <div className="min-w-fit sm:min-w-0">
-          {/* 表格头部 */}
-          <div className="bg-gray-50 border-b border-gray-200">
-            <div className="flex">
-              {/* 员工名称列 */}
-              <div className="flex-shrink-0 w-24 sm:w-32 p-2 sm:p-4 border-r border-gray-200">
-                <h3 className="text-sm sm:text-base font-semibold text-text-primary">员工</h3>
-              </div>
-              
-              {/* 日期列 */}
-              {dates.map(date => {
-                // 使用本地时间格式化日期，避免UTC时区问题
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${day}`;
-                
-                const isCurrentDay = dateStr === todayStr;
-                const isPastDay = date < today;  
-                const isFutureDay = date > today;
-                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                
-                
-                return (
-                  <div 
-                    key={dateStr} 
-                    className={`
-                      flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 text-center border-r border-gray-200
-                      ${isCurrentDay ? 'bg-ios18-blue text-white' : 
-                        isFutureDay ? 'bg-gray-50 opacity-50' : 
-                        isWeekend ? 'bg-gray-100' : ''}
-                    `}
-                  >
-                    <div className={`text-xs ${
-                      isCurrentDay ? 'text-white' : 
-                      isFutureDay ? 'text-gray-400' : 
-                      isWeekend ? 'text-gray-500' : 'text-text-secondary'
-                    }`}>
-                      {date.toLocaleDateString('zh-CN', { weekday: 'short' })}
-                    </div>
-                    <div className={`text-xs sm:text-sm font-bold mt-1 ${
-                      isCurrentDay ? 'text-white' : 
-                      isFutureDay ? 'text-gray-400' : 
-                      isWeekend ? 'text-gray-600' : 'text-text-primary'
-                    }`}>
-                      {date.getDate()}
-                    </div>
-                    {isCurrentDay && (
-                      <div className="w-1 h-1 bg-white rounded-full mx-auto mt-1"></div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 员工行 */}
-          <div className="divide-y divide-gray-100">
-            {employees.map((employee, employeeIndex) => (
-              <div
-                key={employee.id}
-                className="flex hover:bg-gray-50 transition-colors duration-200"
-              >
-                {/* 员工信息 */}
-                <div className="flex-shrink-0 w-24 sm:w-32 p-2 sm:p-4 border-r border-gray-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                    <div className="min-w-0">
-                      <div className="font-medium text-text-primary text-xs sm:text-sm truncate">
-                        {employee.name}
-                      </div>
-                      <div className="text-xs text-text-secondary truncate sm:block hidden">
-                        {employee.position}
-                      </div>
-                    </div>
-                  </div>
+      {/* 统一表格结构，通过CSS实现员工列固定 */}
+      <div className="relative overflow-hidden">
+        {/* 表格容器 */}
+        <div className="overflow-x-auto">
+          <div className="min-w-fit relative">
+            {/* 表格头部 */}
+            <div className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+              <div className="flex">
+                {/* 员工名称列头 - 固定 */}
+                <div className="sticky left-0 z-20 flex-shrink-0 w-24 sm:w-32 p-2 sm:p-4 border-r border-gray-200 bg-gray-50">
+                  <h3 className="text-sm sm:text-base font-semibold text-text-primary">员工</h3>
                 </div>
                 
-                {/* 考勤单元格 */}
+                {/* 日期列头 */}
                 {dates.map(date => {
                   // 使用本地时间格式化日期，避免UTC时区问题
                   const year = date.getFullYear();
@@ -639,52 +573,118 @@ export const AttendanceGrid: React.FC<AttendanceGridProps> = ({
                   const dateStr = `${year}-${month}-${day}`;
                   
                   const isCurrentDay = dateStr === todayStr;
-                  const isPastDay = date < today;
+                  const isPastDay = date < today;  
                   const isFutureDay = date > today;
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                  
-                  // 未来日期不显示考勤单元格，只显示空白
-                  if (isFutureDay) {
-                    return (
-                      <div 
-                        key={dateStr} 
-                        className="flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 flex items-center justify-center border-r border-gray-100 bg-gray-50 opacity-50"
-                        title="未来日期"
-                      >
-                        {/* 未来日期显示空白 */}
-                      </div>
-                    );
-                  }
-                  
-                  const status = getStatus(employee.id, dateStr);
-                  const exception = getException ? getException(employee.id, dateStr) : null;
                   
                   return (
                     <div 
                       key={dateStr} 
                       className={`
-                        flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 flex items-center justify-center border-r border-gray-100
-                        ${isCurrentDay ? 'bg-ios18-blue/10' : ''}
+                        flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 text-center border-r border-gray-200
+                        ${isCurrentDay ? 'bg-ios18-blue text-white' : 
+                          isFutureDay ? 'bg-gray-50 opacity-50' : 
+                          isWeekend ? 'bg-gray-100' : 'bg-gray-50'}
                       `}
                     >
-                      <AttendanceCell
-                        employee={employee}
-                        date={dateStr}
-                        status={status as "leave" | "absent" | "overtime" | "present" | "early" | "late"}
-                        exception={exception}
-                        onStatusChange={(newStatus, exceptionData) => 
-                          onStatusChange(employee.id, dateStr, newStatus, exceptionData)
-                        }
-                        isToday={isCurrentDay}
-                        isWeekend={isWeekend}
-                        rowIndex={employeeIndex}
-                        totalRows={employees.length}
-                      />
+                      <div className={`text-xs ${
+                        isCurrentDay ? 'text-white' : 
+                        isFutureDay ? 'text-gray-400' : 
+                        isWeekend ? 'text-gray-500' : 'text-text-secondary'
+                      }`}>
+                        {date.toLocaleDateString('zh-CN', { weekday: 'short' })}
+                      </div>
+                      <div className={`text-xs sm:text-sm font-bold mt-1 ${
+                        isCurrentDay ? 'text-white' : 
+                        isFutureDay ? 'text-gray-400' : 
+                        isWeekend ? 'text-gray-600' : 'text-text-primary'
+                      }`}>
+                        {date.getDate()}
+                      </div>
+                      {isCurrentDay && (
+                        <div className="w-1 h-1 bg-white rounded-full mx-auto mt-1"></div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            ))}
+            </div>
+
+            {/* 员工行 */}
+            <div className="divide-y divide-gray-100">
+              {employees.map((employee, employeeIndex) => (
+                <div
+                  key={employee.id}
+                  className="flex hover:bg-gray-50 transition-colors duration-200"
+                >
+                  {/* 员工信息 - 固定 */}
+                  <div className="sticky left-0 z-10 flex-shrink-0 w-24 sm:w-32 p-2 sm:p-4 border-r border-gray-100 bg-white hover:bg-gray-50 transition-colors duration-200">
+                    <div className="flex flex-col gap-1">
+                      <div className="font-medium text-text-primary text-xs sm:text-sm truncate">
+                        {employee.name}
+                      </div>
+                      <div className="text-xs text-text-secondary truncate sm:block hidden">
+                        {employee.position}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 考勤单元格 */}
+                  {dates.map(date => {
+                    // 使用本地时间格式化日期，避免UTC时区问题
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
+                    const isCurrentDay = dateStr === todayStr;
+                    const isPastDay = date < today;
+                    const isFutureDay = date > today;
+                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                    
+                    // 未来日期不显示考勤单元格，只显示空白
+                    if (isFutureDay) {
+                      return (
+                        <div 
+                          key={dateStr} 
+                          className="flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 flex items-center justify-center border-r border-gray-100 bg-gray-50 opacity-50"
+                          title="未来日期"
+                        >
+                          {/* 未来日期显示空白 */}
+                        </div>
+                      );
+                    }
+                    
+                    const status = getStatus(employee.id, dateStr);
+                    const exception = getException ? getException(employee.id, dateStr) : null;
+                    
+                    return (
+                      <div 
+                        key={dateStr} 
+                        className={`
+                          flex-shrink-0 w-12 sm:w-16 p-1 sm:p-2 flex items-center justify-center border-r border-gray-100
+                          ${isCurrentDay ? 'bg-ios18-blue/10' : ''}
+                        `}
+                      >
+                        <AttendanceCell
+                          employee={employee}
+                          date={dateStr}
+                          status={status as "leave" | "absent" | "overtime" | "present" | "early" | "late"}
+                          exception={exception}
+                          onStatusChange={(newStatus, exceptionData) => 
+                            onStatusChange(employee.id, dateStr, newStatus, exceptionData)
+                          }
+                          isToday={isCurrentDay}
+                          isWeekend={isWeekend}
+                          rowIndex={employeeIndex}
+                          totalRows={employees.length}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

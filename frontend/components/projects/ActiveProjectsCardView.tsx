@@ -12,7 +12,7 @@ import { ActiveProjectCard } from '@/components/projects/ProjectCard';
 import { StatusType } from '@/components/ui';
 import { Material } from '@/types/project';
 import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, ClockIcon, PlayIcon, FolderIcon, CubeIcon, CheckIcon, ChartBarIcon, MagnifyingGlassIcon, DocumentArrowDownIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import { exportProjectsToExcel } from '@/utils/projectReportExporter';
+import { exportActiveProjectsReport } from '@/utils/projectReportExporter';
 
 interface ActiveProject {
   id: number;
@@ -323,7 +323,7 @@ export const ActiveProjectsCardView: React.FC<ActiveProjectsCardViewProps> = ({
   // 导出报表处理函数
   const handleExportToExcel = () => {
     try {
-      exportProjectsToExcel(projects as ActiveProject[], `活跃项目详细报表_${new Date().toISOString().split('T')[0]}.xlsx`);
+      exportActiveProjectsReport();
       toast.addToast({
         type: 'success',
         message: '活跃项目详细报表已导出为Excel格式'
