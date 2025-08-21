@@ -581,7 +581,22 @@ SELECT * FROM v_monthly_attendance_stats;
 - `frontend/app/mobile-test/page.tsx` - 移动端组件测试页面
 
 ### 版本历史
-- **当前版本**: v2.6.0 (2025-08-20) - 统一DXF预览组件重构完成
+- **当前版本**: v2.6.1 (2025-08-21) - 测试页面清理与构建错误修复
+- **v2.6.1 关键修复**:
+  - **🧹 代码清理**:
+    - 删除所有测试页面（advanced-dxf-test, button-test, drawings-table, simple-test）
+    - 删除临时文档和脚本文件，保持代码库整洁
+    - 清理废弃的DXF部署检查清单和项目搜索导出指南
+  - **🔧 构建错误修复**:
+    - 修复MobileDrawingList中缺失的handleAdvancedPreview函数引用
+    - 添加FireIcon导入，解决图标缺失问题
+    - 修复ProjectDetailModern中缺失的onAdvancedPreviewDrawing属性
+    - 修复DxfDataAnalyzer中dxf-viewer的workerFactory属性
+    - 修复attendanceExporter中的TypeScript类型错误
+  - **✅ 构建验证**:
+    - 前端构建成功通过，无TypeScript错误
+    - 代码质量检查通过，项目处于稳定状态
+    - 删除依赖缺失和模块解析错误
 - **v2.6.0 重大更新**:
   - **🔄 DXF预览系统重构 (BREAKING CHANGE)**:
     - **全面替换预览组件**：将所有DxfPreviewModal替换为AdvancedDxfModal高级预览

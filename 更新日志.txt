@@ -1,6 +1,31 @@
 激光切割生产管理系统 - 更新日志
 ===========================================
 
+版本 2.6.1 - 2025年8月21日
+--------------------------
+
+【🔧 构建修复 (PATCH)】
+
+测试页面清理：
+- 🗑️ 删除 advanced-dxf-test 测试页面
+- 🗑️ 删除 button-test 测试页面  
+- 🗑️ 删除 drawings-table 测试页面
+- 🗑️ 删除 simple-test 测试页面
+- 📚 删除临时文档和脚本文件
+
+TypeScript错误修复：
+- 🔧 修复 MobileDrawingList 中缺失的 handleAdvancedPreview 函数引用
+- 📦 添加 FireIcon 导入，解决图标缺失问题
+- 🔗 修复 ProjectDetailModern 中缺失的 onAdvancedPreviewDrawing 属性
+- ⚙️ 修复 DxfDataAnalyzer 中 dxf-viewer 的 workerFactory 属性
+- 📊 修复 attendanceExporter 中的类型错误和字段映射
+
+构建验证：
+- ✅ 前端构建成功通过，无 TypeScript 错误
+- 🎯 代码质量检查通过，项目处于稳定状态
+- 📦 解决依赖缺失和模块解析错误
+- 🧹 代码库清理完成，准备推送
+
 版本 2.5.5 - 2025年8月20日
 --------------------------
 

@@ -429,6 +429,12 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
     setShowAdvancedDxfPreview(true);
   };
 
+  // 高级预览图纸（与基础预览相同）
+  const handleAdvancedPreviewDrawing = (drawing: Drawing) => {
+    setSelectedDrawing(drawing);
+    setShowAdvancedDxfPreview(true);
+  };
+
 
   // 删除图纸
   const handleDeleteDrawing = async (drawingId: number, filename: string) => {
@@ -698,6 +704,7 @@ export const ProjectDetailModern: React.FC<ProjectDetailModernProps> = ({
               onUploadClick={() => setShowUploadModal(true)}
               onDeleteDrawing={handleDeleteDrawing}
               onPreviewDrawing={handlePreviewDrawing}
+              onAdvancedPreviewDrawing={handleAdvancedPreviewDrawing}
             />
           )}
 

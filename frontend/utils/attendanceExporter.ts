@@ -79,15 +79,26 @@ export const exportDailyAttendance = async (
     const rowIndex = index + 2;
     const row = worksheet.getRow(rowIndex);
     
-    const exception = attendanceExceptions.find(ex => ex.employeeId === employee.employeeId);
+    const exception = attendanceExceptions.find(ex => ex.employeeId === employee.id);
     
-    applyCellStyle(row.getCell(1), employee.employeeId);
+    applyCellStyle(row.getCell(1), employee.employeeId || employee.id.toString());
     applyCellStyle(row.getCell(2), employee.name);
-    applyCellStyle(row.getCell(3), employee.department);
+    applyCellStyle(row.getCell(3), employee.department || '未指定');
     applyCellStyle(row.getCell(4), employee.position);
     applyCellStyle(row.getCell(5), exception ? exception.exceptionType : '正常');
     applyCellStyle(row.getCell(6), exception ? exception.exceptionType : '');
-    applyCellStyle(row.getCell(7), exception ? exception.reason || '' : '');
+    const getExceptionReason = (exception: AttendanceException) => {
+      switch (exception.exceptionType) {
+        case 'leave': return exception.leaveReason || '';
+        case 'overtime': return exception.overtimeReason || '';
+        case 'early': return exception.earlyLeaveReason || '';
+        case 'late': return exception.lateArrivalReason || '';
+        case 'absent': return exception.absentReason || '';
+        default: return '';
+      }
+    };
+
+    applyCellStyle(row.getCell(7), exception ? getExceptionReason(exception) : '');
   });
 
   // 导出文件

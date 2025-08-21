@@ -325,6 +325,7 @@ const DxfDataAnalyzer: React.FC<DxfDataAnalyzerProps> = ({
       await viewer.Load({
         url: `data:application/dxf;charset=utf-8,${encodeURIComponent(dxfText)}`,
         fonts: fontUrls,
+        workerFactory: null, // 添加缺少的属性
         progressCbk: (phase: string, receivedBytes: number, totalBytes: number) => {
           console.log(`📈 加载进度 [${phase}]: ${receivedBytes}/${totalBytes}`);
         }

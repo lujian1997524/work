@@ -14,7 +14,8 @@ import {
   ChevronRightIcon,
   CalendarIcon,
   UserIcon,
-  ArchiveBoxIcon
+  ArchiveBoxIcon,
+  FireIcon
 } from '@heroicons/react/24/outline';
 import AdvancedDxfModal from '@/components/ui/advanced-dxf/AdvancedDxfModal';
 import { Loading, Button } from '@/components/ui';
@@ -330,7 +331,7 @@ export const MobileDrawingList: React.FC<MobileDrawingListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleAdvancedPreview(drawing);
+                        handlePreview(drawing);
                       }}
                       className="flex items-center space-x-1 px-3 py-2 text-orange-600 bg-orange-50 rounded-lg text-sm font-medium hover:bg-orange-100"
                     >
