@@ -117,6 +117,36 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
     }
   }, [refreshTrigger]);
 
+  // 监听项目相关事件，确保项目树能及时更新
+  useEffect(() => {
+    const handleProjectCreated = (event: any) => {
+      // 项目创建成功，刷新项目树
+      fetchProjects();
+    };
+
+    const handleProjectUpdated = (event: any) => {
+      // 项目更新成功，刷新项目树
+      fetchProjects();
+    };
+
+    const handleProjectsUpdated = (event: any) => {
+      // 项目列表更新，刷新项目树
+      fetchProjects();
+    };
+
+    // 注册事件监听器
+    window.addEventListener('project-created', handleProjectCreated);
+    window.addEventListener('project-updated', handleProjectUpdated);
+    window.addEventListener('projects-updated', handleProjectsUpdated);
+
+    // 清理函数
+    return () => {
+      window.removeEventListener('project-created', handleProjectCreated);
+      window.removeEventListener('project-updated', handleProjectUpdated);
+      window.removeEventListener('projects-updated', handleProjectsUpdated);
+    };
+  }, [fetchProjects]); // 依赖fetchProjects，确保引用稳定
+
   // 按状态分组项目
   const groupedProjects = {
     all: projects,

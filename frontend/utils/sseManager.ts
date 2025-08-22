@@ -17,6 +17,7 @@ export type SSEEventType =
   | 'projects-batch-restored'
   | 'projects-batch-soft-deleted'
   | 'projects-batch-destroyed'
+  | 'projects-reordered'
   | 'project-worker-assigned'
   | 'project-worker-reassigned'
   // 材料相关事件
@@ -157,7 +158,7 @@ class SSEManager {
           'project-restored', 'project-soft-deleted', 'project-moved-to-past',
           'project-restored-from-past', 'projects-batch-restored',
           'projects-batch-soft-deleted', 'projects-batch-destroyed',
-          'material-status-changed', 'material-batch-status-changed', 'test'
+          'projects-reordered', 'material-status-changed', 'material-batch-status-changed', 'test'
         ];
 
         eventTypes.forEach(eventType => {

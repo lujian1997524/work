@@ -16,6 +16,8 @@ const Employee = require('./Employee');
 const AttendanceException = require('./AttendanceException');
 const AttendanceSettings = require('./AttendanceSettings');
 const MonthlyAttendanceSummary = require('./MonthlyAttendanceSummary');
+// 排队系统模型
+const { CuttingQueue, QueueAnnouncement, PublicQueueToken, setupAssociations } = require('./QueueModels');
 
 // 导入sequelize实例
 const { sequelize } = require('../utils/database');
@@ -312,6 +314,13 @@ User.hasMany(AttendanceExceptionModel, {
   as: 'createdAttendanceExceptions'
 });
 
+// 设置排队系统关联关系
+setupAssociations({
+  Project,
+  Worker, 
+  User
+});
+
 // 导出所有模型
 module.exports = {
   User,
@@ -331,5 +340,9 @@ module.exports = {
   AttendanceException: AttendanceExceptionModel,
   AttendanceSettings: AttendanceSettingsModel,
   MonthlyAttendanceSummary: MonthlyAttendanceSummaryModel,
+  // 排队系统模型
+  CuttingQueue,
+  QueueAnnouncement,
+  PublicQueueToken,
   sequelize
 };

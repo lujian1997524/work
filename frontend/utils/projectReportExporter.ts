@@ -4,6 +4,7 @@
 
 import ExcelJS from 'exceljs';
 import { Material } from '@/types/project';
+import { apiRequest } from '@/utils/api';
 
 interface ActiveProject {
   id: number;
@@ -53,13 +54,15 @@ const applyCellStyle = (cell: any, text: string | number) => {
  */
 export const exportActiveProjectsReport = async (): Promise<void> => {
   try {
-    // 获取活跃项目数据
-    const response = await fetch('/api/projects?status=active');
-    if (!response.ok) {
-      throw new Error('获取项目数据失败');
-    }
+    // 使用 apiRequest 调用远程API
+    const response: any = await apiRequest('/api/projects');
+    const projects: ActiveProject[] = Array.isArray(response) ? response : response.projects || [];
     
-    const projects: ActiveProject[] = await response.json();
+    // 筛选活跃项目
+    const activeProjects = projects.filter(p => 
+      p.status === 'pending' || p.status === 'in_progress'
+    );
+    
     const workbook = new ExcelJS.Workbook();
     
     // 工作表1: 项目概览
@@ -81,7 +84,7 @@ export const exportActiveProjectsReport = async (): Promise<void> => {
     });
 
     // 添加项目数据
-    projects.forEach((project, index) => {
+    activeProjects.forEach((project, index) => {
       const rowIndex = index + 2;
       const row = overviewSheet.getRow(rowIndex);
       
@@ -115,7 +118,7 @@ export const exportActiveProjectsReport = async (): Promise<void> => {
 
     // 添加材料数据
     let materialRowIndex = 2;
-    projects.forEach((project) => {
+    activeProjects.forEach((project) => {
       if (project.materials && project.materials.length > 0) {
         project.materials.forEach((material) => {
           const row = materialsSheet.getRow(materialRowIndex);

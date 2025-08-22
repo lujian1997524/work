@@ -117,7 +117,10 @@ export const Modal: React.FC<ModalProps> = ({
               )}
               
               {/* 内容区域 */}
-              <div className={`p-6 ${size === '3xl' ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
+              <div className={`p-6 ${
+                size === '3xl' ? 'max-h-[60vh] overflow-y-auto' : 
+                size === 'full' ? 'max-h-[75vh] overflow-y-auto' : ''
+              }`}>
                 {children}
               </div>
               

@@ -205,13 +205,17 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <h4 
-              className="font-semibold text-base truncate cursor-pointer hover:text-blue-600 transition-colors"
-              onClick={() => onViewDetail?.(project.id)}
-              
-            >
-              {project.name}
-            </h4>
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <h4 
+                className="font-semibold text-base truncate cursor-pointer hover:text-blue-600 transition-colors"
+                onClick={() => onViewDetail?.(project.id)}
+              >
+                {project.name}
+              </h4>
+              <span className="text-base font-medium text-blue-600 whitespace-nowrap">
+                {project.assignedWorker?.name || '未分配'}
+              </span>
+            </div>
             <div className="flex items-center space-x-1">
               <span className="text-xs text-gray-400">
                 {formatDate(project.createdAt)}
@@ -260,7 +264,6 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
           </div>
           <div className="flex items-center justify-between text-sm text-gray-600">
             <div className="flex items-center space-x-2">
-              <span>{project.assignedWorker?.name || '未分配'}</span>
               {/* 项目状态标签 */}
               <Badge
                 variant={
@@ -295,7 +298,7 @@ export const ActiveProjectCard: React.FC<ActiveProjectCardProps> = ({
       
       {/* 厚度网格 */}
       <div className="flex-1">
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
           {sortedMaterials.map((material) => (
             <div key={material.id} className="text-center">
               <button

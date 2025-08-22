@@ -145,6 +145,12 @@ interface ProjectDetailModernProps {
 
 // 状态配置
 const statusConfig = {
+  empty: { 
+    label: '空白', 
+    color: 'bg-gray-50 text-gray-500', 
+    icon: ClockIcon,
+    description: '未分配状态'
+  },
   pending: { 
     label: '待处理', 
     color: 'bg-gray-100 text-gray-800', 
@@ -968,6 +974,11 @@ const MaterialsSection: React.FC<{
 
   // 状态配置（与ActiveProjectCard保持一致）
   const statusConfig = {
+    empty: {
+      color: 'bg-gray-50 text-gray-500', 
+      textColor: 'text-gray-500',
+      label: '空白' 
+    },
     pending: { 
       color: 'bg-gray-100 text-gray-800', 
       textColor: 'text-gray-800',

@@ -29,6 +29,8 @@ const sseRoutes = require('./routes/sse');
 // 考勤系统路由
 const employeesRoutes = require('./routes/employees');
 const attendanceRoutes = require('./routes/attendance');
+// 排队系统路由
+const queueRoutes = require('./routes/queue');
 
 const app = express();
 
@@ -84,10 +86,7 @@ app.use(morgan('combined'));
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
 
-// 文件上传路由需要在JSON解析中间件之前处理
-app.use('/api/drawings', drawingsRoutes);
-
-// 其他请求使用JSON解析
+// JSON解析中间件 - 必须在所有路由之前
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
@@ -121,7 +120,9 @@ app.get('/api', (req, res) => {
       sse: '/api/sse',
       // 考勤系统端点
       employees: '/api/employees',
-      attendance: '/api/attendance'
+      attendance: '/api/attendance',
+      // 排队系统端点
+      queue: '/api/queue'
     }
   });
 });
@@ -137,13 +138,15 @@ app.use('/api/worker-materials', workerMaterialsRoutes);
 app.use('/api/material-requirements', materialRequirementsRoutes);
 app.use('/api/material-dimensions', materialDimensionsRoutes);
 app.use('/api/thickness-specs', thicknessSpecsRoutes);
-// drawings路由已在上面提前注册
+app.use('/api/drawings', drawingsRoutes);
 app.use('/api/dxf-preview', dxfPreviewRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/sse', sseRoutes);
 // 考勤系统路由
 app.use('/api/employees', employeesRoutes);
 app.use('/api/attendance', attendanceRoutes);
+// 排队系统路由
+app.use('/api/queue', queueRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

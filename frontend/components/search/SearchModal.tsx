@@ -200,9 +200,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     try {
       // 发送搜索请求到API
       const response = await apiRequest(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
         signal: abortController.current.signal
       });
 

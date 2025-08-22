@@ -15,6 +15,8 @@ module.exports = {
         'ios18-teal': '#30D158',
         'ios18-mint': '#00C7BE',
         'ios18-brown': '#AC8E68',
+        'ios18-orange': '#FF9500',
+        'ios18-yellow': '#FFCC00',
         
         // macOS 15 系统色
         'macos15-accent': '#007AFF',

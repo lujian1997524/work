@@ -37,24 +37,46 @@ router.get('/connect', (req, res) => {
     });
   }
 
-  // 手动验证token
+  // 验证token - 支持JWT和公共token
   const jwt = require('jsonwebtoken');
   let user;
   
-  try {
-    console.log('🔍 验证JWT token...');
-    console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    user = decoded;
-    console.log('✅ JWT验证成功:', { userId: user.id, userName: user.name, role: user.role });
-  } catch (error) {
-    console.log('❌ JWT验证失败:', error.message);
-    console.log('Token内容:', token);
-    return res.status(401).json({
-      success: false,
-      error: '无效的认证令牌'
-    });
+  // 检查是否为公共页面token
+  if (token.startsWith('public-queue-')) {
+    const publicToken = token.replace('public-queue-', '');
+    if (publicToken === 'laser_queue_2025_public') {
+      // 公共页面用户
+      user = {
+        id: 0,
+        name: '公共用户',
+        role: 'public',
+        isPublic: true
+      };
+      console.log('✅ 公共页面SSE连接:', { token: publicToken });
+    } else {
+      console.log('❌ 无效的公共token:', publicToken);
+      return res.status(401).json({
+        success: false,
+        error: '无效的公共访问令牌'
+      });
+    }
+  } else {
+    // JWT token验证
+    try {
+      console.log('🔍 验证JWT token...');
+      console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
+      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      user = decoded;
+      console.log('✅ JWT验证成功:', { userId: user.id, userName: user.name, role: user.role });
+    } catch (error) {
+      console.log('❌ JWT验证失败:', error.message);
+      console.log('Token内容:', token);
+      return res.status(401).json({
+        success: false,
+        error: '无效的认证令牌'
+      });
+    }
   }
   
   console.log(`🔌 用户 ${user.name}(ID:${user.id}) 请求建立SSE连接`);
@@ -81,17 +103,18 @@ router.get('/connect', (req, res) => {
   res.write(welcomeMessage);
 
   // 添加客户端到SSE管理器
-  const clientId = sseManager.addClient(user.id, res);
+  const clientId = sseManager.addClient(user.isPublic ? `public-${user.id}` : user.id, res);
 
   // 处理客户端断开连接
+  const userId = user.isPublic ? `public-${user.id}` : user.id;
   req.on('close', () => {
     console.log(`用户 ${user.name}(ID:${user.id}) SSE连接关闭`);
-    sseManager.removeClient(user.id, clientId);
+    sseManager.removeClient(userId, clientId);
   });
 
   req.on('error', (error) => {
     console.error(`用户 ${user.name}(ID:${user.id}) SSE连接错误:`, error.message);
-    sseManager.removeClient(user.id, clientId);
+    sseManager.removeClient(userId, clientId);
   });
 });
 

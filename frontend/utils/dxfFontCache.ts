@@ -27,7 +27,7 @@ class DxfFontCache {
       return;
     }
 
-    console.log('🎨 开始预加载 DXF 字体...');
+    console.log('开始预加载 DXF 字体...');
     const startTime = performance.now();
 
     try {
@@ -36,9 +36,9 @@ class DxfFontCache {
       
       this.isInitialized = true;
       const loadTime = performance.now() - startTime;
-      console.log(`✅ DXF 字体预加载完成，用时: ${Math.round(loadTime)}ms`);
+      console.log(`DXF 字体预加载完成，用时: ${Math.round(loadTime)}ms`);
     } catch (error) {
-      console.error('❌ DXF 字体预加载失败:', error);
+      console.error('DXF 字体预加载失败:', error);
     }
   }
 
@@ -71,11 +71,11 @@ class DxfFontCache {
       this.fontUrlCache.set(fontPath, blobUrl);
       
       this.loadingPromises.delete(fontPath);
-      console.log(`✅ 字体加载完成: ${fontPath} -> ${blobUrl}`);
+      console.log(`字体加载完成: ${fontPath} -> ${blobUrl}`);
       return fontBuffer;
     } catch (error) {
       this.loadingPromises.delete(fontPath);
-      console.error(`❌ 字体加载失败: ${fontPath}`, error);
+      console.error(`字体加载失败: ${fontPath}`, error);
       throw error;
     }
   }
@@ -96,20 +96,27 @@ class DxfFontCache {
    */
   public getFontUrls(): string[] {
     if (!this.isInitialized) {
-      console.warn('⚠️ 字体未预加载，可能影响显示效果');
+      console.warn('字体未预加载，可能影响显示效果');
       return ['/fonts/NotoSansSC-Thin.ttf']; // 降级到原始URL
     }
     
     // 返回缓存的Blob URL
     const cachedUrl = this.fontUrlCache.get('/fonts/NotoSansSC-Thin.ttf');
     if (cachedUrl) {
-      console.log(`🎯 使用缓存的字体URL: ${cachedUrl}`);
+      console.log(`使用缓存的字体URL: ${cachedUrl}`);
       return [cachedUrl];
     }
     
     // 如果没有缓存，降级到原始URL
-    console.warn('⚠️ 字体缓存的Blob URL不存在，使用原始URL');
+    console.warn('字体缓存的Blob URL不存在，使用原始URL');
     return ['/fonts/NotoSansSC-Thin.ttf'];
+  }
+
+  /**
+   * 检查字体是否已预加载
+   */
+  public isPreloaded(): boolean {
+    return this.isInitialized;
   }
 
   /**

@@ -49,7 +49,7 @@ export const apiRequest = async (
     }
   }
   
-  // 合并用户提供的headers，但对于FormData请求，删除任何Content-Type
+  // 合并用户提供的headers
   if (fetchOptions.headers) {
     const userHeaders = fetchOptions.headers as Record<string, string>;
     Object.keys(userHeaders).forEach(key => {
@@ -59,6 +59,11 @@ export const apiRequest = async (
       }
       headers[key] = userHeaders[key];
     });
+  }
+  
+  // 确保JSON请求有正确的Content-Type（优先级最高）
+  if (!isFormData && fetchOptions.body && typeof fetchOptions.body === 'string') {
+    headers['Content-Type'] = 'application/json';
   }
   
   try {
@@ -75,4 +80,20 @@ export const apiRequest = async (
 // 检查localStorage是否可用
 export const isLocalStorageAvailable = (): boolean => {
   return typeof window !== 'undefined' && !!window.localStorage;
+};
+
+// 获取认证headers用于服务端API调用
+export const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (isLocalStorageAvailable()) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  
+  return headers;
 };

@@ -340,6 +340,17 @@ router.post('/upload', authenticate, upload.single('drawing'), async (req, res) 
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 检查请求体是否存在
+    if (!req.body) {
+      console.error('请求体为空:', req.body);
+      return res.status(400).json({
+        error: '请求数据格式错误'
+      });
+    }
+    
+    console.log('接收到的请求体:', JSON.stringify(req.body, null, 2));
+    
     const { description, status, projectIds, originalFilename } = req.body;
 
     const drawing = await Drawing.findByPk(id);
@@ -381,12 +392,34 @@ router.put('/:id', authenticate, async (req, res) => {
       }
     }
 
+    // 处理项目关联
+    let targetProjectId = drawing.projectId; // 默认保持原有关联
+    if (projectIds !== undefined) {
+      if (Array.isArray(projectIds) && projectIds.length > 0) {
+        targetProjectId = projectIds[0];
+      } else if (projectIds === null || (Array.isArray(projectIds) && projectIds.length === 0)) {
+        targetProjectId = null; // 取消项目关联
+      }
+    }
+
+    console.log('更新图纸参数:', { id, description, status, originalFilename, projectIds, targetProjectId });
+
     // 更新图纸信息
-    await drawing.update({
+    const updateData = {
       description: description !== undefined ? description : drawing.description,
       status: status !== undefined ? status : drawing.status,
-      originalFilename: originalFilename !== undefined ? originalFilename : drawing.originalFilename
-    });
+      projectId: targetProjectId,
+      archivedAt: status === '已归档' ? new Date() : drawing.archivedAt // 添加归档时间
+    };
+
+    // 只有当原始文件名提供时才更新
+    if (originalFilename !== undefined) {
+      updateData.originalFilename = originalFilename;
+    }
+
+    console.log('数据库更新数据:', updateData);
+    
+    await drawing.update(updateData);
 
     // 获取更新后的完整信息
     const updatedDrawing = await Drawing.findByPk(id, {
@@ -764,7 +797,7 @@ router.post('/common-parts/upload', (req, res, next) => {
   }
 });
 
-// 归档项目图纸（项目完成时调用）
+// 归档项目图纸（项目删除或移动到过往项目时调用）
 router.post('/archive-project/:projectId', authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;

@@ -716,6 +716,21 @@ router.put('/:id', authenticate, requireOperator, async (req, res) => {
       // 找出需要新增的厚度规格
       const newThicknessIds = requiredThickness.filter(id => !existingThicknessIds.includes(id));
       
+      // 找出需要删除的厚度规格
+      const removedThicknessIds = existingThicknessIds.filter(id => !requiredThickness.includes(id));
+      
+      // 删除被移除的厚度规格对应的材料记录
+      if (removedThicknessIds.length > 0) {
+        const deletedCount = await Material.destroy({
+          where: {
+            projectId: parseInt(id),
+            thicknessSpecId: removedThicknessIds
+          }
+        });
+        
+        console.log(`项目 ${project.name} 删除了 ${removedThicknessIds.length} 种厚度规格，共删除 ${deletedCount} 条材料记录`);
+      }
+      
       if (newThicknessIds.length > 0) {
         // 验证新厚度规格是否有效
         const validThicknessSpecs = await ThicknessSpec.findAll({

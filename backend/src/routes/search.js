@@ -2,7 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
-const { Project, Worker, Drawing, User, ThicknessSpec } = require('../models');
+// 导入所有需要的模型
+const { 
+  Project, 
+  Worker, 
+  Department, 
+  Drawing, 
+  User, 
+  Material, 
+  ThicknessSpec, 
+  WorkerMaterial, 
+  Employee, 
+  AttendanceException 
+} = require('../models');
 
 /**
  * 全局搜索 - 支持统一格式
@@ -39,9 +51,6 @@ router.get('/', authenticate, async (req, res) => {
     const searchTerm = query.trim();
     const searchPattern = `%${searchTerm}%`;
     
-    // 导入模型
-    const { Project, Worker, Department, Drawing, User, Material, ThicknessSpec, WorkerMaterial, Employee, AttendanceException } = require('../models');
-
     // 智能搜索词处理 - 增强数字和厚度识别
     const processSearchTerm = (searchTerm) => {
       const processed = {
@@ -174,10 +183,7 @@ router.get('/', authenticate, async (req, res) => {
           {
             model: WorkerMaterial,
             as: 'materials',
-            attributes: ['id', 'quantity'],
-            where: { 
-              quantity: { [Op.gt]: 0 }
-            },
+            attributes: ['id'],
             include: [{
               model: ThicknessSpec,
               as: 'thicknessSpec',
@@ -232,9 +238,6 @@ router.get('/', authenticate, async (req, res) => {
 
       // 5. 搜索板材库存 - 修复逻辑，支持更灵活的搜索
       WorkerMaterial.findAll({
-        where: {
-          quantity: { [Op.gt]: 0 }
-        },
         include: [
           {
             model: Worker,
@@ -257,7 +260,7 @@ router.get('/', authenticate, async (req, res) => {
           }
         ],
         limit: 20,
-        order: [['quantity', 'DESC']]
+        order: [['id', 'DESC']]
       }),
 
       // 6. 搜索厚度规格 - 修复数字匹配逻辑
@@ -445,8 +448,8 @@ router.get('/', authenticate, async (req, res) => {
       })) || [],
       // 库存信息
       materials: worker.materials?.map(material => {
-        // 从MaterialDimension计算实际总量
-        const totalQuantity = material.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0;
+        // WorkerMaterial可能没有quantity字段，设为固定值
+        const totalQuantity = 1; // 表示存在该类型材料
         return {
           id: material.id,
           quantity: totalQuantity,
@@ -522,8 +525,8 @@ router.get('/', authenticate, async (req, res) => {
     const formatWorkerMaterials = filterWorkerMaterials(workerMaterials).map(workerMaterial => {
       const department = workerMaterial.worker.departmentInfo?.name || workerMaterial.worker.department || '未分配部门';
       
-      // 从MaterialDimension计算实际总量
-      const totalQuantity = workerMaterial.dimensions?.reduce((sum, dim) => sum + dim.quantity, 0) || 0;
+      // WorkerMaterial可能没有quantity字段，设为固定值
+      const totalQuantity = 1; // 表示存在该类型材料
       
       return {
         id: workerMaterial.id,

@@ -79,6 +79,8 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState<'可用' | '已废弃' | '已归档'>('可用');
   const [editFilename, setEditFilename] = useState('');
+  const [editProjectId, setEditProjectId] = useState<number | null>(null);
+  const [availableProjects, setAvailableProjects] = useState<any[]>([]);
 
   // 批量操作相关状态
   const [batchMode, setBatchMode] = useState(false);
@@ -300,6 +302,29 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     }
   };
 
+  // 获取可用项目列表
+  const fetchAvailableProjects = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await apiRequest('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const projects = data.projects || [];
+        // 只显示活跃项目（非过往项目）
+        const activeProjects = projects.filter((p: any) => !p.isPastProject);
+        setAvailableProjects(activeProjects);
+      }
+    } catch (error) {
+      // 静默处理获取项目列表错误
+    }
+  };
+
   // 获取图纸列表
   const fetchDrawings = async () => {
     if (!token) return;
@@ -353,7 +378,11 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     setEditDescription(drawing.description || '');
     setEditStatus(drawing.status);
     setEditFilename(drawing.originalName || drawing.filename);
+    setEditProjectId(drawing.project?.id || null);
     setShowEditModal(true);
+    
+    // 获取可用项目列表
+    fetchAvailableProjects();
   };
 
   // 处理图纸打开（使用新的统一接口）
@@ -419,23 +448,26 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
     }
 
     try {
+      // 调试日志：打印请求数据
+      const requestData = {
+        description: editDescription,
+        status: editStatus,
+        originalFilename: editFilename,
+        projectIds: editProjectId ? [editProjectId] : []
+      };
+      console.log('图纸更新请求数据:', requestData);
+      console.log('请求JSON字符串:', JSON.stringify(requestData));
+      
       const response = await apiRequest(`/api/drawings/${editingDrawing.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          description: editDescription,
-          status: editStatus,
-          originalFilename: editFilename
-        })
+        body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
         await fetchDrawings(); // 重新获取列表
         setShowEditModal(false);
         setEditingDrawing(null);
+        setEditProjectId(null);
         setError(null);
         // 触发图纸更新事件
         window.dispatchEvent(new CustomEvent('drawing-updated'));
@@ -867,6 +899,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
           setEditFilename('');
           setEditDescription('');
           setEditStatus('可用');
+          setEditProjectId(null);
         }}
         
         size="md"
@@ -919,6 +952,29 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
             />
           </div>
 
+          {/* 关联项目 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              关联项目
+            </label>
+            <Dropdown
+              options={[
+                { label: '无关联项目', value: '' },
+                ...availableProjects.map(project => ({
+                  label: `${project.name} (${project.status === 'completed' ? '已完成' : project.status === 'in_progress' ? '进行中' : '待处理'})`,
+                  value: project.id.toString()
+                }))
+              ]}
+              value={editProjectId?.toString() || ''}
+              onChange={(value) => setEditProjectId(value ? parseInt(value as string) : null)}
+              className="w-full"
+              placeholder="选择要关联的项目..."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {editProjectId ? '图纸将关联到选中的项目' : '图纸不关联任何项目，将显示在"未关联项目"分类中'}
+            </p>
+          </div>
+
           {/* 操作按钮 */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
             <Button
@@ -929,6 +985,7 @@ export const DrawingLibrary: React.FC<DrawingLibraryProps> = ({
                 setEditFilename('');
                 setEditDescription('');
                 setEditStatus('可用');
+                setEditProjectId(null);
               }}
             >
               取消

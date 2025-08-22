@@ -3,27 +3,34 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 
-export type StatusType = 'pending' | 'in_progress' | 'completed'
+export type StatusType = 'empty' | 'pending' | 'in_progress' | 'completed'
 
 export interface StatusIndicatorProps {
   status: StatusType
   size?: 'sm' | 'md' | 'lg'
   interactive?: boolean
-  onClick?: () => void
+  onClick?: (newStatus: StatusType) => void
   showLabel?: boolean
   className?: string
+  disabled?: boolean
 }
 
 const statusConfig = {
-  pending: {
-    color: 'bg-gray-300 border-gray-500',
+  empty: {
+    color: 'bg-gray-100 border-gray-300 hover:bg-gray-200',
     icon: '○',
+    label: '空白',
+    textColor: 'text-gray-500'
+  },
+  pending: {
+    color: 'bg-orange-100 border-orange-400 hover:bg-orange-200',
+    icon: '⏳',
     label: '待处理',
-    textColor: 'text-gray-700'
+    textColor: 'text-orange-600'
   },
   in_progress: {
     color: 'bg-blue-500 hover:bg-blue-600',
-    icon: '●',
+    icon: '⚙️',
     label: '进行中',
     textColor: 'text-white'
   },
@@ -41,7 +48,8 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   interactive = false,
   onClick,
   showLabel = false,
-  className = ''
+  className = '',
+  disabled = false
 }) => {
   const config = statusConfig[status]
   
@@ -55,16 +63,23 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
     ${sizeClasses[size]} ${config.color} ${config.textColor}
     rounded-full flex items-center justify-center font-medium
     transition-all duration-300 ease-in-out
-    ${status === 'pending' ? 'border-2' : ''}
-    ${interactive ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}
+    ${status === 'empty' || status === 'pending' ? 'border-2' : ''}
+    ${interactive && !disabled ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}
+    ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
   `
+
+  const handleClick = () => {
+    if (disabled || !onClick) return;
+    const nextStatus = getNextStatus(status);
+    onClick(nextStatus);
+  }
 
   const IndicatorElement = (
     <motion.div
       className={`${baseClasses} ${className}`}
-      whileHover={interactive ? { scale: 1.15, rotate: 5 } : {}}
-      whileTap={interactive ? { scale: 0.9, rotate: -5 } : {}}
-      onClick={onClick}
+      whileHover={interactive && !disabled ? { scale: 1.15, rotate: 5 } : {}}
+      whileTap={interactive && !disabled ? { scale: 0.9, rotate: -5 } : {}}
+      onClick={handleClick}
       initial={{ scale: 0, rotate: -180 }}
       animate={{ scale: 1, rotate: 0 }}
       transition={{ 
@@ -75,7 +90,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
       }}
       key={status} // 重要：状态变化时重新触发动画
     >
-      {status === 'pending' ? null : config.icon}
+      {status === 'empty' ? null : config.icon}
     </motion.div>
   )
 
@@ -83,7 +98,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
     return (
       <div className="flex items-center space-x-2">
         {IndicatorElement}
-        <span className="text-sm text-text-secondary font-medium">
+        <span className="text-sm text-gray-600 font-medium">
           {config.label}
         </span>
       </div>
@@ -91,6 +106,22 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   }
 
   return IndicatorElement
+}
+
+// 四状态循环函数
+const getNextStatus = (current: StatusType): StatusType => {
+  switch (current) {
+    case 'empty':
+      return 'pending'
+    case 'pending':
+      return 'in_progress'
+    case 'in_progress':
+      return 'completed'
+    case 'completed':
+      return 'empty'
+    default:
+      return 'empty'
+  }
 }
 
 // 状态切换组件
@@ -109,23 +140,9 @@ export const StatusToggle: React.FC<StatusToggleProps> = ({
   disabled = false,
   className = ''
 }) => {
-  const getNextStatus = (current: StatusType): StatusType => {
-    switch (current) {
-      case 'pending':
-        return 'in_progress'
-      case 'in_progress':
-        return 'completed'
-      case 'completed':
-        return 'pending'
-      default:
-        return 'pending'
-    }
-  }
-
-  const handleClick = () => {
+  const handleClick = (newStatus: StatusType) => {
     if (disabled) return;
-    const nextStatus = getNextStatus(status)
-    onChange(nextStatus)
+    onChange(newStatus);
   }
 
   return (
@@ -134,7 +151,8 @@ export const StatusToggle: React.FC<StatusToggleProps> = ({
       size={size}
       interactive={!disabled}
       onClick={handleClick}
-      className={`${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      disabled={disabled}
+      className={className}
     />
   )
 }

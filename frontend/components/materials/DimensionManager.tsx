@@ -129,7 +129,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
 
     setLoading(true);
     try {
-      const response = await apiRequest(`/api/dimensions/${dimensionId}`, {
+      const response = await apiRequest(`/api/material-dimensions/dimensions/${dimensionId}`, {
         method: 'PUT',
         body: JSON.stringify({
           width: parseFloat(formData.width),
@@ -177,7 +177,7 @@ export const DimensionManager: React.FC<DimensionManagerProps> = ({
 
     setLoading(true);
     try {
-      const response = await apiRequest(`/api/dimensions/${dimensionId}`, {
+      const response = await apiRequest(`/api/material-dimensions/dimensions/${dimensionId}`, {
         method: 'DELETE'
       });
 

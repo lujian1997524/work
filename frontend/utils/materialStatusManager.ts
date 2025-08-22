@@ -114,33 +114,11 @@ export class MaterialStatusUpdater {
           project.assignedWorker?.name
         );
         
-        // 如果完成，归档图纸
-        if (newProjectStatus === 'completed') {
-          await this.archiveProjectDrawings(projectId);
-        }
+        // 注意：图纸归档逻辑已移除
+        // 图纸只在项目进入过往项目时才归档，不在项目完成时归档
         
       } catch (error) {
       }
-    }
-  }
-  
-  /**
-   * 归档项目图纸
-   */
-  private static async archiveProjectDrawings(projectId: number): Promise<void> {
-    try {
-      const response = await apiRequest(`/api/drawings/archive-project/${projectId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-      }
-    } catch (error) {
     }
   }
 }

@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   // 应用配置
   environment: 'production',
   appName: '激光切割生产管理系统', 
-  version: '2.5.2',
+  version: '2.6.1',
 
   // 功能开关
   features: {

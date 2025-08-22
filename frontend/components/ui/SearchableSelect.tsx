@@ -1,6 +1,6 @@
 'use client'
 
-import React, { forwardRef, useState, useRef, useEffect } from 'react'
+import React, { forwardRef, useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDownIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
@@ -86,18 +86,6 @@ export const SearchableSelect = forwardRef<HTMLDivElement, SearchableSelectProps
     }
   }, [value, options])
 
-  // 点击外部关闭下拉框
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
-        handleBlur()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   // 过滤选项
   const filteredOptions = options.filter(option => {
     if (!searchTerm) return true
@@ -106,18 +94,76 @@ export const SearchableSelect = forwardRef<HTMLDivElement, SearchableSelectProps
   })
 
   // 获取选中的选项
-  const getSelectedOption = (): SearchableSelectOption | undefined => {
+  const getSelectedOption = useCallback((): SearchableSelectOption | undefined => {
     return options.find(option => option.value === internalValue)
-  }
+  }, [options, internalValue])
+
+  // 处理选项选择
+  const handleOptionSelect = useCallback((option: SearchableSelectOption) => {
+    if (option.disabled) return
+
+    setInternalValue(option.value)
+    setSearchTerm(option.label)
+    setIsOpen(false)
+    onChange?.(option.value)
+  }, [onChange])
+
+  // 处理失去焦点
+  const handleBlur = useCallback(() => {
+    setIsOpen(false)
+    
+    // 获取当前已选中的选项
+    const selectedOption = getSelectedOption()
+    
+    // 如果有已选中的项，始终显示其标签
+    if (selectedOption) {
+      setSearchTerm(selectedOption.label)
+      return
+    }
+    
+    // 如果没有选中项，但用户输入了搜索词，尝试匹配
+    if (searchTerm && filteredOptions.length > 0) {
+      // 完全匹配优先
+      const exactMatch = filteredOptions.find(option => 
+        option.label.toLowerCase() === searchTerm.toLowerCase()
+      )
+      if (exactMatch) {
+        handleOptionSelect(exactMatch)
+        return
+      }
+      
+      // 如果只有一个匹配项，自动选择
+      if (filteredOptions.length === 1) {
+        handleOptionSelect(filteredOptions[0])
+        return
+      }
+    }
+    
+    // 其他情况清空搜索词
+    setSearchTerm('')
+  }, [searchTerm, filteredOptions, getSelectedOption, handleOptionSelect])
+
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+        // 只有当下拉框是打开状态时才需要处理
+        if (isOpen) {
+          handleBlur()
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, handleBlur]) // 添加 handleBlur 依赖
 
   // 处理输入框点击
   const handleInputClick = () => {
     if (disabled) return
     setIsOpen(true)
-    // 如果有选中值，清空搜索词以显示所有选项
-    if (internalValue) {
-      setSearchTerm('')
-    }
+    // 只有在用户实际想要搜索时才清空，而不是简单点击时就清空
+    // 保持显示已选择的标签，用户开始输入时自然会清空
   }
 
   // 处理输入框输入
@@ -126,51 +172,20 @@ export const SearchableSelect = forwardRef<HTMLDivElement, SearchableSelectProps
     setSearchTerm(newSearchTerm)
     setIsOpen(true)
     
+    // 如果用户开始输入新内容，清空之前的选择
+    if (newSearchTerm && internalValue) {
+      // 检查输入内容是否与当前选中项的标签不同
+      const selectedOption = getSelectedOption()
+      if (selectedOption && newSearchTerm !== selectedOption.label) {
+        setInternalValue('')
+        onChange?.('')
+      }
+    }
+    
     // 如果输入为空，清空选中值
     if (!newSearchTerm) {
       setInternalValue('')
       onChange?.('')
-    }
-  }
-
-  // 处理选项选择
-  const handleOptionSelect = (option: SearchableSelectOption) => {
-    if (option.disabled) return
-
-    setInternalValue(option.value)
-    setSearchTerm(option.label)
-    setIsOpen(false)
-    onChange?.(option.value)
-  }
-
-  // 处理失去焦点
-  const handleBlur = () => {
-    setIsOpen(false)
-    
-    // 如果有选中值，恢复显示标签
-    const selectedOption = getSelectedOption()
-    if (selectedOption) {
-      setSearchTerm(selectedOption.label)
-    } else if (searchTerm && filteredOptions.length > 0) {
-      // 如果输入的内容与某个选项匹配，自动选择第一个匹配项
-      const exactMatch = filteredOptions.find(option => 
-        option.label.toLowerCase() === searchTerm.toLowerCase()
-      )
-      if (exactMatch) {
-        handleOptionSelect(exactMatch)
-      } else {
-        // 否则清空输入
-        setSearchTerm('')
-        setInternalValue('')
-        onChange?.('')
-      }
-    } else {
-      // 没有匹配项时清空
-      setSearchTerm('')
-      if (internalValue) {
-        setInternalValue('')
-        onChange?.('')
-      }
     }
   }
 

@@ -1,7 +1,7 @@
 {
   "name": "laser-cutting-manager-frontend",
-  "version": "2.6.1",
-  "description": "激光切割生产管理系统 - 测试页面清理与构建错误修复",
+  "version": "2.6.5",
+  "description": "激光切割生产管理系统 - 公共页面实时同步和队列排序优化",
   "author": "LaserCut Team",
   "private": true,
   "scripts": {
