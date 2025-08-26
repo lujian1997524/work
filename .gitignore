@@ -1,0 +1,90 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Production builds
+.next/
+*/build/
+*/.next/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# ESLint cache
+.eslintcache
+
+# TypeScript build info
+*.tsbuildinfo
+*/tsconfig.tsbuildinfo
+
+# Cache directories
+.cache/
+*/cache/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Log files
+*.log
+logs/
+
+# Package-lock files (optional, some prefer to include them)
+# package-lock.json
+# yarn.lock
+
+# Backup files
+*.backup
+*.bak
+
+# Build artifacts
+dist/
+out/
+
+# Testing
+.nyc_output/
+coverage/
+
+# Misc
+*.tgz
+*.tar.gz

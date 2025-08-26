@@ -1,0 +1,1020 @@
+const express = require('express');
+const router = express.Router();
+const { Op, QueryTypes } = require('sequelize');
+const { MaterialDimension, WorkerMaterial, Worker, ThicknessSpec, Department, MaterialAllocation, sequelize } = require('../models');
+const { authenticate } = require('../middleware/auth');
+const { recordMaterialStock, recordMaterialDimensionUpdate, recordMaterialDimensionDelete, recordMaterialDimensionTransfer } = require('../utils/operationHistory');
+
+// 搜索板材尺寸规格 (修复实时库存显示，计算可用量 = 总量 - 已分配量)
+router.post('/search', authenticate, async (req, res) => {
+  try {
+    const { materialType, thickness, searchQuery } = req.body;
+
+    if (!materialType || !thickness || !searchQuery) {
+      return res.status(400).json({ error: '请提供材料类型、厚度和搜索关键词' });
+    }
+
+    // 将搜索关键词转换为数字（去掉可能的 'mm' 后缀）
+    const searchNumber = parseFloat(searchQuery.replace(/mm$/i, ''));
+    
+    if (isNaN(searchNumber)) {
+      return res.json({ dimensions: [] }); // 如果不是数字，返回空结果
+    }
+
+    console.log(`搜索尺寸: ${searchQuery} (${searchNumber}), 材料: ${materialType}, 厚度: ${thickness}`);
+
+    // 搜索匹配的尺寸记录 - 按指定厚度过滤
+    const dimensions = await MaterialDimension.findAll({
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          required: true,
+          where: {
+            quantity: { [Op.gt]: 0 } // 只搜索有库存的工人材料
+          },
+          include: [
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec',
+              required: true,
+              where: {
+                materialType: materialType === '碳板' ? { [Op.or]: [null, '碳板'] } : materialType,
+                thickness: thickness // 严格按厚度过滤
+              }
+            },
+            {
+              model: Worker,
+              as: 'worker',
+              required: true,
+              attributes: ['id', 'name', 'departmentId'],
+              include: [
+                {
+                  model: Department,
+                  as: 'departmentInfo',
+                  attributes: ['id', 'name'],
+                  required: false
+                }
+              ]
+            },
+            {
+              model: MaterialAllocation,
+              as: 'allocations',
+              required: false,
+              where: {
+                status: 'allocated' // 只计算已分配未归还的
+              },
+              attributes: ['quantity']
+            }
+          ]
+        }
+      ],
+      where: {
+        quantity: { [Op.gt]: 0 }, // 该尺寸有库存（实时数据）
+        [Op.or]: [
+          { width: searchNumber },  // 宽度匹配
+          { height: searchNumber }, // 或高度匹配
+          { width: { [Op.like]: `%${searchNumber}%` } },  // 部分匹配宽度
+          { height: { [Op.like]: `%${searchNumber}%` } }  // 部分匹配高度
+        ]
+      },
+      order: [
+        ['width', 'ASC'],
+        ['height', 'ASC']
+      ]
+    });
+
+    console.log(`找到 ${dimensions.length} 条指定厚度的尺寸记录`);
+
+    // 计算实际可用量：总量 - 已分配量
+    const dimensionMap = new Map();
+    
+    dimensions.forEach((dim, index) => {
+      // 计算已分配数量
+      const allocatedQuantity = dim.workerMaterial.allocations.reduce((sum, alloc) => sum + alloc.quantity, 0);
+      // 计算可用数量
+      const availableQuantity = dim.quantity - allocatedQuantity;
+      
+      console.log(`记录${index}: ${dim.width}x${dim.height}mm - 总量: ${dim.quantity} - 已分配: ${allocatedQuantity} - 可用: ${availableQuantity} - 厚度: ${dim.workerMaterial?.thicknessSpec?.thickness}mm - 工人: ${dim.workerMaterial?.worker?.name}`);
+      
+      // 只计算有可用库存的
+      if (availableQuantity <= 0) {
+        return;
+      }
+      
+      const key = `${dim.width}x${dim.height}`;
+      
+      if (dimensionMap.has(key)) {
+        // 已存在这个尺寸，直接累加当前可用数量
+        const existing = dimensionMap.get(key);
+        existing.totalQuantity += availableQuantity;
+        existing.workerCount += 1;
+        existing.workers.push({
+          workerId: dim.workerMaterial.worker.id,
+          workerName: dim.workerMaterial.worker.name,
+          department: dim.workerMaterial.worker.departmentInfo?.name || '未分配',
+          quantity: availableQuantity // 使用可用库存
+        });
+      } else {
+        // 新尺寸，创建记录
+        dimensionMap.set(key, {
+          width: parseFloat(dim.width),
+          height: parseFloat(dim.height),
+          totalQuantity: availableQuantity, // 直接使用可用库存数量
+          workerCount: 1,
+          workerName: '系统库存',
+          workerId: null,
+          department: '多个工人',
+          workers: [{
+            workerId: dim.workerMaterial.worker.id,
+            workerName: dim.workerMaterial.worker.name,
+            department: dim.workerMaterial.worker.departmentInfo?.name || '未分配',
+            quantity: availableQuantity // 使用可用库存
+          }]
+        });
+      }
+    });
+
+    // 按尺寸聚合后的搜索结果
+    const searchResults = Array.from(dimensionMap.values())
+      .sort((a, b) => {
+        // 优先显示完全匹配的
+        const aExactMatch = (a.width === searchNumber || a.height === searchNumber) ? 1 : 0;
+        const bExactMatch = (b.width === searchNumber || b.height === searchNumber) ? 1 : 0;
+        
+        if (aExactMatch !== bExactMatch) {
+          return bExactMatch - aExactMatch; // 完全匹配的排在前面
+        }
+        
+        // 然后按总数量降序
+        return b.totalQuantity - a.totalQuantity;
+      })
+      .slice(0, 20); // 限制返回数量
+
+    console.log(`返回 ${searchResults.length} 个聚合结果`);
+    searchResults.forEach(result => {
+      console.log(`聚合结果: ${result.width}x${result.height}mm - 可用总量: ${result.totalQuantity}`);
+    });
+
+    res.json({
+      success: true,
+      searchQuery,
+      materialType,
+      thickness,
+      dimensions: searchResults
+    });
+
+  } catch (error) {
+    console.error('搜索板材尺寸错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 获取指定工人板材记录的所有尺寸
+router.get('/worker-materials/:workerMaterialId/dimensions', authenticate, async (req, res) => {
+  try {
+    const { workerMaterialId } = req.params;
+
+    // 验证工人板材记录存在
+    const workerMaterial = await WorkerMaterial.findByPk(workerMaterialId, {
+      include: [
+        { model: Worker, as: 'worker' },
+        { model: ThicknessSpec, as: 'thicknessSpec' }
+      ]
+    });
+
+    if (!workerMaterial) {
+      return res.status(404).json({ error: '工人板材记录不存在' });
+    }
+
+    const dimensions = await MaterialDimension.getDimensionsByWorkerMaterial(workerMaterialId);
+
+    res.json({
+      workerMaterial: {
+        id: workerMaterial.id,
+        workerName: workerMaterial.worker.name,
+        materialType: workerMaterial.thicknessSpec.materialType,
+        thickness: workerMaterial.thicknessSpec.thickness,
+        totalQuantity: dimensions.reduce((sum, dim) => sum + dim.quantity, 0) // 从dimensions计算总量
+      },
+      dimensions: dimensions.map(dim => ({
+        id: dim.id,
+        width: parseFloat(dim.width),
+        height: parseFloat(dim.height),
+        quantity: dim.quantity,
+        notes: dim.notes,
+        dimensionLabel: dim.getDimensionLabel(),
+        createdAt: dim.createdAt,
+        updatedAt: dim.updatedAt
+      }))
+    });
+
+  } catch (error) {
+    console.error('获取尺寸数据错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 简单创建尺寸记录 - 添加操作记录功能
+router.post('/worker-materials/:workerMaterialId/dimensions/simple', authenticate, async (req, res) => {
+  try {
+    const { workerMaterialId } = req.params;
+    const { width, height, quantity, notes } = req.body;
+    const user = req.user;
+
+    // 验证工人板材记录存在，并获取完整信息用于操作记录
+    const workerMaterial = await WorkerMaterial.findByPk(workerMaterialId, {
+      include: [
+        {
+          model: Worker,
+          as: 'worker',
+          include: [{ model: Department, as: 'departmentInfo' }]
+        },
+        {
+          model: ThicknessSpec,
+          as: 'thicknessSpec'
+        }
+      ]
+    });
+
+    if (!workerMaterial) {
+      return res.status(404).json({ error: '工人板材记录不存在' });
+    }
+
+    // 数据验证
+    const validation = MaterialDimension.validateDimensionData({
+      width, height, quantity
+    });
+    
+    if (!validation.isValid) {
+      return res.status(400).json({ error: validation.errors[0] });
+    }
+
+    // 创建新尺寸记录
+    const newDimension = await MaterialDimension.create({
+      workerMaterialId,
+      width: parseFloat(width),
+      height: parseFloat(height),
+      quantity: parseInt(quantity),
+      notes: notes || null
+    });
+
+    // 记录操作历史 - 板材添加
+    const stockData = {
+      workerMaterialId: parseInt(workerMaterialId),
+      dimensionId: newDimension.id,
+      materialType: workerMaterial.thicknessSpec.materialType || '碳板',
+      thickness: workerMaterial.thicknessSpec.thickness,
+      unit: workerMaterial.thicknessSpec.unit || 'mm',
+      width: parseFloat(width),
+      height: parseFloat(height),
+      quantity: parseInt(quantity),
+      workerName: workerMaterial.worker.name,
+      departmentName: workerMaterial.worker.departmentInfo?.name,
+      notes: notes
+    };
+    
+    await recordMaterialStock(0, stockData, user.id, user.name);
+
+    // 计算总量
+    const totalQuantity = await MaterialDimension.calculateTotalQuantity(workerMaterialId);
+
+    res.status(201).json({
+      message: '尺寸记录创建成功',
+      dimension: newDimension,
+      totalQuantity: totalQuantity
+    });
+
+  } catch (error) {
+    console.error('简单创建尺寸记录错误:', error);
+    res.status(500).json({ error: '创建失败' });
+  }
+});
+
+// 创建新的尺寸记录
+router.post('/worker-materials/:workerMaterialId/dimensions', authenticate, async (req, res) => {
+  try {
+    const { workerMaterialId } = req.params;
+    const { width, height, quantity, notes } = req.body;
+
+    // 验证工人板材记录存在
+    const workerMaterial = await WorkerMaterial.findByPk(workerMaterialId);
+    if (!workerMaterial) {
+      return res.status(404).json({ error: '工人板材记录不存在' });
+    }
+
+    // 数据验证
+    const validation = MaterialDimension.validateDimensionData({
+      width, height, quantity
+    });
+    
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: '数据验证失败',
+        details: validation.errors 
+      });
+    }
+
+    const newDimension = await MaterialDimension.create({
+      workerMaterialId: parseInt(workerMaterialId),
+      width: parseFloat(width),
+      height: parseFloat(height),
+      quantity: parseInt(quantity),
+      notes: notes || null
+    });
+
+    // 获取完整的关联信息用于操作历史记录
+    const dimensionWithInfo = await MaterialDimension.findByPk(newDimension.id, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            {
+              model: Worker,
+              as: 'worker',
+              include: [
+                {
+                  model: Department,
+                  as: 'department'
+                }
+              ]
+            },
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec'
+            }
+          ]
+        }
+      ]
+    });
+
+    // 暂时跳过操作历史记录，直接返回成功结果
+
+    // 注意：worker_materials表没有quantity字段，总数量通过MaterialDimension动态计算
+    // 计算新的总量仅用于响应
+    const totalQuantity = await MaterialDimension.calculateTotalQuantity(workerMaterialId);
+
+    res.status(201).json({
+      id: newDimension.id,
+      width: parseFloat(newDimension.width),
+      height: parseFloat(newDimension.height),
+      quantity: newDimension.quantity,
+      notes: newDimension.notes,
+      dimensionLabel: newDimension.getDimensionLabel(),
+      workerMaterialId: newDimension.workerMaterialId,
+      updatedTotalQuantity: totalQuantity
+    });
+
+  } catch (error) {
+    console.error('创建尺寸记录错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 获取单个尺寸记录详情（供编辑功能使用）
+router.get('/dimensions/:dimensionId', authenticate, async (req, res) => {
+  try {
+    const { dimensionId } = req.params;
+
+    const dimension = await MaterialDimension.findByPk(dimensionId, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            {
+              model: Worker,
+              as: 'worker',
+              attributes: ['id', 'name'],
+              include: [
+                {
+                  model: Department,
+                  as: 'departmentInfo',
+                  attributes: ['id', 'name'],
+                  required: false
+                }
+              ]
+            },
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec',
+              attributes: ['id', 'thickness', 'unit', 'materialType']
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!dimension) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    res.json({
+      id: dimension.id,
+      width: parseFloat(dimension.width),
+      height: parseFloat(dimension.height || dimension.thickness || ''),
+      quantity: dimension.quantity,
+      notes: dimension.notes || '',
+      dimensionLabel: dimension.getDimensionLabel(),
+      workerMaterialId: dimension.workerMaterialId,
+      createdAt: dimension.createdAt,
+      updatedAt: dimension.updatedAt,
+      workerMaterial: {
+        id: dimension.workerMaterial.id,
+        workerName: dimension.workerMaterial.worker.name,
+        materialType: dimension.workerMaterial.thicknessSpec.materialType,
+        thickness: dimension.workerMaterial.thicknessSpec.thickness,
+        unit: dimension.workerMaterial.thicknessSpec.unit || 'mm'
+      }
+    });
+
+  } catch (error) {
+    console.error('获取尺寸记录详情错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 更新尺寸记录
+router.put('/dimensions/:dimensionId', authenticate, async (req, res) => {
+  try {
+    const { dimensionId } = req.params;
+    const { width, height, quantity, notes } = req.body;
+
+    const dimension = await MaterialDimension.findByPk(dimensionId);
+    if (!dimension) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    // 数据验证
+    const validation = MaterialDimension.validateDimensionData({
+      width, height, quantity
+    });
+    
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: '数据验证失败',
+        details: validation.errors 
+      });
+    }
+
+    const workerMaterialId = dimension.workerMaterialId;
+
+    // 记录修改前的数据，用于操作历史
+    const oldData = {
+      width: dimension.width,
+      height: dimension.height, 
+      quantity: dimension.quantity
+    };
+
+    await dimension.update({
+      width: parseFloat(width),
+      height: parseFloat(height),
+      quantity: parseInt(quantity),
+      notes: notes || null
+    });
+
+    // 记录尺寸修改操作历史
+    try {
+      const user = req.user;
+      
+      // 获取关联的工人材料信息，用于操作记录
+      const dimensionWithRelations = await MaterialDimension.findByPk(dimensionId, {
+        include: [
+          {
+            model: WorkerMaterial,
+            as: 'workerMaterial',
+            include: [
+              {
+                model: Worker,
+                as: 'worker',
+                include: [
+                  {
+                    model: Department,
+                    as: 'departmentInfo'
+                  }
+                ]
+              },
+              {
+                model: ThicknessSpec,
+                as: 'thicknessSpec'
+              }
+            ]
+          }
+        ]
+      });
+
+      const dimensionData = {
+        dimensionId: dimensionWithRelations.id,
+        workerMaterialId: dimensionWithRelations.workerMaterialId,
+        materialType: dimensionWithRelations.workerMaterial?.thicknessSpec?.materialType || '碳板',
+        thickness: dimensionWithRelations.workerMaterial?.thicknessSpec?.thickness,
+        unit: dimensionWithRelations.workerMaterial?.thicknessSpec?.unit || 'mm',
+        workerName: dimensionWithRelations.workerMaterial?.worker?.name,
+        departmentName: dimensionWithRelations.workerMaterial?.worker?.departmentInfo?.name
+      };
+
+      const newData = {
+        width: parseFloat(width),
+        height: parseFloat(height),
+        quantity: parseInt(quantity)
+      };
+
+      await recordMaterialDimensionUpdate(dimensionData, oldData, newData, user.id, user.name);
+    } catch (historyError) {
+      console.error('记录尺寸修改历史失败:', historyError);
+    }
+
+    // 更新主表数量
+    const totalQuantity = await MaterialDimension.calculateTotalQuantity(workerMaterialId);
+    await WorkerMaterial.update(
+      { quantity: totalQuantity },
+      { where: { id: workerMaterialId } }
+    );
+
+    res.json({
+      id: dimension.id,
+      width: parseFloat(dimension.width),
+      height: parseFloat(dimension.height),
+      quantity: dimension.quantity,
+      notes: dimension.notes,
+      dimensionLabel: dimension.getDimensionLabel(),
+      workerMaterialId: dimension.workerMaterialId,
+      updatedTotalQuantity: totalQuantity
+    });
+
+  } catch (error) {
+    console.error('更新尺寸记录错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 简单删除尺寸记录 - 添加操作记录功能
+router.delete('/dimensions/:dimensionId/simple', authenticate, async (req, res) => {
+  try {
+    const { dimensionId } = req.params;
+    const user = req.user;
+    
+    // 获取尺寸记录详细信息用于操作记录
+    const dimension = await MaterialDimension.findByPk(dimensionId, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            {
+              model: Worker,
+              as: 'worker',
+              include: [{ model: Department, as: 'departmentInfo' }]
+            },
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec'
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!dimension) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    // 记录操作历史 - 板材删除（扣除）
+    const dimensionData = {
+      dimensionId: dimension.id,
+      workerMaterialId: dimension.workerMaterialId,
+      materialType: dimension.workerMaterial.thicknessSpec.materialType || '碳板',
+      thickness: dimension.workerMaterial.thicknessSpec.thickness,
+      unit: dimension.workerMaterial.thicknessSpec.unit || 'mm',
+      width: dimension.width,
+      height: dimension.height,
+      quantity: dimension.quantity,
+      workerName: dimension.workerMaterial.worker.name,
+      departmentName: dimension.workerMaterial.worker.departmentInfo?.name,
+      notes: dimension.notes
+    };
+    
+    await recordMaterialDimensionDelete(dimensionData, user.id, user.name);
+    
+    // 执行删除操作
+    const [results] = await sequelize.query(
+      'DELETE FROM material_dimensions WHERE id = ?',
+      {
+        replacements: [dimensionId],
+        type: sequelize.QueryTypes.DELETE
+      }
+    );
+
+    if (results === 0) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    res.json({
+      message: '尺寸记录已删除',
+      deletedId: parseInt(dimensionId)
+    });
+
+  } catch (error) {
+    console.error('简单删除错误:', error);
+    res.status(500).json({ error: '删除失败' });
+  }
+});
+
+// 删除尺寸记录 - 添加操作记录功能
+router.delete('/dimensions/:dimensionId', authenticate, async (req, res) => {
+  try {
+    const { dimensionId } = req.params;
+    const user = req.user;
+
+    // 获取尺寸记录详细信息用于操作记录
+    const dimension = await MaterialDimension.findByPk(dimensionId, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            {
+              model: Worker,
+              as: 'worker',
+              include: [{ model: Department, as: 'departmentInfo' }]
+            },
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec'
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!dimension) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    const workerMaterialId = dimension.workerMaterialId;
+
+    // 记录操作历史 - 板材删除（扣除）
+    const dimensionData = {
+      dimensionId: dimension.id,
+      workerMaterialId: dimension.workerMaterialId,
+      materialType: dimension.workerMaterial.thicknessSpec.materialType || '碳板',
+      thickness: dimension.workerMaterial.thicknessSpec.thickness,
+      unit: dimension.workerMaterial.thicknessSpec.unit || 'mm',
+      width: dimension.width,
+      height: dimension.height,
+      quantity: dimension.quantity,
+      workerName: dimension.workerMaterial.worker.name,
+      departmentName: dimension.workerMaterial.worker.departmentInfo?.name,
+      notes: dimension.notes
+    };
+    
+    await recordMaterialDimensionDelete(dimensionData, user.id, user.name);
+
+    // 执行删除
+    await dimension.destroy();
+
+    // 计算新的总量
+    const updatedTotalQuantity = await MaterialDimension.calculateTotalQuantity(workerMaterialId);
+
+    res.json({
+      message: '尺寸记录已删除',
+      deletedId: parseInt(dimensionId),
+      workerMaterialId: workerMaterialId,
+      updatedTotalQuantity: updatedTotalQuantity
+    });
+
+  } catch (error) {
+    console.error('删除尺寸记录错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 批量创建尺寸记录
+router.post('/worker-materials/:workerMaterialId/dimensions/batch', authenticate, async (req, res) => {
+  try {
+    const { workerMaterialId } = req.params;
+    const { dimensions } = req.body; // 数组格式: [{ width, height, quantity, notes }, ...]
+
+    if (!Array.isArray(dimensions) || dimensions.length === 0) {
+      return res.status(400).json({ error: '请提供有效的尺寸数组' });
+    }
+
+    // 验证工人板材记录存在
+    const workerMaterial = await WorkerMaterial.findByPk(workerMaterialId);
+    if (!workerMaterial) {
+      return res.status(404).json({ error: '工人板材记录不存在' });
+    }
+
+    // 验证所有尺寸数据
+    const validationResults = dimensions.map(dim => 
+      MaterialDimension.validateDimensionData(dim)
+    );
+
+    const hasErrors = validationResults.some(result => !result.isValid);
+    if (hasErrors) {
+      return res.status(400).json({
+        error: '数据验证失败',
+        details: validationResults.map((result, index) => ({
+          index,
+          errors: result.errors
+        })).filter(item => item.errors.length > 0)
+      });
+    }
+
+    // 批量创建
+    const createdDimensions = await MaterialDimension.bulkCreate(
+      dimensions.map(dim => ({
+        workerMaterialId: parseInt(workerMaterialId),
+        width: parseFloat(dim.width),
+        height: parseFloat(dim.height),
+        quantity: parseInt(dim.quantity),
+        notes: dim.notes || null
+      }))
+    );
+
+    // 注意：worker_materials表没有quantity字段，总数量通过MaterialDimension动态计算
+    // 计算新的总量仅用于响应
+    const totalQuantity = await MaterialDimension.calculateTotalQuantity(workerMaterialId);
+
+    res.status(201).json({
+      message: `成功创建 ${createdDimensions.length} 条尺寸记录`,
+      dimensions: createdDimensions.map(dim => ({
+        id: dim.id,
+        width: parseFloat(dim.width),
+        height: parseFloat(dim.height),
+        quantity: dim.quantity,
+        notes: dim.notes,
+        dimensionLabel: `${dim.width}×${dim.height}mm`
+      })),
+      updatedTotalQuantity: totalQuantity
+    });
+
+  } catch (error) {
+    console.error('批量创建尺寸记录错误:', error);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// 转移材料尺寸
+router.post('/transfer', authenticate, async (req, res) => {
+  try {
+    const { fromDimensionId, toWorkerId, quantity, notes } = req.body;
+
+    // 数据验证
+    if (!fromDimensionId || !toWorkerId || !quantity) {
+      return res.status(400).json({ error: '请提供完整的转移信息' });
+    }
+
+    const transferQuantity = parseInt(quantity);
+    if (transferQuantity <= 0) {
+      return res.status(400).json({ error: '转移数量必须大于0' });
+    }
+
+    // 查找源尺寸记录
+    const sourceDimension = await MaterialDimension.findByPk(fromDimensionId, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            { model: Worker, as: 'worker' },
+            { model: ThicknessSpec, as: 'thicknessSpec' }
+          ]
+        }
+      ]
+    });
+
+    if (!sourceDimension) {
+      return res.status(404).json({ error: '源尺寸记录不存在' });
+    }
+
+    // 检查转移数量是否超过可用数量
+    if (transferQuantity > sourceDimension.quantity) {
+      return res.status(400).json({ 
+        error: `转移数量 ${transferQuantity} 超过可用数量 ${sourceDimension.quantity}` 
+      });
+    }
+
+    // 查找目标工人
+    const targetWorker = await Worker.findByPk(toWorkerId);
+    if (!targetWorker) {
+      return res.status(404).json({ error: '目标工人不存在' });
+    }
+
+    const sourceWorkerMaterial = sourceDimension.workerMaterial;
+    const thicknessSpec = sourceWorkerMaterial.thicknessSpec;
+
+    // 查找或创建目标工人的材料记录
+    let targetWorkerMaterial = await WorkerMaterial.findOne({
+      where: {
+        workerId: toWorkerId,
+        thicknessSpecId: thicknessSpec.id
+      }
+    });
+
+    if (!targetWorkerMaterial) {
+      // 创建新的工人材料记录
+      targetWorkerMaterial = await WorkerMaterial.create({
+        workerId: toWorkerId,
+        thicknessSpecId: thicknessSpec.id,
+        quantity: 0 // 初始数量为0，稍后会更新
+      });
+    }
+
+    // 查找或创建目标尺寸记录
+    let targetDimension = await MaterialDimension.findOne({
+      where: {
+        workerMaterialId: targetWorkerMaterial.id,
+        width: sourceDimension.width,
+        height: sourceDimension.height
+      }
+    });
+
+    if (targetDimension) {
+      // 更新现有尺寸记录
+      await targetDimension.update({
+        quantity: targetDimension.quantity + transferQuantity,
+        notes: notes ? (targetDimension.notes ? `${targetDimension.notes}; ${notes}` : notes) : targetDimension.notes
+      });
+    } else {
+      // 创建新的尺寸记录
+      targetDimension = await MaterialDimension.create({
+        workerMaterialId: targetWorkerMaterial.id,
+        width: sourceDimension.width,
+        height: sourceDimension.height,
+        quantity: transferQuantity,
+        notes: notes || null
+      });
+    }
+
+    // 更新源尺寸记录
+    const remainingQuantity = sourceDimension.quantity - transferQuantity;
+    if (remainingQuantity === 0) {
+      // 如果转移全部数量，删除源记录
+      await sourceDimension.destroy();
+    } else {
+      // 否则更新数量
+      await sourceDimension.update({ quantity: remainingQuantity });
+    }
+
+    // 计算两个工人的材料总量（仅用于返回给前端）
+    const sourceTotalQuantity = await MaterialDimension.calculateTotalQuantity(sourceWorkerMaterial.id);
+    const targetTotalQuantity = await MaterialDimension.calculateTotalQuantity(targetWorkerMaterial.id);
+
+    // 记录转移操作历史
+    const user = req.user;
+    const transferData = {
+      fromDimensionId: sourceDimension.id,
+      toDimensionId: targetDimension.id,
+      materialType: thicknessSpec.materialType || '碳板',
+      thickness: thicknessSpec.thickness,
+      unit: thicknessSpec.unit || 'mm',
+      width: sourceDimension.width,
+      height: sourceDimension.height,
+      quantity: transferQuantity,
+      fromWorkerName: sourceWorkerMaterial.worker.name,
+      toWorkerName: targetWorker.name,
+      notes: notes || null
+    };
+    
+    try {
+      await recordMaterialDimensionTransfer(transferData, user.id, user.name);
+    } catch (historyError) {
+      console.error('记录板材转移历史失败:', historyError);
+    }
+
+    // 注意：worker_materials表没有quantity字段，不需要更新
+    // 前端会通过API动态获取最新的计算总量
+
+    res.json({
+      success: true,
+      message: `成功转移 ${transferQuantity} 张 ${sourceDimension.width}×${sourceDimension.height}mm 材料`,
+      transfer: {
+        fromWorker: sourceWorkerMaterial.worker.name,
+        toWorker: targetWorker.name,
+        dimension: `${sourceDimension.width}×${sourceDimension.height}mm`,
+        quantity: transferQuantity,
+        notes: notes || null
+      },
+      updatedQuantities: {
+        sourceWorkerMaterial: {
+          id: sourceWorkerMaterial.id,
+          totalQuantity: sourceTotalQuantity
+        },
+        targetWorkerMaterial: {
+          id: targetWorkerMaterial.id,
+          totalQuantity: targetTotalQuantity
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('转移材料失败:', error);
+    res.status(500).json({ error: '服务器错误', details: error.message });
+  }
+});
+
+// 扣除材料尺寸记录 - 专门为项目扣除材料使用
+router.post('/deduct', authenticate, async (req, res) => {
+  try {
+    const { projectId, dimensionId, quantity, thicknessSpecId, notes } = req.body;
+    const user = req.user;
+
+    // 数据验证
+    if (!projectId || !dimensionId || !quantity || !thicknessSpecId) {
+      return res.status(400).json({ error: '请提供完整的扣除信息' });
+    }
+
+    const deductQuantity = parseInt(quantity);
+    if (deductQuantity <= 0) {
+      return res.status(400).json({ error: '扣除数量必须大于0' });
+    }
+
+    // 查找尺寸记录
+    const dimension = await MaterialDimension.findByPk(dimensionId, {
+      include: [
+        {
+          model: WorkerMaterial,
+          as: 'workerMaterial',
+          include: [
+            {
+              model: Worker,
+              as: 'worker',
+              include: [{ model: Department, as: 'departmentInfo' }]
+            },
+            {
+              model: ThicknessSpec,
+              as: 'thicknessSpec'
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!dimension) {
+      return res.status(404).json({ error: '尺寸记录不存在' });
+    }
+
+    // 检查扣除数量是否超过可用数量
+    if (deductQuantity > dimension.quantity) {
+      return res.status(400).json({ 
+        error: `扣除数量 ${deductQuantity} 超过可用数量 ${dimension.quantity}` 
+      });
+    }
+
+    // 更新尺寸记录数量
+    const remainingQuantity = dimension.quantity - deductQuantity;
+    if (remainingQuantity === 0) {
+      // 如果扣除全部数量，删除记录
+      await dimension.destroy();
+    } else {
+      // 否则更新数量
+      await dimension.update({ quantity: remainingQuantity });
+    }
+
+    // 记录操作历史 - 材料扣除
+    const stockData = {
+      workerMaterialId: dimension.workerMaterialId,
+      dimensionId: dimension.id,
+      materialType: dimension.workerMaterial.thicknessSpec.materialType || '碳板',
+      thickness: dimension.workerMaterial.thicknessSpec.thickness,
+      unit: dimension.workerMaterial.thicknessSpec.unit || 'mm',
+      width: dimension.width,
+      height: dimension.height,
+      quantity: deductQuantity,
+      workerName: dimension.workerMaterial.worker.name,
+      departmentName: dimension.workerMaterial.worker.departmentInfo?.name,
+      notes: notes || `项目材料扣除`
+    };
+    
+    try {
+      await recordMaterialStock(projectId, stockData, user.id, user.name);
+    } catch (historyError) {
+      console.error('记录材料扣除历史失败:', historyError);
+    }
+
+    // 计算工人材料总量
+    const totalQuantity = await MaterialDimension.calculateTotalQuantity(dimension.workerMaterialId);
+
+    res.json({
+      success: true,
+      message: `成功扣除 ${deductQuantity} 张 ${dimension.width}×${dimension.height}mm 材料`,
+      deduction: {
+        dimensionId: dimension.id,
+        workerName: dimension.workerMaterial.worker.name,
+        dimension: `${dimension.width}×${dimension.height}mm`,
+        deductedQuantity: deductQuantity,
+        remainingQuantity: remainingQuantity,
+        notes: notes || null
+      },
+      updatedTotalQuantity: totalQuantity
+    });
+
+  } catch (error) {
+    console.error('扣除材料失败:', error);
+    res.status(500).json({ error: '服务器错误', details: error.message });
+  }
+});
+
+module.exports = router;
