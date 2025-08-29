@@ -6,25 +6,33 @@ const router = express.Router();
 
 /**
  * SSE连接端点
- * GET /api/sse/connect?token=xxx
+ * GET /api/sse/connect?token=xxx&deviceId=xxx
  * 建立服务器发送事件连接，用于实时推送
  * 
- * 由于EventSource不支持自定义请求头，token通过查询参数传递
+ * 参数：
+ * - token: 认证令牌（必需）
+ * - deviceId: 设备唯一标识（可选，服务器会自动生成）
+ * 
+ * 由于EventSource不支持自定义请求头，参数通过查询参数传递
  */
 router.get('/connect', async (req, res) => {
-  // 从查询参数获取token
+  // 从查询参数获取token和deviceId
   const token = req.query.token;
+  const clientDeviceId = req.query.deviceId; // 来自客户端的设备ID
+  const userAgent = req.headers['user-agent'];
   
   console.log('SSE连接请求:', {
     url: req.url,
     method: req.method,
     headers: {
       origin: req.headers.origin,
-      'user-agent': req.headers['user-agent']?.substring(0, 50),
+      'user-agent': userAgent?.substring(0, 50),
       accept: req.headers.accept
     },
     query: req.query,
     tokenExists: !!token,
+    deviceIdExists: !!clientDeviceId,
+    clientDeviceId: clientDeviceId || 'auto-generate',
     tokenLength: token ? token.length : 0,
     tokenStart: token ? token.substring(0, 20) + '...' : 'N/A'
   });
@@ -95,7 +103,7 @@ router.get('/connect', async (req, res) => {
     }
   }
   
-  console.log(`🔌 用户 ${user.name}(ID:${user.id}) 请求建立SSE连接`);
+  console.log(`🔌 用户 ${user.name}(ID:${user.id}) 请求建立SSE连接，设备ID: ${clientDeviceId || '自动生成'}`);
 
   // 设置SSE响应头
   res.writeHead(200, {
@@ -109,27 +117,33 @@ router.get('/connect', async (req, res) => {
     'X-Accel-Buffering': 'no' // 禁用nginx缓冲
   });
 
-  // 发送初始连接成功消息
+  // 添加客户端到SSE管理器（支持设备ID）
+  const connectionId = sseManager.addClient(user.id, res, clientDeviceId, userAgent);
+  
+  // 获取实际使用的设备ID（可能是自动生成的）
+  const connectionInfo = sseManager.connectionIndex.get(connectionId);
+  const actualDeviceId = connectionInfo?.deviceId || 'unknown';
+
+  // 发送初始连接成功消息，包含连接和设备信息
   const welcomeMessage = sseManager.formatSSEMessage('connected', {
     message: '连接成功',
     userId: user.id,
     userName: user.name,
+    connectionId: connectionId,
+    deviceId: actualDeviceId,
     timestamp: new Date().toISOString()
   });
   res.write(welcomeMessage);
 
-  // 添加客户端到SSE管理器
-  const clientId = sseManager.addClient(user.id, res);
-
   // 处理客户端断开连接
   req.on('close', () => {
-    console.log(`用户 ${user.name}(ID:${user.id}) SSE连接关闭`);
-    sseManager.removeClient(user.id, clientId);
+    console.log(`用户 ${user.name}(ID:${user.id}) SSE连接关闭，设备: ${actualDeviceId}`);
+    sseManager.removeClient(user.id, connectionId);
   });
 
   req.on('error', (error) => {
-    console.error(`用户 ${user.name}(ID:${user.id}) SSE连接错误:`, error.message);
-    sseManager.removeClient(user.id, clientId);
+    console.error(`用户 ${user.name}(ID:${user.id}) SSE连接错误，设备: ${actualDeviceId}:`, error.message);
+    sseManager.removeClient(user.id, connectionId);
   });
 });
 

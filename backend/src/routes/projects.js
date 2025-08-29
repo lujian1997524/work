@@ -678,8 +678,9 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
         requiredThickness,
         userName: req.user.name,
         userId: req.user.id,
-        workerMaterialsCreated: validThicknessSpecs.length
-      }, req.user.id);
+        workerMaterialsCreated: validThicknessSpecs.length,
+        timestamp: new Date().toISOString()
+      }); // 移除用户排除，让所有设备都能收到项目创建通知
       
       console.log(`SSE事件已发送: 项目创建 - ${newProject.name}，厚度规格: ${requiredThickness.length} 种，为工人创建/关联了材料库存记录`);
     } catch (sseError) {
@@ -916,8 +917,9 @@ router.put('/:id', authenticate, requireOperator, async (req, res) => {
           oldStatus: originalData.status,
           newStatus: status,
           userName: req.user.name,
-          userId: req.user.id
-        }, req.user.id);
+          userId: req.user.id,
+          timestamp: new Date().toISOString()
+        }); // 移除用户排除，让所有设备都能收到项目状态变更
         
         console.log(`SSE事件已发送: 项目状态变更 - ${updatedProject.name} (${originalData.status} → ${status})`);
       } catch (sseError) {

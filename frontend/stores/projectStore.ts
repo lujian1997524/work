@@ -569,13 +569,33 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     // 监听项目状态变更事件
     const projectStatusChangedHandler = (data: any) => {
-      // 收到项目状态变更事件，开始处理
+      // 兼容两种事件格式：
+      // 1. 直接项目更新: {project: {...}, oldStatus, newStatus}
+      // 2. 材料触发的级联更新: {projectId: 123, projectName, oldStatus, newStatus}
+      let targetProjectId: number;
+      
       if (data.projectId) {
-        // 更新项目状态
-        get().updateProjectInStore(data.projectId, { status: data.newStatus });
-        set({ lastUpdated: Date.now() });
-        debouncedRefresh(get().fetchProjects);
+        // 格式2：材料触发的级联更新
+        targetProjectId = data.projectId;
+      } else if (data.project?.id) {
+        // 格式1：直接项目更新
+        targetProjectId = data.project.id;
+      } else {
+        console.log('⚠️ 项目状态变更事件格式错误，缺少项目标识:', data);
+        return;
       }
+      
+      // 更新项目状态
+      if (data.project) {
+        // 如果有完整的项目对象，使用完整更新
+        get().updateProjectInStore(targetProjectId, data.project);
+      } else {
+        // 否则只更新状态
+        get().updateProjectInStore(targetProjectId, { status: data.newStatus });
+      }
+      
+      set({ lastUpdated: Date.now() });
+      debouncedRefresh(get().fetchProjects);
     };
 
     // 监听项目删除事件
@@ -725,10 +745,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
   
   updateProjectInStore: (id, updates) => {
-    // Zustand updateProjectInStore被调用，开始处理
+    const currentProjects = get().projects;
+    const targetProject = currentProjects.find(p => p.id === id || p.id === Number(id));
+    
+    if (!targetProject) {
+      console.log('⚠️ 未找到目标项目:', { id, availableProjects: currentProjects.map(p => ({ id: p.id, name: p.name })) });
+      return;
+    }
+    
     set(state => ({
       projects: state.projects.map(p => 
-        p.id === id ? { ...p, ...updates } : p
+        (p.id === id || p.id === Number(id)) ? { ...p, ...updates } : p
       ),
       lastUpdated: Date.now()
     }));

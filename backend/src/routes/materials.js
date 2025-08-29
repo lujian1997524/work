@@ -158,8 +158,9 @@ router.post('/', authenticate, requireOperator, async (req, res) => {
       projectName: createdMaterial.project?.name,
       materialType: createdMaterial.thicknessSpec?.thickness + createdMaterial.thicknessSpec?.unit,
       userName: req.user.name,
-      userId: req.user.id
-    }, req.user.id);
+      userId: req.user.id,
+      timestamp: new Date().toISOString()
+    }); // 移除用户排除，让所有设备都能收到新材料创建通知
 
   } catch (error) {
     console.error('创建板材错误:', error);
@@ -263,13 +264,16 @@ router.put('/:id',
       }
     }
 
+    // 保存原始状态用于项目状态级联检查
+    const originalMaterialStatus = material.status;
+    const shouldCheckProjectStatus = status && status !== originalMaterialStatus;
+
     await material.update(updateData);
 
     // 检查并更新项目状态
-    if (status && status !== material.status) {
+    if (shouldCheckProjectStatus) {
       const projectId = material.projectId;
       const project = material.project;
-      const oldMaterialStatus = material.status; // 保存原始状态用于通知
       
       // 获取项目所有材料的状态（包括刚更新的材料）
       const allProjectMaterials = await Material.findAll({
@@ -298,11 +302,18 @@ router.put('/:id',
       if (newProjectStatus !== oldProjectStatus) {
         await Project.update({ status: newProjectStatus }, { where: { id: projectId } });
         
-        console.log(`项目状态自动更新: ${project.name} ${oldProjectStatus} → ${newProjectStatus}`);
+        console.log(`🔄 项目状态自动更新: ${project.name} (ID:${projectId}) ${oldProjectStatus} → ${newProjectStatus}`);
+        console.log(`📊 材料状态统计:`, {
+          projectId,
+          materialStatuses,
+          allCompleted,
+          hasInProgress,
+          allPending
+        });
 
         // 发送项目状态变更通知（SSE事件）
-        sseManager.broadcast('project-status-changed', {
-          projectId,
+        const sseData = {
+          projectId: Number(projectId), // 确保是数字类型
           projectName: project.name,
           oldStatus: oldProjectStatus,
           newStatus: newProjectStatus,
@@ -312,10 +323,15 @@ router.put('/:id',
           materialChanged: {
             materialId: material.id,
             thicknessSpec: material.thicknessSpec?.thickness + material.thicknessSpec?.unit,
-            oldStatus: oldMaterialStatus,
+            oldStatus: originalMaterialStatus,
             newStatus: status
-          }
-        }, req.user.id);
+          },
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('📡 发送项目状态变更SSE事件:', sseData);
+        const sentCount = sseManager.broadcast('project-status-changed', sseData);
+        console.log(`📤 SSE事件发送完成，发送给 ${sentCount} 个连接`);
       }
     }
 
@@ -342,7 +358,8 @@ router.put('/:id',
       material: updatedMaterial
     });
 
-    // 广播板材状态变更事件（不触发通知弹窗）
+    // 广播板材状态变更事件 - 所有连接都会收到，前端通过本地操作标记进行智能去重
+    // 这样同一用户的多个设备都能收到状态更新
     sseManager.broadcast('material-status-changed', {
       material: updatedMaterial,
       oldStatus: material.status, // 原状态
@@ -351,8 +368,9 @@ router.put('/:id',
       projectName: material.project?.name,
       materialType: material.thicknessSpec?.thickness + material.thicknessSpec?.unit,
       userName: req.user.name,
-      userId: req.user.id
-    }, req.user.id);
+      userId: req.user.id,
+      timestamp: new Date().toISOString()
+    }); // 不排除任何连接，让前端智能处理
 
   } catch (error) {
     console.error('更新板材状态错误:', error);

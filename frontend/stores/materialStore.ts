@@ -101,6 +101,61 @@ export const useMaterialStore = create<MaterialStore>((set, get) => ({
         updateData.completed_date = new Date().toISOString().split('T')[0];
       }
 
+      // 标记本地操作，用于避免重复通知
+      const { sseManager } = await import('@/utils/sseManager');
+      const currentMaterial = get().materials.find(m => m.id === id);
+      
+      // 标记材料状态变更操作
+      sseManager.markLocalOperation('material-status-changed', id, {
+        oldStatus: currentMaterial?.status,
+        newStatus: status,
+        operationType: 'status_update'
+      });
+
+      // 预测并标记可能的项目状态级联变更
+      if (currentMaterial?.projectId) {
+        const projectId = currentMaterial.projectId;
+        const projectMaterials = get().materials.filter(m => m.projectId === projectId);
+        
+        // 预测新的项目状态
+        const predictedMaterialStatuses = projectMaterials.map(m => 
+          m.id === id ? status : m.status
+        );
+        
+        const allCompleted = predictedMaterialStatuses.every(s => s === 'completed');
+        const hasInProgress = predictedMaterialStatuses.some(s => s === 'in_progress');
+        const allPending = predictedMaterialStatuses.every(s => s === 'pending');
+        
+        let predictedProjectStatus;
+        if (allCompleted) {
+          predictedProjectStatus = 'completed';
+        } else if (hasInProgress || (!allPending && !allCompleted)) {
+          predictedProjectStatus = 'in_progress';
+        } else if (allPending) {
+          predictedProjectStatus = 'pending';
+        }
+        
+        // 获取当前项目状态来判断是否会发生变更
+        const { useProjectStore } = await import('@/stores/projectStore');
+        const currentProject = useProjectStore.getState().projects.find(p => p.id === projectId);
+        
+        // 如果项目状态会发生变更，标记项目状态级联变更操作
+        if (currentProject && predictedProjectStatus && predictedProjectStatus !== currentProject.status) {
+          sseManager.markLocalOperation('project-status-changed', projectId, {
+            oldStatus: currentProject.status,
+            newStatus: predictedProjectStatus,
+            operationType: 'cascade_from_material',
+            materialId: id,
+            materialStatusChange: {
+              oldStatus: currentMaterial?.status,
+              newStatus: status
+            }
+          });
+          
+          console.log(`标记项目状态级联变更: 项目${projectId} ${currentProject.status} → ${predictedProjectStatus} (由材料${id}状态变更触发)`);
+        }
+      }
+
       const response = await apiRequest(`/api/materials/${id}`, {
         method: 'PUT',
         headers: {

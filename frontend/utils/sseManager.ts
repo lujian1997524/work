@@ -1,6 +1,80 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { configManager } from './configManager';
 
+// 生成设备唯一标识符
+const generateDeviceId = (): string => {
+  // 尝试从localStorage获取已存在的设备ID
+  if (typeof window !== 'undefined') {
+    const existingDeviceId = localStorage.getItem('device_id');
+    if (existingDeviceId) {
+      return existingDeviceId;
+    }
+  }
+
+  // 生成新的设备ID
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  const userAgent = typeof window !== 'undefined' ? navigator.userAgent : 'unknown';
+  const userAgentHash = simpleHash(userAgent);
+  
+  const deviceId = `device_${userAgentHash}_${timestamp}_${random}`;
+  
+  // 保存到localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('device_id', deviceId);
+      localStorage.setItem('device_created_at', new Date().toISOString());
+      console.log('🏷️ 生成新设备ID:', deviceId);
+    } catch (error) {
+      console.warn('无法保存设备ID到localStorage:', error);
+    }
+  }
+  
+  return deviceId;
+};
+
+// 简单哈希函数
+const simpleHash = (str: string): string => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 转为32位整数
+  }
+  return Math.abs(hash).toString(36).substring(0, 8);
+};
+
+// 获取设备信息
+const getDeviceInfo = () => {
+  if (typeof window === 'undefined') {
+    return {
+      deviceId: 'server_unknown',
+      userAgent: 'Server',
+      platform: 'Server',
+      deviceType: 'unknown'
+    };
+  }
+
+  const deviceId = generateDeviceId();
+  const userAgent = navigator.userAgent;
+  const platform = navigator.platform || 'Unknown';
+  
+  // 简单的设备类型检测
+  let deviceType = 'desktop';
+  if (/Mobile|Android|iPhone|iPad/.test(userAgent)) {
+    deviceType = 'mobile';
+  } else if (/Tablet|iPad/.test(userAgent)) {
+    deviceType = 'tablet';
+  }
+
+  return {
+    deviceId,
+    userAgent,
+    platform,
+    deviceType
+  };
+};
+
 // SSE事件类型
 export type SSEEventType = 
   | 'connected'
@@ -97,24 +171,47 @@ class SSEManager {
   private notificationCallbacks: Set<(notification: NotificationMessage) => void> = new Set();
   private recentEvents: Set<string> = new Set(); // 用于去重的最近事件集合
   private localOperations: Map<string, number> = new Map(); // 跟踪本地操作，时间戳作为值
+  
+  // 新增：设备和连接信息
+  private deviceInfo: ReturnType<typeof getDeviceInfo>;
+  private connectionId: string | null = null;
+  private serverDeviceId: string | null = null; // 服务器确认的设备ID
 
   constructor() {
     // 绑定方法上下文
     this.handleMessage = this.handleMessage.bind(this);
     this.handleError = this.handleError.bind(this);
     this.handleOpen = this.handleOpen.bind(this);
+    
+    // 初始化设备信息
+    this.deviceInfo = getDeviceInfo();
+    console.log('🏷️ SSE管理器设备信息:', this.deviceInfo);
   }
 
-  // 获取SSE连接URL - 直连模式
+  // 获取当前设备信息
+  getDeviceInfo() {
+    return this.deviceInfo;
+  }
+
+  // 获取连接信息
+  getConnectionInfo() {
+    return {
+      connectionId: this.connectionId,
+      deviceId: this.serverDeviceId || this.deviceInfo.deviceId,
+      isConnected: this.isConnected(),
+      reconnectAttempts: this.reconnectAttempts
+    };
+  }
+
+  // 获取SSE连接URL - 直连模式，支持设备ID
   private getSSEUrl(token: string): string {
-    // 优先使用完整URL配置
-    if (process.env.NEXT_PUBLIC_BACKEND_URL) {
-      const sseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/sse/connect?token=${encodeURIComponent(token)}`;
-      return sseUrl;
-    }
+    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.gei5.com';
+    const deviceId = this.deviceInfo.deviceId;
     
-    // 兜底使用生产服务器配置
-    const sseUrl = `https://api.gei5.com/api/sse/connect?token=${encodeURIComponent(token)}`;
+    // 构建包含设备ID的SSE URL
+    const sseUrl = `${baseUrl}/api/sse/connect?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+    console.log('🔗 SSE连接URL:', sseUrl.replace(token, token.substring(0, 20) + '...'));
+    
     return sseUrl;
   }
 
@@ -216,25 +313,48 @@ class SSEManager {
     try {
       const eventData: SSEEventData = JSON.parse(event.data);
 
+      // 处理连接确认消息，保存服务器返回的连接信息
+      if (eventType === 'connected') {
+        this.connectionId = eventData.data.connectionId || null;
+        this.serverDeviceId = eventData.data.deviceId || null;
+        console.log('🔗 SSE连接已确认:', {
+          connectionId: this.connectionId,
+          serverDeviceId: this.serverDeviceId,
+          clientDeviceId: this.deviceInfo.deviceId
+        });
+      }
+
+      // 处理心跳消息，更新连接信息
+      if (eventType === 'heartbeat') {
+        if (eventData.data.connectionId) {
+          this.connectionId = eventData.data.connectionId;
+        }
+        if (eventData.data.deviceId) {
+          this.serverDeviceId = eventData.data.deviceId;
+        }
+        // 心跳不需要进一步处理
+        return;
+      }
+
       // 生成事件唯一标识符用于去重（使用事件类型+时间戳+数据的关键字段）
       let eventId: string;
       if (eventType === 'project-status-changed') {
-        if (eventData.data.projectId) {
-          eventId = `${eventType}-${eventData.data.projectId}-${eventData.timestamp}`;
-        } else if (eventData.data.project?.id) {
-          eventId = `${eventType}-${eventData.data.project.id}-${eventData.timestamp}`;
-        } else {
-          eventId = `${eventType}-${eventData.timestamp}`;
-        }
+        const projectId = eventData.data.projectId || eventData.data.project?.id || 'unknown';
+        // 包含状态变更信息避免同一项目的不同状态变更被误判为重复
+        eventId = `${eventType}-${projectId}-${eventData.data.oldStatus}-${eventData.data.newStatus}-${eventData.timestamp}`;
       } else if (eventType === 'project-created' && eventData.data.project) {
         eventId = `${eventType}-${eventData.data.project.id}-${eventData.timestamp}`;
       } else if (eventType === 'project-deleted') {
         eventId = `${eventType}-${eventData.data.projectId}-${eventData.timestamp}`;
+      } else if (eventType === 'material-status-changed') {
+        const materialId = eventData.data.material?.id || eventData.data.materialId || 'unknown';
+        eventId = `${eventType}-${materialId}-${eventData.timestamp}`;
       } else {
         eventId = `${eventType}-${eventData.timestamp}`;
       }
       
       if (this.recentEvents.has(eventId)) {
+        console.log('⏭️ 跳过重复事件:', eventId);
         return;
       }
 
@@ -251,6 +371,7 @@ class SSEManager {
           try {
             callback(eventData.data);
           } catch (error) {
+            console.error('SSE事件监听器执行错误:', error);
           }
         });
       }
@@ -259,6 +380,7 @@ class SSEManager {
       this.handleEventNotification(eventType, eventData.data);
 
     } catch (error) {
+      console.error('处理SSE消息失败:', error, event.data);
     }
   }
 
@@ -546,18 +668,36 @@ class SSEManager {
     }
   }
 
-  // 记录本地操作，用于智能去重
-  markLocalOperation(eventType: SSEEventType, entityId: string | number): void {
-    const key = `${eventType}-${entityId}`;
-    this.localOperations.set(key, Date.now());
+  // 记录本地操作，用于智能去重 - 增强版本
+  markLocalOperation(eventType: SSEEventType, entityId: string | number, additionalInfo?: any): void {
+    const deviceId = this.serverDeviceId || this.deviceInfo.deviceId;
+    const connectionId = this.connectionId || 'unknown';
+    
+    // 创建更精确的操作标识
+    const operationKey = `${eventType}-${entityId}-${deviceId}`;
+    const operationInfo = {
+      timestamp: Date.now(),
+      deviceId,
+      connectionId,
+      eventType,
+      entityId,
+      ...additionalInfo
+    };
+    
+    this.localOperations.set(operationKey, operationInfo.timestamp);
+    
+    console.log('🏷️ 标记本地操作:', {
+      key: operationKey,
+      info: operationInfo
+    });
     
     // 5秒后清理记录
     setTimeout(() => {
-      this.localOperations.delete(key);
+      this.localOperations.delete(operationKey);
     }, 5000);
   }
 
-  // 检查是否为本地操作（避免重复通知）
+  // 检查是否为本地操作（避免重复通知） - 增强版本
   private isLocalOperation(eventType: SSEEventType, data: any): boolean {
     let entityId: string | number = 'unknown';
     
@@ -579,20 +719,38 @@ class SSEManager {
         return false;
     }
     
-    const key = `${eventType}-${entityId}`;
-    const localOpTime = this.localOperations.get(key);
+    const deviceId = this.serverDeviceId || this.deviceInfo.deviceId;
+    const operationKey = `${eventType}-${entityId}-${deviceId}`;
+    const localOpTime = this.localOperations.get(operationKey);
     
     if (localOpTime) {
       const timeDiff = Date.now() - localOpTime;
-      // 如果在3秒内有本地操作，则认为是本地操作触发的SSE事件
-      return timeDiff < 3000;
+      // 如果在5秒内有本地操作，则认为是本地操作触发的SSE事件
+      const isLocal = timeDiff < 5000;
+      
+      if (isLocal) {
+        console.log('⏭️ 检测到本地操作触发的事件:', {
+          operationKey,
+          timeDiff: `${timeDiff}ms`,
+          deviceId: deviceId
+        });
+      }
+      
+      return isLocal;
     }
     
     return false;
   }
 
-  // 处理连接错误
+  // 处理连接错误 - 增强版本
   private handleError(_event: Event) {
+    console.warn('🔴 SSE连接发生错误:', {
+      deviceId: this.serverDeviceId || this.deviceInfo.deviceId,
+      connectionId: this.connectionId,
+      reconnectAttempts: this.reconnectAttempts,
+      isManuallyDisconnected: this.isManuallyDisconnected
+    });
+
     // 如果是手动断开，不进行重连
     if (this.isManuallyDisconnected) {
       return;
@@ -600,20 +758,79 @@ class SSEManager {
 
     // 达到最大重连次数
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('🚫 SSE重连次数已达上限，停止重连:', {
+        maxAttempts: this.maxReconnectAttempts,
+        deviceId: this.serverDeviceId || this.deviceInfo.deviceId
+      });
+      
+      // 发送连接丢失通知
+      this.showNotification({
+        id: `connection-lost-${Date.now()}`,
+        type: 'error',
+        title: '连接已断开',
+        message: '实时同步连接已断开，请刷新页面重新连接',
+        timestamp: new Date().toISOString(),
+        duration: 0 // 不自动消失
+      });
+      
       return;
     }
 
     // 开始重连
     this.reconnectAttempts++;
-    const delay = this.reconnectInterval * this.reconnectAttempts;
+    const delay = Math.min(this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1), 30000); // 指数退避，最大30秒
+    
+    console.log('🔄 开始SSE重连:', {
+      attempt: this.reconnectAttempts,
+      maxAttempts: this.maxReconnectAttempts,
+      delay: `${delay}ms`,
+      deviceId: this.serverDeviceId || this.deviceInfo.deviceId
+    });
     
     this.reconnectTimer = setTimeout(() => {
       if (!this.isManuallyDisconnected && this.currentToken) {
-        this.connect(this.currentToken).catch(_error => {
-          // 重连失败，忽略错误
+        this.connect(this.currentToken).catch(error => {
+          console.error('🔴 SSE重连失败:', error);
         });
       }
     }, delay);
+  }
+
+  // 获取连接健康状态
+  getHealthStatus() {
+    const now = Date.now();
+    const isConnected = this.isConnected();
+    
+    return {
+      isConnected,
+      isHealthy: isConnected && this.reconnectAttempts === 0,
+      deviceId: this.serverDeviceId || this.deviceInfo.deviceId,
+      connectionId: this.connectionId,
+      reconnectAttempts: this.reconnectAttempts,
+      maxReconnectAttempts: this.maxReconnectAttempts,
+      connectionState: this.getConnectionState(),
+      lastReconnectTime: this.reconnectAttempts > 0 ? new Date().toISOString() : null
+    };
+  }
+
+  // 强制重连
+  forceReconnect(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.currentToken) {
+        reject(new Error('没有保存的令牌，无法重连'));
+        return;
+      }
+
+      console.log('🔄 用户强制重连SSE...');
+      this.disconnect();
+      this.reconnectAttempts = 0; // 重置重连次数
+      
+      setTimeout(() => {
+        this.connect(this.currentToken!)
+          .then(resolve)
+          .catch(reject);
+      }, 1000);
+    });
   }
 
   // 添加事件监听器
